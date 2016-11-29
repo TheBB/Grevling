@@ -37,14 +37,35 @@
 # written agreement between you and SINTEF ICT.
 
 from yaml import dump as yaml_dump
+from numpy import array, ones, savetxt
 
 
-FORMATS = ['yaml', 'py']
+FORMATS = ['yaml', 'py', 'txt']
 
 
 def yaml(data, types, fn):
     with open(fn, 'w') as f:
         yaml_dump(data, f, default_flow_style=False)
+
+
+def txt(data, types, fn):
+    keys, values, sh = [], [], []
+    # Parameters in first columns, repeated as needed
+    for d in data['parameters']:
+      keys.append(d['name'])
+      values.append(d['values'])
+      sh.append(len(values[-1]))
+    template = ones(sh)
+    for i in range(len(values)):
+      sh = len(keys)*[1]
+      sh[i] = -1
+      new = array(values[i]).reshape(*sh)*template
+      values[i] = new.flatten().tolist()
+    # Results in ensuing columns
+    for k, v in data['results'].items():
+      keys.append(k)
+      values.append(v)
+    savetxt(fn, array(values).T, header=' '.join(keys), comments='')
 
 
 def py(data, types, fn):
