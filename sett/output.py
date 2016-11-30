@@ -49,11 +49,13 @@ def yaml(data, types, fn):
 
 
 def txt(data, types, fn):
-    keys, values, sh = [], [], []
+    getfmt = lambda t: '%d' if t is int else '%.4e'
+    keys, values, fmt, sh = [], [], [], []
     # Parameters in first columns, repeated as needed
     for d in data['parameters']:
       keys.append(d['name'])
       values.append(d['values'])
+      fmt.append(getfmt(type(values[-1][0])))
       sh.append(len(values[-1]))
     template = ones(sh)
     for i in range(len(values)):
@@ -65,7 +67,8 @@ def txt(data, types, fn):
     for k, v in data['results'].items():
       keys.append(k)
       values.append(v)
-    savetxt(fn, array(values).T, header=' '.join(keys), comments='')
+      fmt.append(getfmt(eval(types[keys[-1]])))
+    savetxt(fn, array(values).T, fmt=' '.join(fmt), header=' '.join(keys), comments='')
 
 
 def py(data, types, fn):
