@@ -37,7 +37,7 @@
 # written agreement between you and SINTEF ICT.
 
 from yaml import dump as yaml_dump
-from numpy import array, ones, savetxt
+from numpy import array, tile
 
 
 FORMATS = ['yaml', 'py', 'txt']
@@ -49,26 +49,26 @@ def yaml(data, types, fn):
 
 
 def txt(data, types, fn):
-    getfmt = lambda t: '%d' if t is int else '%.4e'
-    keys, values, fmt, sh = [], [], [], []
+    keys, values, sh0 = [], [], []
     # Parameters in first columns, repeated as needed
     for d in data['parameters']:
       keys.append(d['name'])
       values.append(d['values'])
-      fmt.append(getfmt(type(values[-1][0])))
-      sh.append(len(values[-1]))
-    template = ones(sh)
+      sh0.append(len(values[-1]))
     for i in range(len(values)):
-      sh = len(keys)*[1]
+      sh, reps = len(keys)*[1], sh0+[]
       sh[i] = -1
-      new = array(values[i]).reshape(*sh)*template
+      reps[i] = 1
+      new = tile(array(values[i]).reshape(*sh), reps)
       values[i] = new.flatten().tolist()
     # Results in ensuing columns
     for k, v in data['results'].items():
       keys.append(k)
       values.append(v)
-      fmt.append(getfmt(eval(types[keys[-1]])))
-    savetxt(fn, array(values).T, fmt=' '.join(fmt), header=' '.join(keys), comments='')
+    with open(fn, 'w') as f:
+      f.write(' '.join(keys) + '\n')
+      for row in array(values, dtype=str).T.tolist():
+        f.write(' '.join(row) + '\n')
 
 
 def py(data, types, fn):
