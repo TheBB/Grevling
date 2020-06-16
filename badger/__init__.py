@@ -35,14 +35,13 @@ Scalar = lambda: yaml.Int() | yaml.Float()
 FileMappingValidator = lambda: yaml.Str() | yaml.Map({'source': yaml.Str(), 'target': yaml.Str()})
 
 CASE_SCHEMA = yaml.Map({
+    # Parameter and script validation happens separately
     yaml.Optional('parameters'): yaml.MapPattern(yaml.Str(), yaml.Any()),
     yaml.Optional('evaluate'): yaml.MapPattern(yaml.Str(), yaml.Str()),
     yaml.Optional('templates'): yaml.Seq(FileMappingValidator()),
     yaml.Optional('prefiles'): yaml.Seq(FileMappingValidator()),
     yaml.Optional('postfiles'): yaml.Seq(FileMappingValidator()),
-    yaml.Optional('script'): yaml.Seq(
-        yaml.Str(),
-    ),
+    yaml.Optional('script'): yaml.Seq(yaml.Any()),
     yaml.Optional('settings'): yaml.Map({
         yaml.Optional('logdir'): yaml.Str(),
     })
@@ -64,21 +63,37 @@ PARAM_SCHEMAS = [
     })
 ]
 
+COMMAND_SCHEMAS = [
+    yaml.Str(),
+    yaml.Seq(yaml.Str()),
+    yaml.Map({
+        'command': yaml.Str() | yaml.Seq(yaml.Str()),
+        yaml.Optional('name'): yaml.Str(),
+        yaml.Optional('capture_output'): yaml.Bool(),
+    })
+]
+
+
+def validate_multiple(node, schemas, name):
+    for schema in schemas:
+        try:
+            node.revalidate(schema)
+            break
+        except yaml.YAMLValidationError:
+            pass
+    else:
+        raise yaml.YAMLValidationError(
+            f"failed to find a valid schema for {name}",
+            "found invalid input", node._chunk
+        )
+
 
 def load_and_validate(text, path):
     casedata = yaml.parser.generic_load(text, schema=CASE_SCHEMA, label=path, allow_flow_style=True)
     for name, paramspec in casedata.get('parameters', {}).items():
-        for schema in PARAM_SCHEMAS:
-            try:
-                paramspec.revalidate(schema)
-                break
-            except yaml.YAMLValidationError:
-                pass
-        else:
-            raise yaml.YAMLValidationError(
-                f"failed to find a valid parameter specification for {name}",
-                "found invalid input", paramspec._chunk
-            )
+        validate_multiple(paramspec, PARAM_SCHEMAS, name)
+    for commandspec in casedata.get('script', []):
+        validate_multiple(commandspec, COMMAND_SCHEMAS, 'script command')
     return casedata.data
 
 

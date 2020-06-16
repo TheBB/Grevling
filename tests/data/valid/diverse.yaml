@@ -1,0 +1,40 @@
+parameters:
+  alpha: [1, 2]
+  bravo: [1.0, 2.0]
+  charlie: [3, 4.5]
+  delta:
+    type: uniform
+    interval: [0.0, 1.0]
+    num: 5
+  echo:
+    type: graded
+    interval: [0.0, 1.0]
+    num: 5
+    grading: 1.2
+  foxtrot: ['a', 'b', 'c']
+evaluate:
+  dblalpha: 2 * alpha
+  intasstring: 14
+  floatasstring: 14.0
+templates:
+  - somefile
+  - source: from
+    target: to
+prefiles:
+  - source: a
+    target: b
+postfiles:
+  - source: c
+    target: d
+script:
+  - string command here
+  - [list, command, here]
+  - /usr/bin/nontrivial-name with args
+  - [/usr/bin/nontrivial-name, with, args, as, list]
+  - name: somecommand
+    command: run this thing
+    capture_output: yes
+  - command: /some/nontrivial-stuff
+    capture_output: no
+settings:
+  logdir: loop-de-loop
