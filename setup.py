@@ -10,6 +10,8 @@ setup(
     author_email='eivind.fonn@sintef.no',
     license='AGPL3',
     url='https://github.com/TheBB/Badger',
-    packages=['sett'],
-    scripts=['badger'],
+    packages=['badger'],
+    entry_points={
+        'console_scripts': ['badger=badger.__main__:main'],
+    },
 )
