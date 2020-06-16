@@ -4,7 +4,8 @@ import sys
 
 import click
 import treelog as log
-import strictyaml as yaml
+from strictyaml import YAMLValidationError
+from ruamel.yaml.parser import ParserError as YAMLParserError
 
 import badger
 
@@ -26,7 +27,7 @@ class Case(click.Path):
             raise click.FileError(str(casefile), hint='is not a file')
         try:
             return badger.Case(path)
-        except yaml.YAMLValidationError as error:
+        except (YAMLValidationError, YAMLParserError) as error:
             raise CustomClickException(str(error))
 
 
