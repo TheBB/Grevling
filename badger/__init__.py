@@ -1,3 +1,4 @@
+from functools import reduce
 import inspect
 from itertools import product
 from pathlib import Path
@@ -8,6 +9,7 @@ import subprocess
 import re
 
 import numpy as np
+import numpy.ma as ma
 from simpleeval import SimpleEval
 import strictyaml as yaml
 from ruamel.yaml.error import MarkedYAMLError
@@ -32,11 +34,12 @@ class Literal(yaml.ScalarValidator):
         return chunk.contents
 
 
+Choice = lambda *args: reduce(lambda x,y: x|y, map(Literal, args))
 Scalar = lambda: yaml.Int() | yaml.Float()
 FileMappingValidator = lambda: yaml.Str() | yaml.Map({'source': yaml.Str(), 'target': yaml.Str()})
 RegexValidator = lambda: yaml.Map({
     'pattern': yaml.Str(),
-    yaml.Optional('mode'): Literal('first') | Literal('last') | Literal('all'),
+    yaml.Optional('mode'): Choice('first', 'last', 'all'),
 })
 
 CASE_SCHEMA = yaml.Map({
@@ -49,7 +52,11 @@ CASE_SCHEMA = yaml.Map({
     yaml.Optional('script'): yaml.Seq(yaml.Any()),
     yaml.Optional('settings'): yaml.Map({
         yaml.Optional('logdir'): yaml.Str(),
-    })
+    }),
+    yaml.Optional('types'): yaml.MapPattern(
+        yaml.Str(),
+        Choice('int', 'integer', 'str', 'string', 'float', 'floating', 'double'),
+    ),
 })
 
 PARAM_SCHEMAS = [
@@ -78,6 +85,22 @@ COMMAND_SCHEMAS = [
         yaml.Optional('capture'): yaml.Str() | RegexValidator() | yaml.Seq(yaml.Str() | RegexValidator()),
     })
 ]
+
+TYPES = {
+    'int': int,
+    'integer': int,
+    'str': str,
+    'string': str,
+    'float': float,
+    'floating': float,
+    'double': float,
+}
+
+
+def _numpy_dtype(tp):
+    if tp in (int, float):
+        return tp
+    return object
 
 
 def validate_multiple(node, schemas, name):
@@ -191,6 +214,19 @@ class Capture:
         self._regex = re.compile(pattern)
         self._mode = mode
 
+    def find_in(self, collector, string):
+        matches = self._regex.finditer(string)
+        if self._mode == 'first':
+            matches = [next(matches)]
+        elif self._mode == 'last':
+            for match in matches:
+                pass
+            matches = [match]
+
+        for match in matches:
+            for name, value in match.groupdict().items():
+                collector.collect(name, value)
+
 
 class Command:
 
@@ -216,7 +252,7 @@ class Command:
         elif isinstance(capture, list):
             self._capture.extend(Capture.load(c) for c in capture)
 
-    def run(self, context, workpath, logdir):
+    def run(self, collector, context, workpath, logdir):
         kwargs = {
             'cwd': workpath,
             'capture_output': True,
@@ -245,7 +281,21 @@ class Command:
                 log.error(f"stderr stored in {stderr_path}")
             return False
 
+        stdout = result.stdout.decode()
+        for capture in self._capture:
+            capture.find_in(collector, stdout)
+
         return True
+
+
+class ResultCollector(dict):
+
+    def __init__(self, types):
+        super().__init__()
+        self._types = types
+
+    def collect(self, name, value):
+        self[name] = self._types[name](value)
 
 
 class Case:
@@ -281,9 +331,34 @@ class Case:
         # Read commands
         self._commands = [Command.load(spec) for spec in casedata.get('script', [])]
 
+        # Read types
+        self._types = {key: TYPES[value] for key, value in casedata.get('types', {}).items()}
+        self._dtype = [(key, _numpy_dtype(tp)) for key, tp in self._types.items()]
+
         # Read settings
         settings = casedata.get('settings', {})
         self._logdir = settings.get('logdir', None)
+
+    def clear_cache(self):
+        shutil.rmtree(self.storagepath)
+        self.storagepath.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def shape(self):
+        return tuple(map(len, self._parameters.values()))
+
+    def result_array(self):
+        path = self.storagepath / 'results.npy'
+        if path.is_file():
+            return np.load(path, allow_pickle=True)
+        else:
+            return ma.array(
+                np.zeros(self.shape, dtype=self._dtype),
+                mask=np.ones(self.shape, dtype=bool)
+            )
+
+    def commit_result(self, array):
+        np.save(self.storagepath / 'results.npy', array, allow_pickle=True)
 
     def check(self):
         if self._logdir is None:
@@ -297,20 +372,30 @@ class Case:
         self.check()
 
         parameters = list(self.parameters())
-        nsuccess = 0
-        for namespace in log.iter.fraction('parameter', parameters):
-            nsuccess += self.run_single(namespace)
+        results = self.result_array()
 
+        nsuccess = 0
+        for index, namespace in enumerate(log.iter.fraction('parameter', parameters)):
+            collector = self.run_single(index, namespace)
+            if collector is None:
+                continue
+            nsuccess += 1
+            for key, value in collector.items():
+                results.flat[index][key] = value
+
+        self.commit_result(results)
         logger = log.info if nsuccess == len(parameters) else log.warning
         logger(f"{nsuccess} of {len(parameters)} succeeded")
 
-    def run_single(self, namespace):
+    def run_single(self, index, namespace):
         # Handle all evaluables
         evaluator = SimpleEval()
         evaluator.names.update(namespace)
         for name, code in self._evaluables.items():
             result = evaluator.eval(code) if isinstance(code, str) else code
             evaluator.names[name] = namespace[name] = result
+
+        collector = ResultCollector(self._types)
 
         with TemporaryDirectory() as workpath:
             workpath = Path(workpath)
@@ -324,7 +409,7 @@ class Case:
             for filemap in self._pre_files:
                 filemap.copy(namespace, self.sourcepath, workpath)
             for command in self._commands:
-                if not command.run(namespace, workpath, logdir):
+                if not command.run(collector, namespace, workpath, logdir):
                     return False
 
-        return True
+        return collector
