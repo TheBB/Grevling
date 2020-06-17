@@ -210,7 +210,7 @@ class Command:
         else:
             command = [render(arg, context) for arg in self.command]
 
-        result = subprocess.run(self.command, **kwargs)
+        result = subprocess.run(command, **kwargs)
 
         if logdir and (result.returncode or self.capture_output):
             stdout_path = logdir / f'{self.name}.stdout'
