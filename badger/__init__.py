@@ -1,12 +1,14 @@
+from contextlib import contextmanager
 from functools import reduce
 import inspect
 from itertools import product
 from pathlib import Path
-from tempfile import TemporaryDirectory
+import re
 import shlex
 import shutil
 import subprocess
-import re
+from tempfile import TemporaryDirectory
+from time import time as osclock
 
 import numpy as np
 import numpy.ma as ma
@@ -81,8 +83,9 @@ COMMAND_SCHEMAS = [
     yaml.Map({
         'command': yaml.Str() | yaml.Seq(yaml.Str()),
         yaml.Optional('name'): yaml.Str(),
-        yaml.Optional('capture-output'): yaml.Bool(),
         yaml.Optional('capture'): yaml.Str() | RegexValidator() | yaml.Seq(yaml.Str() | RegexValidator()),
+        yaml.Optional('capture-output'): yaml.Bool(),
+        yaml.Optional('capture-walltime'): yaml.Bool(),
     })
 ]
 
@@ -97,10 +100,26 @@ TYPES = {
 }
 
 
+@contextmanager
+def time():
+    start = osclock()
+    yield lambda: end - start
+    end = osclock()
+
+
 def _numpy_dtype(tp):
     if tp in (int, float):
         return tp
     return object
+
+
+def _guess_eltype(collection):
+    if all(isinstance(v, str) for v in collection):
+        return str
+    if all(isinstance(v, int) for v in collection):
+        return int
+    assert all(isinstance(v, (int, float)) for v in collection)
+    return float
 
 
 def validate_multiple(node, schemas, name):
@@ -236,9 +255,10 @@ class Command:
             return cls(spec)
         return call_yaml(cls, spec)
 
-    def __init__(self, command, name=None, capture=None, capture_output=False):
+    def __init__(self, command, name=None, capture=None, capture_output=False, capture_walltime=False):
         self._command = command
         self._capture_output = capture_output
+        self._capture_walltime = capture_walltime
 
         if name is None:
             exe = shlex.split(command)[0] if isinstance(command, str) else command[0]
@@ -252,6 +272,10 @@ class Command:
         elif isinstance(capture, list):
             self._capture.extend(Capture.load(c) for c in capture)
 
+    def add_types(self, types):
+        if self._capture_walltime:
+            types[self.name] = float
+
     def run(self, collector, context, workpath, logdir):
         kwargs = {
             'cwd': workpath,
@@ -264,7 +288,9 @@ class Command:
         else:
             command = [render(arg, context) for arg in self._command]
 
-        result = subprocess.run(command, **kwargs)
+        with time() as duration:
+            result = subprocess.run(command, **kwargs)
+        duration = duration()
 
         if logdir and (result.returncode or self._capture_output):
             stdout_path = logdir / f'{self.name}.stdout'
@@ -284,6 +310,8 @@ class Command:
         stdout = result.stdout.decode()
         for capture in self._capture:
             capture.find_in(collector, stdout)
+        if self._capture_walltime:
+            collector.collect(self.name, duration)
 
         return True
 
@@ -333,6 +361,27 @@ class Case:
 
         # Read types
         self._types = {key: TYPES[value] for key, value in casedata.get('types', {}).items()}
+
+        # Guess types of parameters
+        for name, param in self._parameters.items():
+            if name not in self._types:
+                self._types[name] = _guess_eltype(param)
+
+        # Guess types of evaluables
+        if any(name not in self._types for name in self._evaluables):
+            contexts = list(self.parameters())
+            for ctx in contexts:
+                self.evaluate_context(ctx)
+            for name in self._evaluables:
+                if name not in self._types:
+                    values = [ctx[name] for ctx in contexts]
+                    self._types[name] = _guess_eltype(values)
+
+        # Fill in types derived from commands
+        for cmd in self._commands:
+            cmd.add_types(self._types)
+
+        # Construct numpy dtype of result array
         self._dtype = [(key, _numpy_dtype(tp)) for key, tp in self._types.items()]
 
         # Read settings
@@ -342,6 +391,13 @@ class Case:
     def clear_cache(self):
         shutil.rmtree(self.storagepath)
         self.storagepath.mkdir(parents=True, exist_ok=True)
+
+    def evaluate_context(self, context):
+        evaluator = SimpleEval()
+        evaluator.names.update(context)
+        for name, code in self._evaluables.items():
+            result = evaluator.eval(code) if isinstance(code, str) else code
+            evaluator.names[name] = context[name] = result
 
     @property
     def shape(self):
@@ -388,14 +444,11 @@ class Case:
         logger(f"{nsuccess} of {len(parameters)} succeeded")
 
     def run_single(self, index, namespace):
-        # Handle all evaluables
-        evaluator = SimpleEval()
-        evaluator.names.update(namespace)
-        for name, code in self._evaluables.items():
-            result = evaluator.eval(code) if isinstance(code, str) else code
-            evaluator.names[name] = namespace[name] = result
+        self.evaluate_context(namespace)
 
         collector = ResultCollector(self._types)
+        for key, value in namespace.items():
+            collector.collect(key, value)
 
         with TemporaryDirectory() as workpath:
             workpath = Path(workpath)
