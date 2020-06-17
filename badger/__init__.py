@@ -91,9 +91,9 @@ def validate_multiple(node, schemas, name):
 def load_and_validate(text, path):
     casedata = yaml.parser.generic_load(text, schema=CASE_SCHEMA, label=path, allow_flow_style=True)
     for name, paramspec in casedata.get('parameters', {}).items():
-        validate_multiple(paramspec, PARAM_SCHEMAS, name)
+        validate_multiple(paramspec, PARAM_SCHEMAS, f"parameter {name}")
     for commandspec in casedata.get('script', []):
-        validate_multiple(commandspec, COMMAND_SCHEMAS, 'script command')
+        validate_multiple(commandspec, COMMAND_SCHEMAS, "script command")
     return casedata.data
 
 
