@@ -34,7 +34,15 @@ script:
   - name: somecommand
     command: run this thing
     capture-output: yes
+    capture: oneregex
   - command: /some/nontrivial-stuff
     capture-output: no
+    capture:
+      - pattern: multiregex
+        mode: all
+      - pattern: firstregex
+        mode: first
+      - pattern: lastregex
+        mode: last
 settings:
   logdir: loop-de-loop

@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 import shlex
 import shutil
 import subprocess
+import re
 
 import numpy as np
 from simpleeval import SimpleEval
@@ -33,6 +34,10 @@ class Literal(yaml.ScalarValidator):
 
 Scalar = lambda: yaml.Int() | yaml.Float()
 FileMappingValidator = lambda: yaml.Str() | yaml.Map({'source': yaml.Str(), 'target': yaml.Str()})
+RegexValidator = lambda: yaml.Map({
+    'pattern': yaml.Str(),
+    yaml.Optional('mode'): Literal('first') | Literal('last') | Literal('all'),
+})
 
 CASE_SCHEMA = yaml.Map({
     # Parameter and script validation happens separately
@@ -70,6 +75,7 @@ COMMAND_SCHEMAS = [
         'command': yaml.Str() | yaml.Seq(yaml.Str()),
         yaml.Optional('name'): yaml.Str(),
         yaml.Optional('capture-output'): yaml.Bool(),
+        yaml.Optional('capture'): yaml.Str() | RegexValidator() | yaml.Seq(yaml.Str() | RegexValidator()),
     })
 ]
 
@@ -98,14 +104,9 @@ def load_and_validate(text, path):
 
 
 def call_yaml(func, mapping, *args, **kwargs):
-    if not isinstance(mapping, dict):
-        raise CaseFileError("expected mapping", mapping)
     signature = inspect.signature(func)
     mapping = {key.replace('-', '_'): value for key, value in mapping.items()}
-    try:
-        binding = signature.bind(*args, **kwargs, **mapping)
-    except TypeError as e:
-        raise CaseFileError(str(e), mapping)
+    binding = signature.bind(*args, **kwargs, **mapping)
     return func(*binding.args, **binding.kwargs)
 
 
@@ -158,9 +159,7 @@ class FileMapping:
     def load(cls, spec, **kwargs):
         if isinstance(spec, str):
             return cls(spec, spec, **kwargs)
-        if isinstance(spec, dict):
-            return call_yaml(cls, spec, **kwargs)
-        raise CaseFileError("expected string or mapping", spec)
+        return call_yaml(cls, spec, **kwargs)
 
     def __init__(self, source, target, template=False):
         self.source = source
@@ -180,6 +179,19 @@ class FileMapping:
             f.write(render(text, context))
 
 
+class Capture:
+
+    @classmethod
+    def load(cls, spec):
+        if isinstance(spec, str):
+            return cls(spec)
+        return call_yaml(cls, spec)
+
+    def __init__(self, pattern, mode='last'):
+        self._regex = re.compile(pattern)
+        self._mode = mode
+
+
 class Command:
 
     @classmethod
@@ -188,9 +200,9 @@ class Command:
             return cls(spec)
         return call_yaml(cls, spec)
 
-    def __init__(self, command, name=None, capture_output=False):
-        self.command = command
-        self.capture_output = capture_output
+    def __init__(self, command, name=None, capture=None, capture_output=False):
+        self._command = command
+        self._capture_output = capture_output
 
         if name is None:
             exe = shlex.split(command)[0] if isinstance(command, str) else command[0]
@@ -198,21 +210,27 @@ class Command:
         else:
             self.name = name
 
+        self._capture = []
+        if isinstance(capture, (str, dict)):
+            self._capture.append(Capture.load(capture))
+        elif isinstance(capture, list):
+            self._capture.extend(Capture.load(c) for c in capture)
+
     def run(self, context, workpath, logdir):
         kwargs = {
             'cwd': workpath,
             'capture_output': True,
         }
 
-        if isinstance(self.command, str):
+        if isinstance(self._command, str):
             kwargs['shell'] = True
-            command = render(self.command, context, mode='shell')
+            command = render(self._command, context, mode='shell')
         else:
-            command = [render(arg, context) for arg in self.command]
+            command = [render(arg, context) for arg in self._command]
 
         result = subprocess.run(command, **kwargs)
 
-        if logdir and (result.returncode or self.capture_output):
+        if logdir and (result.returncode or self._capture_output):
             stdout_path = logdir / f'{self.name}.stdout'
             with open(stdout_path, 'wb') as f:
                 f.write(result.stdout)
