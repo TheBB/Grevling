@@ -33,8 +33,8 @@ script:
   - [/usr/bin/nontrivial-name, with, args, as, list]
   - name: somecommand
     command: run this thing
-    capture_output: yes
+    capture-output: yes
   - command: /some/nontrivial-stuff
-    capture_output: no
+    capture-output: no
 settings:
   logdir: loop-de-loop

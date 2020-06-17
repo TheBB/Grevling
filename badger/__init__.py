@@ -69,7 +69,7 @@ COMMAND_SCHEMAS = [
     yaml.Map({
         'command': yaml.Str() | yaml.Seq(yaml.Str()),
         yaml.Optional('name'): yaml.Str(),
-        yaml.Optional('capture_output'): yaml.Bool(),
+        yaml.Optional('capture-output'): yaml.Bool(),
     })
 ]
 
@@ -101,6 +101,7 @@ def call_yaml(func, mapping, *args, **kwargs):
     if not isinstance(mapping, dict):
         raise CaseFileError("expected mapping", mapping)
     signature = inspect.signature(func)
+    mapping = {key.replace('-', '_'): value for key, value in mapping.items()}
     try:
         binding = signature.bind(*args, **kwargs, **mapping)
     except TypeError as e:
