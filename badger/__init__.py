@@ -10,6 +10,7 @@ import subprocess
 from tempfile import TemporaryDirectory
 from time import time as osclock
 
+from fasteners import InterProcessLock
 import numpy as np
 import numpy.ma as ma
 from simpleeval import SimpleEval
@@ -403,6 +404,18 @@ class Case:
     def shape(self):
         return tuple(map(len, self._parameters.values()))
 
+    @contextmanager
+    def acquire_lock(self):
+        with InterProcessLock(self.storagepath / 'lockfile'):
+            yield
+
+    def commit_result(self, index, collector):
+        with self.acquire_lock():
+            results = self.result_array()
+            for key, value in collector.items():
+                results.flat[index][key] = value
+            np.save(self.storagepath / 'results.npy', results, allow_pickle=True)
+
     def result_array(self):
         path = self.storagepath / 'results.npy'
         if path.is_file():
@@ -412,9 +425,6 @@ class Case:
                 np.zeros(self.shape, dtype=self._dtype),
                 mask=np.ones(self.shape, dtype=bool)
             )
-
-    def commit_result(self, array):
-        np.save(self.storagepath / 'results.npy', array, allow_pickle=True)
 
     def check(self):
         if self._logdir is None:
@@ -432,14 +442,8 @@ class Case:
 
         nsuccess = 0
         for index, namespace in enumerate(log.iter.fraction('parameter', parameters)):
-            collector = self.run_single(index, namespace)
-            if collector is None:
-                continue
-            nsuccess += 1
-            for key, value in collector.items():
-                results.flat[index][key] = value
+            nsuccess += self.run_single(index, namespace)
 
-        self.commit_result(results)
         logger = log.info if nsuccess == len(parameters) else log.warning
         logger(f"{nsuccess} of {len(parameters)} succeeded")
 
@@ -465,4 +469,5 @@ class Case:
                 if not command.run(collector, namespace, workpath, logdir):
                     return False
 
-        return collector
+        self.commit_result(index, collector)
+        return True
