@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-from functools import reduce
 import inspect
 from itertools import product
 from pathlib import Path
@@ -14,81 +13,15 @@ from fasteners import InterProcessLock
 import numpy as np
 import numpy.ma as ma
 from simpleeval import SimpleEval
-import strictyaml as yaml
-from ruamel.yaml.error import MarkedYAMLError
 import treelog as log
 
-from badger.util import find_subclass
 from badger.render import render
+from badger.schema import load_and_validate
+from badger.util import find_subclass
 
 
 __version__ = '0.1.0'
 
-
-class Literal(yaml.ScalarValidator):
-
-    def __init__(self, expected):
-        super().__init__()
-        self._expected = expected
-
-    def validate_scalar(self, chunk):
-        if self._expected != chunk.contents:
-            chunk.expecting_but_found(f"when expecting {self._expected}", "found non-matching string")
-        return chunk.contents
-
-
-Choice = lambda *args: reduce(lambda x,y: x|y, map(Literal, args))
-Scalar = lambda: yaml.Int() | yaml.Float()
-FileMappingValidator = lambda: yaml.Str() | yaml.Map({'source': yaml.Str(), 'target': yaml.Str()})
-RegexValidator = lambda: yaml.Map({
-    'pattern': yaml.Str(),
-    yaml.Optional('mode'): Choice('first', 'last', 'all'),
-})
-
-CASE_SCHEMA = yaml.Map({
-    # Parameter and script validation happens separately
-    yaml.Optional('parameters'): yaml.MapPattern(yaml.Str(), yaml.Any()),
-    yaml.Optional('evaluate'): yaml.MapPattern(yaml.Str(), yaml.Str()),
-    yaml.Optional('templates'): yaml.Seq(FileMappingValidator()),
-    yaml.Optional('prefiles'): yaml.Seq(FileMappingValidator()),
-    yaml.Optional('postfiles'): yaml.Seq(FileMappingValidator()),
-    yaml.Optional('script'): yaml.Seq(yaml.Any()),
-    yaml.Optional('settings'): yaml.Map({
-        yaml.Optional('logdir'): yaml.Str(),
-    }),
-    yaml.Optional('types'): yaml.MapPattern(
-        yaml.Str(),
-        Choice('int', 'integer', 'str', 'string', 'float', 'floating', 'double'),
-    ),
-})
-
-PARAM_SCHEMAS = [
-    yaml.Seq(Scalar()),
-    yaml.Seq(yaml.Str()),
-    yaml.Map({
-        'type': Literal('uniform'),
-        'interval': yaml.FixedSeq([Scalar(), Scalar()]),
-        'num': yaml.Int(),
-    }),
-    yaml.Map({
-        'type': Literal('graded'),
-        'interval': yaml.FixedSeq([Scalar(), Scalar()]),
-        'num': yaml.Int(),
-        'grading': Scalar(),
-    })
-]
-
-COMMAND_SCHEMAS = [
-    yaml.Str(),
-    yaml.Seq(yaml.Str()),
-    yaml.Map({
-        'command': yaml.Str() | yaml.Seq(yaml.Str()),
-        yaml.Optional('name'): yaml.Str(),
-        yaml.Optional('capture'): yaml.Str() | RegexValidator() | yaml.Seq(yaml.Str() | RegexValidator()),
-        yaml.Optional('capture-output'): yaml.Bool(),
-        yaml.Optional('capture-walltime'): yaml.Bool(),
-    })
-]
 
 TYPES = {
     'int': int,
@@ -121,29 +54,6 @@ def _guess_eltype(collection):
         return int
     assert all(isinstance(v, (int, float)) for v in collection)
     return float
-
-
-def validate_multiple(node, schemas, name):
-    for schema in schemas:
-        try:
-            node.revalidate(schema)
-            break
-        except yaml.YAMLValidationError:
-            pass
-    else:
-        raise yaml.YAMLValidationError(
-            f"failed to find a valid schema for {name}",
-            "found invalid input", node._chunk
-        )
-
-
-def load_and_validate(text, path):
-    casedata = yaml.parser.generic_load(text, schema=CASE_SCHEMA, label=path, allow_flow_style=True)
-    for name, paramspec in casedata.get('parameters', {}).items():
-        validate_multiple(paramspec, PARAM_SCHEMAS, f"parameter {name}")
-    for commandspec in casedata.get('script', []):
-        validate_multiple(commandspec, COMMAND_SCHEMAS, "script command")
-    return casedata.data
 
 
 def call_yaml(func, mapping, *args, **kwargs):
