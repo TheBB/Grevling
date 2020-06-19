@@ -1,12 +1,14 @@
 from functools import reduce
 
-import strictyaml as yaml
 from strictyaml import (
-    ScalarValidator, Optional, Any, Bool, Int, Float, Str, Map, MapPattern, Seq, FixedSeq
+    ScalarValidator, Optional, Any, Bool, Int, Float, Str, Map,
+    MapPattern, Seq, FixedSeq, Validator, OrValidator, YAMLValidationError
 )
 
+from strictyaml.parser import generic_load
 
-class Literal(yaml.ScalarValidator):
+
+class Literal(ScalarValidator):
     """Validator that only matches a literal string."""
 
     def __init__(self, expected):
@@ -21,8 +23,7 @@ class Literal(yaml.ScalarValidator):
 
 def Choice(*args):
     """Validator that matches a choice of several literal strings."""
-    either = lambda x, y: x | y
-    return reduce(either, map(Literal, args))
+    return reduce(OrValidator, map(Literal, args))
 
 
 def Scalar():
@@ -50,13 +51,67 @@ def Regex():
     })
 
 
-CASE_SCHEMA = yaml.Map({
-    Optional('parameters'): MapPattern(Str(), Any()),
+class First(Validator):
+    """Validator that validates against a sequence of sub-validators,
+    picking the first that matches.
+    """
+
+    def __init__(self, name, *validators):
+        self._name = name
+        self._validators = validators
+
+    def __call__(self, chunk):
+        for validator in self._validators:
+            try:
+                result = validator(chunk)
+                result._selected_validator = validator
+                result._validator = self
+                return result
+            except YAMLValidationError:
+                pass
+        else:
+            raise YAMLValidationError(
+                f"failed to find a valid schema for {self._name}",
+                "found invalid input", chunk
+            )
+
+
+CASE_SCHEMA = Map({
+    Optional('parameters'): MapPattern(
+        Str(),
+        First(
+            "parameter",
+            Seq(Scalar()),
+            Seq(Str()),
+            Map({
+                'type': Literal('uniform'),
+                'interval': FixedSeq([Scalar(), Scalar()]),
+                'num': Int(),
+            }),
+            Map({
+                'type': Literal('graded'),
+                'interval': FixedSeq([Scalar(), Scalar()]),
+                'num': Int(),
+                'grading': Scalar(),
+            })
+        ),
+    ),
     Optional('evaluate'): MapPattern(Str(), Str()),
     Optional('templates'): Seq(FileMapping()),
     Optional('prefiles'): Seq(FileMapping()),
     Optional('postfiles'): Seq(FileMapping()),
-    Optional('script'): Seq(Any()),
+    Optional('script'): Seq(First(
+        "script command",
+        Str(),
+        Seq(Str()),
+        Map({
+            'command': Str() | Seq(Str()),
+            Optional('name'): Str(),
+            Optional('capture'): Str() | Regex() | Seq(Str() | Regex()),
+            Optional('capture-output'): Bool(),
+            Optional('capture-walltime'): Bool(),
+        }),
+    )),
     Optional('settings'): Map({
         Optional('logdir'): Str(),
     }),
@@ -66,53 +121,7 @@ CASE_SCHEMA = yaml.Map({
     ),
 })
 
-PARAM_SCHEMAS = [
-    Seq(Scalar()),
-    Seq(yaml.Str()),
-    Map({
-        'type': Literal('uniform'),
-        'interval': FixedSeq([Scalar(), Scalar()]),
-        'num': Int(),
-    }),
-    Map({
-        'type': Literal('graded'),
-        'interval': FixedSeq([Scalar(), Scalar()]),
-        'num': Int(),
-        'grading': Scalar(),
-    })
-]
-
-COMMAND_SCHEMAS = [
-    Str(),
-    Seq(Str()),
-    Map({
-        'command': Str() | Seq(yaml.Str()),
-        Optional('name'): Str(),
-        Optional('capture'): Str() | Regex() | Seq(Str() | Regex()),
-        Optional('capture-output'): Bool(),
-        Optional('capture-walltime'): Bool(),
-    })
-]
-
-
-def validate_multiple(node, schemas, name):
-    for schema in schemas:
-        try:
-            node.revalidate(schema)
-            break
-        except yaml.YAMLValidationError:
-            pass
-    else:
-        raise yaml.YAMLValidationError(
-            f"failed to find a valid schema for {name}",
-            "found invalid input", node._chunk
-        )
-
 
 def load_and_validate(text, path):
-    casedata = yaml.parser.generic_load(text, schema=CASE_SCHEMA, label=path, allow_flow_style=True)
-    for name, paramspec in casedata.get('parameters', {}).items():
-        validate_multiple(paramspec, PARAM_SCHEMAS, f"parameter {name}")
-    for commandspec in casedata.get('script', []):
-        validate_multiple(commandspec, COMMAND_SCHEMAS, "script command")
+    casedata = generic_load(text, schema=CASE_SCHEMA, label=path, allow_flow_style=True)
     return casedata.data
