@@ -23,17 +23,6 @@ from badger.util import find_subclass
 __version__ = '0.1.0'
 
 
-TYPES = {
-    'int': int,
-    'integer': int,
-    'str': str,
-    'string': str,
-    'float': float,
-    'floating': float,
-    'double': float,
-}
-
-
 @contextmanager
 def time():
     start = osclock()
@@ -271,7 +260,7 @@ class Case:
         self._commands = [Command.load(spec) for spec in casedata.get('script', [])]
 
         # Read types
-        self._types = {key: TYPES[value] for key, value in casedata.get('types', {}).items()}
+        self._types = {key: value for key, value in casedata.get('types', {}).items()}
 
         # Guess types of parameters
         for name, param in self._parameters.items():

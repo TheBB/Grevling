@@ -1,4 +1,5 @@
 from functools import reduce
+import re
 
 from strictyaml import (
     ScalarValidator, Optional, Any, Bool, Int, Float, Str, Map,
@@ -76,6 +77,23 @@ class First(Validator):
             )
 
 
+class Type(ScalarValidator):
+    """Validator that parses a type description."""
+
+    scalar_regex = re.compile('^(int|integer|str|string|float|floating|double)$')
+
+    scalar_map = {
+        'int': int, 'integer': int,
+        'str': str, 'string': str,
+        'float': float, 'floating': float, 'double': float,
+    }
+
+    def validate_scalar(self, chunk):
+        if self.scalar_regex.match(chunk.contents):
+            return self.scalar_map[chunk.contents]
+        chunk.expecting_but_found("when expecting a valid type description", "found invalid input")
+
+
 CASE_SCHEMA = Map({
     Optional('parameters'): MapPattern(
         Str(),
@@ -115,10 +133,7 @@ CASE_SCHEMA = Map({
     Optional('settings'): Map({
         Optional('logdir'): Str(),
     }),
-    Optional('types'): MapPattern(
-        Str(),
-        Choice('int', 'integer', 'str', 'string', 'float', 'floating', 'double'),
-    ),
+    Optional('types'): MapPattern(Str(), Type()),
 })
 
 
