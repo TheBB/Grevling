@@ -65,7 +65,7 @@ def build_initial_namespace(setup, parameters):
     for name, expr in setup.dependencies.items():
         try:
             namespace[name] = eval(expr, {}, namespace)
-        except (TypeError, SyntaxError):
+        except (TypeError, SyntaxError, NameError):
             namespace[name] = expr
     return namespace
 
