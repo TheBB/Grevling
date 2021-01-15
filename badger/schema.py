@@ -1,9 +1,12 @@
 from functools import reduce
+from pathlib import Path
 import re
+
+from typing import Tuple, Dict
 
 from strictyaml import (
     ScalarValidator, Optional, Any, Bool, Int, Float, Str, Map,
-    MapPattern, Seq, FixedSeq, Validator, OrValidator, YAMLValidationError
+    MapPattern, Seq, FixedSeq, Validator, OrValidator, YAMLValidationError,
 )
 
 from strictyaml.parser import generic_load
@@ -12,7 +15,9 @@ from strictyaml.parser import generic_load
 class Literal(ScalarValidator):
     """Validator that only matches a literal string."""
 
-    def __init__(self, expected):
+    _expected: str
+
+    def __init__(self, expected: str):
         super().__init__()
         self._expected = expected
 
@@ -57,7 +62,9 @@ class First(Validator):
     picking the first that matches.
     """
 
-    def __init__(self, name, *validators):
+    _validators: Tuple[Validator]
+
+    def __init__(self, name: str, *validators: Validator):
         self._name = name
         self._validators = validators
 
@@ -137,6 +144,6 @@ CASE_SCHEMA = Map({
 })
 
 
-def load_and_validate(text, path):
+def load_and_validate(text: str, path: Path) -> Dict:
     casedata = generic_load(text, schema=CASE_SCHEMA, label=path, allow_flow_style=True)
     return casedata.data

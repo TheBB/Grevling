@@ -9,6 +9,8 @@ import subprocess
 from tempfile import TemporaryDirectory
 from time import time as osclock
 
+from typing import Dict, List, Any
+
 from fasteners import InterProcessLock
 import numpy as np
 import numpy.ma as ma
@@ -33,6 +35,8 @@ def time():
 def _numpy_dtype(tp):
     if tp in (int, float):
         return tp
+    if isinstance(tp, dict):
+        return list(tp.items())
     return object
 
 
@@ -144,7 +148,7 @@ class Capture:
 
         for match in matches:
             for name, value in match.groupdict().items():
-                collector.collect(name, value)
+                collector.collect(name=name, value=value)
 
 
 class Command:
@@ -174,12 +178,13 @@ class Command:
 
     def add_types(self, types):
         if self._capture_walltime:
-            types[self.name] = float
+            types.setdefault('walltime', {})[self.name] = float
 
-    def run(self, collector, context, workpath, logdir):
+    def run(self, collector: 'ResultCollector', context: Dict, workpath: Path, logdir: Path) -> bool:
         kwargs = {
             'cwd': workpath,
             'capture_output': True,
+            'shell': False,
         }
 
         if isinstance(self._command, str):
@@ -211,7 +216,7 @@ class Command:
         for capture in self._capture:
             capture.find_in(collector, stdout)
         if self._capture_walltime:
-            collector.collect(self.name, duration)
+            collector.collect('walltime', name=self.name, value=duration)
 
         return True
 
@@ -222,11 +227,37 @@ class ResultCollector(dict):
         super().__init__()
         self._types = types
 
-    def collect(self, name, value):
-        self[name] = self._types[name](value)
+    def collect(self, *path: str, name: str, value: Any):
+        target = self
+        types = self._types
+        for component in path:
+            target = target.setdefault(component, {})
+            types = types[component]
+        target[name] = types[name](value)
+
+    def commit(self, array, index, data=None):
+        if data is None:
+            data = self
+        for key, value in data.items():
+            if isinstance(value, dict):
+                self.commit(array[key], index, data=value)
+            else:
+                array.flat[index][key] = value
+
 
 
 class Case:
+
+    yamlpath: Path
+    sourcepath: Path
+    storagepath: Path
+
+    _parameters: Dict[str, Parameter]
+    _evaluables: Dict[str, str]
+    _pre_files: List[FileMapping]
+    _post_files: List[FileMapping]
+    _commands: List[Command]
+    _types: Dict[str, type]
 
     def __init__(self, yamlpath, storagepath=None):
         if yamlpath.is_dir():
@@ -311,8 +342,7 @@ class Case:
     def commit_result(self, index, collector):
         with self.acquire_lock():
             results = self.result_array()
-            for key, value in collector.items():
-                results.flat[index][key] = value
+            collector.commit(results, index)
             np.save(self.storagepath / 'results.npy', results, allow_pickle=True)
 
     def result_array(self):
@@ -351,7 +381,7 @@ class Case:
 
         collector = ResultCollector(self._types)
         for key, value in namespace.items():
-            collector.collect(key, value)
+            collector.collect(name=key, value=value)
 
         with TemporaryDirectory() as workpath:
             workpath = Path(workpath)

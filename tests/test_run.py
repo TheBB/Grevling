@@ -20,7 +20,7 @@ def test_echo():
     assert data['bravo'].dtype == object
     assert data['c'].dtype == float
     assert data['charlie'].dtype == int
-    assert data['echo'].dtype == float
+    assert data['walltime']['echo'].dtype == float
     np.testing.assert_array_equal(data['a'], [[1, 1, 1], [2, 2, 2], [3, 3, 3]])
     np.testing.assert_array_equal(data['alpha'], [[1, 1, 1], [2, 2, 2], [3, 3, 3]])
     np.testing.assert_array_equal(data['b'], [['a', 'b', 'c'], ['a', 'b', 'c'], ['a', 'b', 'c']])
@@ -41,7 +41,7 @@ def test_cat():
     assert data['bravo'].dtype == object
     assert data['c'].dtype == float
     assert data['charlie'].dtype == int
-    assert data['cat'].dtype == float
+    assert data['walltime']['cat'].dtype == float
     np.testing.assert_array_equal(data['a'], [[1, 1, 1], [2, 2, 2], [3, 3, 3]])
     np.testing.assert_array_equal(data['alpha'], [[1, 1, 1], [2, 2, 2], [3, 3, 3]])
     np.testing.assert_array_equal(data['b'], [['a', 'b', 'c'], ['a', 'b', 'c'], ['a', 'b', 'c']])
