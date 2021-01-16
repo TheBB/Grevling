@@ -34,15 +34,18 @@ script:
   - name: somecommand
     command: run this thing
     capture-output: yes
-    capture: oneregex
+    capture: oneregex (?P<one>.*)
   - command: /some/nontrivial-stuff
     capture-output: no
     capture:
-      - pattern: multiregex
+      - pattern: multiregex (?P<multi>.*)
         mode: all
-      - pattern: firstregex
+      - pattern: firstregex (?P<first>.*)
         mode: first
-      - pattern: lastregex
+      - pattern: lastregex (?P<last>.*)
         mode: last
+types:
+  one: int
+  last: float
 settings:
   logdir: loop-de-loop

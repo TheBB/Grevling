@@ -144,6 +144,11 @@ class Capture:
         self._regex = re.compile(pattern)
         self._mode = mode
 
+    def add_types(self, types: NestedDict):
+        tp = object if self._mode == 'all' else str
+        for group in self._regex.groupindex.keys():
+            types.setdefault(group, tp)
+
     def find_in(self, collector, string):
         matches = self._regex.finditer(string)
         if self._mode == 'first':
@@ -186,6 +191,8 @@ class Command:
     def add_types(self, types: NestedDict):
         if self._capture_walltime:
             types[f'walltime/{self.name}'] = float
+        for cap in self._capture:
+            cap.add_types(types)
 
     def run(self, collector: 'ResultCollector', context: Dict, workpath: Path, logdir: Path) -> bool:
         kwargs = {

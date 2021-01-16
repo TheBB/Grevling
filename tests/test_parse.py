@@ -61,17 +61,32 @@ def test_parse():
     assert case._commands[4]._command == 'run this thing'
     assert case._commands[4].name == 'somecommand'
     assert case._commands[4]._capture_output == True
-    assert case._commands[4]._capture[0]._regex.pattern == 'oneregex'
+    assert case._commands[4]._capture[0]._regex.pattern == 'oneregex (?P<one>.*)'
     assert case._commands[4]._capture[0]._mode == 'last'
 
     assert case._commands[5]._command == '/some/nontrivial-stuff'
     assert case._commands[5].name == 'nontrivial-stuff'
     assert case._commands[5]._capture_output == False
-    assert case._commands[5]._capture[0]._regex.pattern == 'multiregex'
+    assert case._commands[5]._capture[0]._regex.pattern == 'multiregex (?P<multi>.*)'
     assert case._commands[5]._capture[0]._mode == 'all'
-    assert case._commands[5]._capture[1]._regex.pattern == 'firstregex'
+    assert case._commands[5]._capture[1]._regex.pattern == 'firstregex (?P<first>.*)'
     assert case._commands[5]._capture[1]._mode == 'first'
-    assert case._commands[5]._capture[2]._regex.pattern == 'lastregex'
+    assert case._commands[5]._capture[2]._regex.pattern == 'lastregex (?P<last>.*)'
     assert case._commands[5]._capture[2]._mode == 'last'
+
+    assert case._types == {
+        'alpha': int,
+        'bravo': float,
+        'charlie': float,
+        'delta': float,
+        'echo': float,
+        'foxtrot': str,
+        'dblalpha': int,
+        'intasstring': int,
+        'floatasstring': float,
+        'one': int,
+        'multi': object,
+        'last': float,
+    }
 
     assert case._logdir == 'loop-de-loop'
