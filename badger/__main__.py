@@ -20,7 +20,10 @@ class Case(click.Path):
 
     def convert(self, value, param, ctx):
         path = Path(super().convert(value, param, ctx))
-        casefile = path / 'badger.yaml'
+        if path.is_dir():
+            casefile = path / 'badger.yaml'
+        else:
+            casefile = path
         if not casefile.exists():
             raise click.FileError(str(casefile), hint='does not exist')
         if not casefile.is_file():
@@ -80,12 +83,12 @@ def main(ctx, verbosity, rich):
 
 
 @main.command()
-@click.argument('case', default='.', type=Case(file_okay=False))
+@click.argument('case', default='.', type=Case(file_okay=True, dir_okay=True))
 def check(case):
     case.check()
 
 
 @main.command()
-@click.argument('case', default='.', type=Case(file_okay=False))
+@click.argument('case', default='.', type=Case(file_okay=True, dir_okay=True))
 def run(case):
     case.run()

@@ -8,6 +8,11 @@ from badger import Case
 DATADIR = Path(__file__).parent / 'data'
 
 
+def read_file(path: Path) -> str:
+    with open(path, 'r') as f:
+        return f.read()
+
+
 def test_echo():
     case = Case(DATADIR / 'run' / 'echo.yaml')
     case.clear_cache()
@@ -48,3 +53,16 @@ def test_cat():
     np.testing.assert_array_equal(data['bravo'], [['a', 'b', 'c'], ['a', 'b', 'c'], ['a', 'b', 'c']])
     np.testing.assert_array_equal(data['c'], [[1, 1, 1], [3, 3, 3], [5, 5, 5]])
     np.testing.assert_array_equal(data['charlie'], [[1, 1, 1], [3, 3, 3], [5, 5, 5]])
+
+
+def test_files():
+    case = Case(DATADIR / 'run' / 'files.yaml')
+    case.clear_cache()
+    case.run()
+
+    for a in range(1,4):
+        for b in 'abc':
+            path = DATADIR / 'run' / '.badgerdata' / f'{a}-{b}'
+            assert read_file(path / 'template.txt') == f'a={a} b={b} c={2*a-1}\n'
+            assert read_file(path / 'other-template.txt') == f'a={a} b={b} c={2*a-1}\n'
+            assert read_file(path / 'non-template.txt') == 'a=${alpha} b=${bravo} c=${charlie}\n'

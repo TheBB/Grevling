@@ -6,6 +6,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 from tempfile import TemporaryDirectory
 from time import time as osclock
 
@@ -237,7 +238,6 @@ class ResultCollector(NestedDict):
         self[name] = self._types[name](value)
 
     def commit(self, array):
-        print(array)
         for key, value in self.items():
             subindex_set(array, key, value)
 
@@ -355,6 +355,9 @@ class Case:
     def check(self):
         if self._logdir is None:
             log.warning("Warning: logdir is not set; no stdout/stderr will be captured")
+            if self._post_files:
+                log.error("Error: logdir is not set; no files will be captured")
+                sys.exit(1)
 
     def parameters(self):
         for values in product(*(param for param in self._parameters.values())):
@@ -364,7 +367,6 @@ class Case:
         self.check()
 
         parameters = list(self.parameters())
-        results = self.result_array()
 
         nsuccess = 0
         for index, namespace in enumerate(log.iter.fraction('parameter', parameters)):
@@ -394,6 +396,9 @@ class Case:
             for command in self._commands:
                 if not command.run(collector, namespace, workpath, logdir):
                     return False
+            if logdir:
+                for filemap in self._post_files:
+                    filemap.copy(namespace, workpath, logdir)
 
         self.commit_result(index, collector)
         return True
