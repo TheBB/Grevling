@@ -20,6 +20,16 @@ def subindex_set(target, key, value):
     target[last] = value
 
 
+def completer(options):
+    matches = []
+    def complete(text, state):
+        if state == 0:
+            matches.clear()
+            matches.extend(c for c in options if c.startswith(text))
+        return matches[state] if state < len(matches) else None
+    return complete
+
+
 class NestedDict(dict):
 
     def __contains__(self, key: str):

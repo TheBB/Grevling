@@ -1,12 +1,14 @@
 from contextlib import contextmanager
+from difflib import Differ
 import inspect
 from itertools import product
 from pathlib import Path
+import pydoc
 import re
+import readline
 import shlex
 import shutil
 import subprocess
-import sys
 from tempfile import TemporaryDirectory
 from time import time as osclock
 
@@ -20,7 +22,7 @@ import treelog as log
 
 from badger.render import render
 from badger.schema import load_and_validate
-from badger.util import find_subclass, subindex_set, NestedDict
+from badger.util import find_subclass, subindex_set, completer, NestedDict
 
 
 __version__ = '0.1.0'
@@ -352,20 +354,70 @@ class Case:
                 mask=np.ones(self.shape, dtype=bool)
             )
 
-    def check(self):
+    def has_data(self):
+        array = self.result_array()
+        for k in array.dtype.fields.keys():
+            if array[k].count() > 0:
+                return True
+        return False
+
+    def check(self, interactive=True) -> bool:
         if self._logdir is None:
-            log.warning("Warning: logdir is not set; no stdout/stderr will be captured")
-            if self._post_files:
-                log.error("Error: logdir is not set; no files will be captured")
-                sys.exit(1)
+            if self._post_files or any(c._capture_output for c in self._commands):
+                log.error("Error: logdir must be set for capture of stdout, stderr or files")
+                return False
+
+        prev_file = self.storagepath / 'badger.yaml'
+        if prev_file.exists():
+            with open(self.yamlpath, 'r') as f:
+                new_lines = f.readlines()
+            with open(prev_file, 'r') as f:
+                old_lines = f.readlines()
+            diff = list(Differ().compare(old_lines, new_lines))
+            if not all(line.startswith('  ') for line in diff) and self.has_data():
+                decision = None
+                decisions = ['exit', 'diff', 'new-delete', 'new-keep', 'old']
+                if interactive:
+                    readline.set_completer(completer(decisions))
+                    readline.parse_and_bind('tab: complete')
+                    log.warning("Warning: Badgerfile has changed and data have already been stored")
+                    log.warning("Pick an option:")
+                    log.warning("  exit - quit badger and fix the problem manually")
+                    log.warning("  diff - view a diff between old and new")
+                    log.warning("  new-delete - accept new version and delete existing data (significant changes made)")
+                    log.warning("  new-keep - accept new version and keep existing data (no significant changes made)")
+                    log.warning("  old - accept old version and exit (re-run badger to load the changed badgerfile)")
+                    while decision is None:
+                        decision = input('>>> ').strip().lower()
+                        if decision not in decisions:
+                            decision = None
+                            continue
+                        if decision == 'diff':
+                            pydoc.pager(''.join(diff))
+                            decision = None
+                        if decision == 'exit':
+                            return False
+                        if decision == 'new-delete':
+                            self.clear_cache()
+                            break
+                        if decision == 'new-keep':
+                            break
+                        if decision == 'old':
+                            shutil.copyfile(prev_file, self.yamlpath)
+                            return False
+                else:
+                    log.error("Error: Badgerfile has changed and data have already been stored")
+                    log.error("Try running 'badger check' for more information, or delete .badgerdata if you're sure")
+                    return False
+
+        shutil.copyfile(self.yamlpath, prev_file)
+        return True
 
     def parameters(self):
         for values in product(*(param for param in self._parameters.values())):
             yield dict(zip(self._parameters, values))
 
     def run(self):
-        self.check()
-
         parameters = list(self.parameters())
 
         nsuccess = 0

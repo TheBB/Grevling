@@ -85,10 +85,12 @@ def main(ctx, verbosity, rich):
 @main.command()
 @click.argument('case', default='.', type=Case(file_okay=True, dir_okay=True))
 def check(case):
-    case.check()
+    case.check(interactive=True)
 
 
 @main.command()
 @click.argument('case', default='.', type=Case(file_okay=True, dir_okay=True))
 def run(case):
+    if not case.check(interactive=False):
+        sys.exit(1)
     case.run()
