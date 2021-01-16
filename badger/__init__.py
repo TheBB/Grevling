@@ -138,16 +138,31 @@ class Capture:
     def load(cls, spec):
         if isinstance(spec, str):
             return cls(spec)
+        if spec.get('type') in ('integer', 'float'):
+            pattern, tp = {
+                'integer': (r'[-+]?[0-9]+', int),
+                'float': (r'[-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?', float),
+            }[spec['type']]
+            pattern = re.escape(spec['prefix']) + r'\s*(?P<' + spec['name'] + '>' + pattern + ')'
+            mode = spec.get('mode', 'last')
+            type_overrides = {spec['name']: tp}
+            return cls(pattern, mode, type_overrides)
         return call_yaml(cls, spec)
 
-    def __init__(self, pattern, mode='last'):
+    def __init__(self, pattern, mode='last', type_overrides=None):
+        print(pattern)
         self._regex = re.compile(pattern)
         self._mode = mode
+        self._type_overrides = type_overrides or {}
 
     def add_types(self, types: NestedDict):
-        tp = object if self._mode == 'all' else str
         for group in self._regex.groupindex.keys():
-            types.setdefault(group, tp)
+            if self._mode == 'all':
+                types[group] = object
+            elif group in self._type_overrides:
+                types[group] = self._type_overrides[group]
+            else:
+                types.setdefault(group, str)
 
     def find_in(self, collector, string):
         matches = self._regex.finditer(string)

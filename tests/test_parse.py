@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 import numpy as np
 
@@ -73,6 +74,10 @@ def test_parse():
     assert case._commands[5]._capture[1]._mode == 'first'
     assert case._commands[5]._capture[2]._regex.pattern == 'lastregex (?P<last>.*)'
     assert case._commands[5]._capture[2]._mode == 'last'
+    assert case._commands[5]._capture[3]._regex.pattern.startswith(re.escape('someint'))
+    assert case._commands[5]._capture[3]._mode == 'last'
+    assert case._commands[5]._capture[4]._regex.pattern.startswith(re.escape('here is a prefix'))
+    assert case._commands[5]._capture[4]._mode == 'all'
 
     assert case._types == {
         'alpha': int,
@@ -85,8 +90,11 @@ def test_parse():
         'intasstring': int,
         'floatasstring': float,
         'one': int,
+        'first': str,
         'multi': object,
         'last': float,
+        'someint': int,
+        'somefloat': object,
     }
 
     assert case._logdir == 'loop-de-loop'

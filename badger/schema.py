@@ -57,6 +57,26 @@ def Regex():
     })
 
 
+def NumberCapture():
+    """Validator that matches a predefined integer or float capture."""
+    return Map({
+        'type': Choice('integer', 'float'),
+        'name': Str(),
+        'prefix': Str(),
+        Optional('mode'): Choice('first', 'last', 'all'),
+    })
+
+
+def Capture():
+    """Validator that matches any of the valid capture specs."""
+    return First(
+        "capture",
+        Str(),
+        Regex(),
+        NumberCapture(),
+    )
+
+
 class First(Validator):
     """Validator that validates against a sequence of sub-validators,
     picking the first that matches.
@@ -132,7 +152,7 @@ CASE_SCHEMA = Map({
         Map({
             'command': Str() | Seq(Str()),
             Optional('name'): Str(),
-            Optional('capture'): Str() | Regex() | Seq(Str() | Regex()),
+            Optional('capture'): Capture() | Seq(Capture()),
             Optional('capture-output'): Bool(),
             Optional('capture-walltime'): Bool(),
         }),

@@ -44,6 +44,13 @@ script:
         mode: first
       - pattern: lastregex (?P<last>.*)
         mode: last
+      - type: integer
+        name: someint
+        prefix: someint
+      - type: float
+        name: somefloat
+        prefix: here is a prefix
+        mode: all
 types:
   one: int
   last: float
