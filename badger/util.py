@@ -25,7 +25,7 @@ def completer(options):
     def complete(text, state):
         if state == 0:
             matches.clear()
-            matches.extend(c for c in options if c.startswith(text))
+            matches.extend(c for c in options if c.startswith(text.lower()))
         return matches[state] if state < len(matches) else None
     return complete
 
