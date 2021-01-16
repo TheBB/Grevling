@@ -19,7 +19,7 @@ import treelog as log
 
 from badger.render import render
 from badger.schema import load_and_validate
-from badger.util import find_subclass
+from badger.util import find_subclass, subindex_set, NestedDict
 
 
 __version__ = '0.1.0'
@@ -101,8 +101,12 @@ class GradedParameter(Parameter):
 
 class FileMapping:
 
+    source: str
+    target: str
+    template: bool
+
     @classmethod
-    def load(cls, spec, **kwargs):
+    def load(cls, spec: dict, **kwargs):
         if isinstance(spec, str):
             return cls(spec, spec, **kwargs)
         return call_yaml(cls, spec, **kwargs)
@@ -148,7 +152,7 @@ class Capture:
 
         for match in matches:
             for name, value in match.groupdict().items():
-                collector.collect(name=name, value=value)
+                collector.collect(name, value)
 
 
 class Command:
@@ -176,9 +180,9 @@ class Command:
         elif isinstance(capture, list):
             self._capture.extend(Capture.load(c) for c in capture)
 
-    def add_types(self, types):
+    def add_types(self, types: NestedDict):
         if self._capture_walltime:
-            types.setdefault('walltime', {})[self.name] = float
+            types[f'walltime/{self.name}'] = float
 
     def run(self, collector: 'ResultCollector', context: Dict, workpath: Path, logdir: Path) -> bool:
         kwargs = {
@@ -216,34 +220,26 @@ class Command:
         for capture in self._capture:
             capture.find_in(collector, stdout)
         if self._capture_walltime:
-            collector.collect('walltime', name=self.name, value=duration)
+            collector.collect(f'walltime/{self.name}', duration)
 
         return True
 
 
-class ResultCollector(dict):
+class ResultCollector(NestedDict):
+
+    _types: NestedDict
 
     def __init__(self, types):
         super().__init__()
         self._types = types
 
-    def collect(self, *path: str, name: str, value: Any):
-        target = self
-        types = self._types
-        for component in path:
-            target = target.setdefault(component, {})
-            types = types[component]
-        target[name] = types[name](value)
+    def collect(self, name: str, value: Any):
+        self[name] = self._types[name](value)
 
-    def commit(self, array, index, data=None):
-        if data is None:
-            data = self
-        for key, value in data.items():
-            if isinstance(value, dict):
-                self.commit(array[key], index, data=value)
-            else:
-                array.flat[index][key] = value
-
+    def commit(self, array):
+        print(array)
+        for key, value in self.items():
+            subindex_set(array, key, value)
 
 
 class Case:
@@ -257,7 +253,7 @@ class Case:
     _pre_files: List[FileMapping]
     _post_files: List[FileMapping]
     _commands: List[Command]
-    _types: Dict[str, type]
+    _types: NestedDict
 
     def __init__(self, yamlpath, storagepath=None):
         if yamlpath.is_dir():
@@ -291,7 +287,7 @@ class Case:
         self._commands = [Command.load(spec) for spec in casedata.get('script', [])]
 
         # Read types
-        self._types = {key: value for key, value in casedata.get('types', {}).items()}
+        self._types = NestedDict(casedata.get('types', {}).items())
 
         # Guess types of parameters
         for name, param in self._parameters.items():
@@ -313,7 +309,7 @@ class Case:
             cmd.add_types(self._types)
 
         # Construct numpy dtype of result array
-        self._dtype = [(key, _numpy_dtype(tp)) for key, tp in self._types.items()]
+        self._dtype = self._types.map(_numpy_dtype).as_list_of_tuples()
 
         # Read settings
         settings = casedata.get('settings', {})
@@ -342,7 +338,8 @@ class Case:
     def commit_result(self, index, collector):
         with self.acquire_lock():
             results = self.result_array()
-            collector.commit(results, index)
+            results.mask.flat[index] = False
+            collector.commit(results.flat[index])
             np.save(self.storagepath / 'results.npy', results, allow_pickle=True)
 
     def result_array(self):
@@ -381,7 +378,7 @@ class Case:
 
         collector = ResultCollector(self._types)
         for key, value in namespace.items():
-            collector.collect(name=key, value=value)
+            collector.collect(key, value)
 
         with TemporaryDirectory() as workpath:
             workpath = Path(workpath)
