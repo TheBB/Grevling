@@ -387,7 +387,7 @@ class Case:
     def has_data(self):
         return has_data(self.result_array())
 
-    def _check_decide_diff(self, diff: List[str], interactive: bool = True) -> bool:
+    def _check_decide_diff(self, diff: List[str], prev_file: Path, interactive: bool = True) -> bool:
         decision = None
         decisions = ['exit', 'diff', 'new-delete', 'new-keep', 'old']
         if interactive:
@@ -438,7 +438,7 @@ class Case:
                 old_lines = f.readlines()
             diff = list(Differ().compare(old_lines, new_lines))
             if not all(line.startswith('  ') for line in diff) and self.has_data():
-                if not self._check_decide_diff(diff, interactive=interactive):
+                if not self._check_decide_diff(diff, prev_file, interactive=interactive):
                     return False
 
         shutil.copyfile(self.yamlpath, prev_file)
