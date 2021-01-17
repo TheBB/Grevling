@@ -1,3 +1,6 @@
+import numpy.ma as ma
+
+
 def subclasses(cls, root=False):
     if root:
         yield cls
@@ -18,6 +21,15 @@ def subindex_set(target, key, value):
     for p in path:
         target = target[p]
     target[last] = value
+
+
+def has_data(array: ma.MaskedArray) -> bool:
+    if array.dtype.fields is None:
+        return array.count() > 0
+    for k in array.dtype.fields.keys():
+        if has_data(array[k]):
+            return True
+    return False
 
 
 def completer(options):

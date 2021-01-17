@@ -23,7 +23,7 @@ from typing_inspect import get_origin, get_args
 
 from badger.render import render
 from badger.schema import load_and_validate
-from badger.util import find_subclass, subindex_set, completer, NestedDict
+from badger.util import find_subclass, subindex_set, has_data, completer, NestedDict
 
 
 __version__ = '0.1.0'
@@ -385,11 +385,7 @@ class Case:
             )
 
     def has_data(self):
-        array = self.result_array()
-        for k in array.dtype.fields.keys():
-            if array[k].count() > 0:
-                return True
-        return False
+        return has_data(self.result_array())
 
     def _check_decide_diff(self, diff: List[str], interactive: bool = True) -> bool:
         decision = None
