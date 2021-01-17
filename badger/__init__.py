@@ -19,6 +19,7 @@ import numpy as np
 import numpy.ma as ma
 from simpleeval import SimpleEval
 import treelog as log
+from typing_inspect import get_origin, get_args
 
 from badger.render import render
 from badger.schema import load_and_validate
@@ -38,9 +39,18 @@ def time():
 def _numpy_dtype(tp):
     if tp in (int, float):
         return tp
-    if isinstance(tp, dict):
+    if isinstance(tp, NestedDict):
         return list(tp.items())
     return object
+
+
+def _typename(tp) -> str:
+    try:
+        return {int: 'integer', str: 'string', float: 'float'}[tp]
+    except KeyError:
+        base = {list: 'list'}[get_origin(tp)]
+        subs = ', '.join(_typename(k) for k in get_args(tp))
+        return f'{base}[{subs}]'
 
 
 def _guess_eltype(collection):
@@ -150,19 +160,17 @@ class Capture:
         return call_yaml(cls, spec)
 
     def __init__(self, pattern, mode='last', type_overrides=None):
-        print(pattern)
         self._regex = re.compile(pattern)
         self._mode = mode
         self._type_overrides = type_overrides or {}
 
     def add_types(self, types: NestedDict):
         for group in self._regex.groupindex.keys():
+            single = self._type_overrides.get(group, str)
             if self._mode == 'all':
-                types[group] = object
-            elif group in self._type_overrides:
-                types[group] = self._type_overrides[group]
+                types.setdefault(group, List[single])
             else:
-                types.setdefault(group, str)
+                types.setdefault(group, single)
 
     def find_in(self, collector, string):
         matches = self._regex.finditer(string)
@@ -383,6 +391,43 @@ class Case:
                 return True
         return False
 
+    def _check_decide_diff(self, diff: List[str], interactive: bool = True) -> bool:
+        decision = None
+        decisions = ['exit', 'diff', 'new-delete', 'new-keep', 'old']
+        if interactive:
+            readline.set_completer(completer(decisions))
+            readline.parse_and_bind('tab: complete')
+            log.warning("Warning: Badgerfile has changed and data have already been stored")
+            log.warning("Pick an option:")
+            log.warning("  exit - quit badger and fix the problem manually")
+            log.warning("  diff - view a diff between old and new")
+            log.warning("  new-delete - accept new version and delete existing data (significant changes made)")
+            log.warning("  new-keep - accept new version and keep existing data (no significant changes made)")
+            log.warning("  old - accept old version and exit (re-run badger to load the changed badgerfile)")
+            while decision is None:
+                decision = input('>>> ').strip().lower()
+                if decision not in decisions:
+                    decision = None
+                    continue
+                if decision == 'diff':
+                    pydoc.pager(''.join(diff))
+                    decision = None
+                if decision == 'exit':
+                    return False
+                if decision == 'new-delete':
+                    self.clear_cache()
+                    break
+                if decision == 'new-keep':
+                    break
+                if decision == 'old':
+                    shutil.copyfile(prev_file, self.yamlpath)
+                    return False
+        else:
+            log.error("Error: Badgerfile has changed and data have already been stored")
+            log.error("Try running 'badger check' for more information, or delete .badgerdata if you're sure")
+            return False
+        return True
+
     def check(self, interactive=True) -> bool:
         if self._logdir is None:
             if self._post_files or any(c._capture_output for c in self._commands):
@@ -397,42 +442,16 @@ class Case:
                 old_lines = f.readlines()
             diff = list(Differ().compare(old_lines, new_lines))
             if not all(line.startswith('  ') for line in diff) and self.has_data():
-                decision = None
-                decisions = ['exit', 'diff', 'new-delete', 'new-keep', 'old']
-                if interactive:
-                    readline.set_completer(completer(decisions))
-                    readline.parse_and_bind('tab: complete')
-                    log.warning("Warning: Badgerfile has changed and data have already been stored")
-                    log.warning("Pick an option:")
-                    log.warning("  exit - quit badger and fix the problem manually")
-                    log.warning("  diff - view a diff between old and new")
-                    log.warning("  new-delete - accept new version and delete existing data (significant changes made)")
-                    log.warning("  new-keep - accept new version and keep existing data (no significant changes made)")
-                    log.warning("  old - accept old version and exit (re-run badger to load the changed badgerfile)")
-                    while decision is None:
-                        decision = input('>>> ').strip().lower()
-                        if decision not in decisions:
-                            decision = None
-                            continue
-                        if decision == 'diff':
-                            pydoc.pager(''.join(diff))
-                            decision = None
-                        if decision == 'exit':
-                            return False
-                        if decision == 'new-delete':
-                            self.clear_cache()
-                            break
-                        if decision == 'new-keep':
-                            break
-                        if decision == 'old':
-                            shutil.copyfile(prev_file, self.yamlpath)
-                            return False
-                else:
-                    log.error("Error: Badgerfile has changed and data have already been stored")
-                    log.error("Try running 'badger check' for more information, or delete .badgerdata if you're sure")
+                if not self._check_decide_diff(diff, interactive=interactive):
                     return False
 
         shutil.copyfile(self.yamlpath, prev_file)
+
+        if interactive:
+            log.info("Derived types:")
+            for key, value in self._types.items():
+                log.info(f"  {key}: {_typename(value)}")
+
         return True
 
     def parameters(self):

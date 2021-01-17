@@ -1,6 +1,8 @@
 from pathlib import Path
 import re
 
+from typing import List
+
 import numpy as np
 
 from badger import Case
@@ -91,10 +93,10 @@ def test_parse():
         'floatasstring': float,
         'one': int,
         'first': str,
-        'multi': object,
+        'multi': List[str],
         'last': float,
         'someint': int,
-        'somefloat': object,
+        'somefloat': List[float],
     }
 
     assert case._logdir == 'loop-de-loop'
