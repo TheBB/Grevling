@@ -149,8 +149,12 @@ class FileMapping:
                 path = path.relative_to(sourcepath)
                 yield (sourcepath / path, target / path)
 
-    def copy(self, context, sourcepath, targetpath):
+    def copy(self, context, sourcepath, targetpath, sourcename='SRC', targetname='TGT'):
         for source, target in self.iter_paths(context, sourcepath, targetpath):
+            logsrc = Path(sourcename) / source.relative_to(sourcepath)
+            logtgt = Path(targetname) / target.relative_to(targetpath)
+            log.debug(logsrc, '->', logtgt)
+
             target.parent.mkdir(parents=True, exist_ok=True)
             if not self.template:
                 shutil.copyfile(source, target)
@@ -249,24 +253,28 @@ class Command:
         else:
             command = [render(arg, context) for arg in self._command]
 
-        with time() as duration:
-            result = subprocess.run(command, **kwargs)
-        duration = duration()
+        with log.context(self.name):
+            log.debug(command if isinstance(command, str) else ' '.join(command))
+            with time() as duration:
+                result = subprocess.run(command, **kwargs)
+            duration = duration()
 
-        if logdir and (result.returncode or self._capture_output):
-            stdout_path = logdir / f'{self.name}.stdout'
-            with open(stdout_path, 'wb') as f:
-                f.write(result.stdout)
-            stderr_path = logdir / f'{self.name}.stderr'
-            with open(stderr_path, 'wb') as f:
-                f.write(result.stderr)
+            if logdir and (result.returncode or self._capture_output):
+                stdout_path = logdir / f'{self.name}.stdout'
+                with open(stdout_path, 'wb') as f:
+                    f.write(result.stdout)
+                stderr_path = logdir / f'{self.name}.stderr'
+                with open(stderr_path, 'wb') as f:
+                    f.write(result.stderr)
 
-        if result.returncode:
-            log.error(f"command {self.name} returned exit status {result.returncode}")
-            if logdir:
-                log.error(f"stdout stored in {stdout_path}")
-                log.error(f"stderr stored in {stderr_path}")
-            return False
+            if result.returncode:
+                log.error(f"Command returned exit status {result.returncode}")
+                if logdir:
+                    log.error(f"stdout stored in {stdout_path}")
+                    log.error(f"stderr stored in {stderr_path}")
+                return False
+            else:
+                log.info(f"Success ({duration:.3g}s)")
 
         stdout = result.stdout.decode()
         for capture in self._capture:
@@ -356,7 +364,7 @@ class Case:
         if any(name not in self._types for name in self._evaluables):
             contexts = list(self.parameters())
             for ctx in contexts:
-                self.evaluate_context(ctx)
+                self.evaluate_context(ctx, verbose=False)
             for name in self._evaluables:
                 if name not in self._types:
                     values = [ctx[name] for ctx in contexts]
@@ -377,11 +385,13 @@ class Case:
         shutil.rmtree(self.storagepath)
         self.storagepath.mkdir(parents=True, exist_ok=True)
 
-    def evaluate_context(self, context):
+    def evaluate_context(self, context, verbose=True):
         evaluator = SimpleEval()
         evaluator.names.update(context)
         for name, code in self._evaluables.items():
             result = evaluator.eval(code) if isinstance(code, str) else code
+            if verbose:
+                log.debug(f'Evaluated: {name} = {repr(result)}')
             evaluator.names[name] = context[name] = result
 
     @property
@@ -487,10 +497,11 @@ class Case:
         for index, namespace in enumerate(log.iter.fraction('parameter', parameters)):
             nsuccess += self.run_single(index, namespace)
 
-        logger = log.info if nsuccess == len(parameters) else log.warning
+        logger = log.user if nsuccess == len(parameters) else log.warning
         logger(f"{nsuccess} of {len(parameters)} succeeded")
 
     def run_single(self, index, namespace):
+        log.user(', '.join(f'{k}={repr(v)}' for k, v in namespace.items()))
         self.evaluate_context(namespace)
 
         collector = ResultCollector(self._types)
@@ -506,14 +517,16 @@ class Case:
             else:
                 logdir = None
 
+            log.debug(f"Using SRC='{self.sourcepath}', WRK='{workpath}', LOG='{logdir}'")
+
             for filemap in self._pre_files:
-                filemap.copy(namespace, self.sourcepath, workpath)
+                filemap.copy(namespace, self.sourcepath, workpath, sourcename='SRC', targetname='WRK')
             for command in self._commands:
                 if not command.run(collector, namespace, workpath, logdir):
                     return False
             if logdir:
                 for filemap in self._post_files:
-                    filemap.copy(namespace, workpath, logdir)
+                    filemap.copy(namespace, workpath, logdir, sourcename='WRK', targetname='LOG')
 
         self.commit_result(index, collector)
         return True
