@@ -14,7 +14,7 @@ def read_file(path: Path) -> str:
 
 
 def test_echo():
-    case = Case(DATADIR / 'run' / 'echo.yaml')
+    case = Case(DATADIR / 'run' / 'echo')
     case.clear_cache()
     case.run()
 
@@ -35,7 +35,7 @@ def test_echo():
 
 
 def test_cat():
-    case = Case(DATADIR / 'run' / 'cat.yaml')
+    case = Case(DATADIR / 'run' / 'cat')
     case.clear_cache()
     case.run()
 
@@ -56,7 +56,7 @@ def test_cat():
 
 
 def test_files():
-    case = Case(DATADIR / 'run' / 'files.yaml')
+    case = Case(DATADIR / 'run' / 'files')
     case.clear_cache()
     case.run()
 
