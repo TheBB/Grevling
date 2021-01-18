@@ -117,6 +117,7 @@ class FileMapping:
     source: str
     target: str
     template: bool
+    mode: str
 
     @classmethod
     def load(cls, spec: dict, **kwargs):
@@ -124,22 +125,34 @@ class FileMapping:
             return cls(spec, spec, **kwargs)
         return call_yaml(cls, spec, **kwargs)
 
-    def __init__(self, source, target, template=False):
+    def __init__(self, source, target=None, template=False, mode='simple'):
+        if target is None:
+            target = source if mode == 'simple' else '.'
+        if template:
+            mode = 'simple'
+
         self.source = source
         self.target = target
         self.template = template
+        self.mode = mode
 
     def copy(self, context, sourcepath, targetpath):
-        source = sourcepath / render(self.source, context)
-        target = targetpath / render(self.target, context)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if not self.template:
-            shutil.copyfile(source, target)
-            return
-        with open(source, 'r') as f:
-            text = f.read()
-        with open(target, 'w') as f:
-            f.write(render(text, context))
+        if self.mode == 'simple':
+            source = sourcepath / render(self.source, context)
+            target = targetpath / render(self.target, context)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if not self.template:
+                shutil.copyfile(source, target)
+                return
+            with open(source, 'r') as f:
+                text = f.read()
+            with open(target, 'w') as f:
+                f.write(render(text, context))
+
+        elif self.mode == 'glob':
+            target = targetpath / render(self.target, context)
+            for path in sourcepath.glob(render(self.source, context)):
+                shutil.copyfile(sourcepath / path, target / path)
 
 
 class Capture:

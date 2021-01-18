@@ -20,12 +20,18 @@ templates:
   - somefile
   - source: from
     target: to
+  - source: q
 prefiles:
   - source: a
     target: b
+  - source: r
+    target: s
+    mode: simple
 postfiles:
   - source: c
     target: d
+  - source: m
+    mode: glob
 script:
   - string command here
   - [list, command, here]

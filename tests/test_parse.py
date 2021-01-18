@@ -30,16 +30,38 @@ def test_parse():
 
     assert case._pre_files[0].source == 'somefile'
     assert case._pre_files[0].target == 'somefile'
+    assert case._pre_files[0].mode == 'simple'
     assert case._pre_files[0].template
+
     assert case._pre_files[1].source == 'from'
     assert case._pre_files[1].target == 'to'
+    assert case._pre_files[1].mode == 'simple'
     assert case._pre_files[1].template
-    assert case._pre_files[2].source == 'a'
-    assert case._pre_files[2].target == 'b'
-    assert not case._pre_files[2].template
+
+    assert case._pre_files[2].source == 'q'
+    assert case._pre_files[2].target == 'q'
+    assert case._pre_files[2].mode == 'simple'
+    assert case._pre_files[2].template
+
+    assert case._pre_files[3].source == 'a'
+    assert case._pre_files[3].target == 'b'
+    assert case._pre_files[3].mode == 'simple'
+    assert not case._pre_files[3].template
+
+    assert case._pre_files[4].source == 'r'
+    assert case._pre_files[4].target == 's'
+    assert case._pre_files[4].mode == 'simple'
+    assert not case._pre_files[4].template
+
     assert case._post_files[0].source == 'c'
     assert case._post_files[0].target == 'd'
+    assert case._post_files[0].mode == 'simple'
     assert not case._post_files[0].template
+
+    assert case._post_files[1].source == 'm'
+    assert case._post_files[1].target == '.'
+    assert case._post_files[1].mode == 'glob'
+    assert not case._post_files[1].template
 
     assert case._commands[0]._command == 'string command here'
     assert case._commands[0].name == 'string'

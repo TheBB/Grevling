@@ -37,13 +37,20 @@ def Scalar():
     return Int() | Float()
 
 
-def FileMapping():
+def FileMapping(glob_allowed: bool):
     """Validator that matches a file mapping: a string or a mapping with
     source and target.
     """
+    if glob_allowed:
+        return Str() | Map({
+            'source': Str(),
+            Optional('target'): Str(),
+            Optional('mode'): Choice('simple', 'glob')
+        })
+
     return Str() | Map({
         'source': Str(),
-        'target': Str(),
+        Optional('target'): Str(),
     })
 
 
@@ -95,7 +102,7 @@ class First(Validator):
                 result._selected_validator = validator
                 result._validator = self
                 return result
-            except YAMLValidationError:
+            except YAMLValidationError as e:
                 pass
         else:
             raise YAMLValidationError(
@@ -142,9 +149,9 @@ CASE_SCHEMA = Map({
         ),
     ),
     Optional('evaluate'): MapPattern(Str(), Str()),
-    Optional('templates'): Seq(FileMapping()),
-    Optional('prefiles'): Seq(FileMapping()),
-    Optional('postfiles'): Seq(FileMapping()),
+    Optional('templates'): Seq(FileMapping(glob_allowed=False)),
+    Optional('prefiles'): Seq(FileMapping(glob_allowed=True)),
+    Optional('postfiles'): Seq(FileMapping(glob_allowed=True)),
     Optional('script'): Seq(First(
         "script command",
         Str(),
