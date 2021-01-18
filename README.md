@@ -1,125 +1,216 @@
 # Badger
 
-[![Build status](https://travis-ci.org/TheBB/badger.svg)](https://travis-ci.org/TheBB/badger)
-
-A simple batch runner tool. (BATCH runnER)
+Badger is a tool for running parameter studies, where for a given set of
+parameter values, a sequence of commands are run based on input files,
+generating output that should be captured or analyzed. Badger indends, in
+this setting, to replace the ubiquitous bash scripts.
 
 ## Usage
 
-```sh
-$ badger [-h] [-o OUTPUT] [-f {yaml,py}] [-d] [-v {0,1,2,3,4}] [-l {0,1,2,3,4}] file
+To use Badger most effectively, create a new directory for each study you'd
+like to run. In this directory, add all the files you need to run your study,
+as well as a file called `badger.yaml`. This file describes, essentially,
+which parameter values to run, how to run a case and which output to capture
+for later. Then use `badger run` to run everything automatically.
+
+Badger stores captured data in a subdirectory called `.badgerdata`. It is
+safe to delete this directory if anything should go awry. It can be
+regenerated with `badger run`.
+
+Badger tries to preserve the integrity of the data directory. If you change
+the `badger.yaml` file with a non-empty data directory, Badger should detect
+this and refuse to continue. To fix this, delete the data directory, or run
+`badger check` for more information.
+
+Badger stores three kinds of data from a run:
+
+- Standard output and error from commands
+- Captured files
+- Data captured from standard output using regular expressions
+
+In the first two cases, such files can be found in subdirectories of
+`.badgerdata`, one subdirectory per run. For the latter, these are stored in
+a structured and masked numpy array in `.badgerdata/results.npy`. The easiest
+way to load it is by using:
+
+```python
+from badger import Case
+data = Case(path).result_array()
 ```
 
-Supported formats are `yaml` and `py`. If the format is not specified, it is
-determined from the output extension, which is `output.yaml` by default.
+The array is masked because some runs may fail. In this case, data from those
+runs are appropriately marked as missing. In the future it should be possible
+to also run a subset of parameter cases.
 
-## Dependencies
+## Structure of a badger file
 
-Python 3.3 or later, PyYAML and Jinja2.
-
-To install the dependencies with `pip`,
-
-```sh
-$ pip install -r requirements.txt
-```
-
-## Configuration file
-
-The configuration file is in YAML format. The following entries are supported.
-
-- templates: Template files. (String or list)
-- files: Additional files that the executable will need. (String or list)
-- executable: The (full) path to the executable that should be run.
-- cmdargs: Additional command-line arguments passed to the executable. (String
-  or list)
-- parameters: A list of parameters that should be varied.
-- dependencies: Additional dependent variables. These are python expressions
-  evaluated at runtime.
-- parse: Regular expressions for searching in stdout. Python regexp syntax. Each
-  defined group will end up in the output. (String or list)
-- types: Defines the expected types for each output group. Valid types are `int`,
-  `float`, `bool` and `str`. Default is `str`.
-
-Most of these are optional, but `executable`, `parameters` and `parse` must be
-present.
-
-## Behaviour
-
-For each tuple of parameters, the dependent variables are computed. The values
-of these variables are then substituted in the template files. The templates
-follow the standard [Jinja2](http://jinja.pocoo.org/docs/dev/) format, whereby
-strings of the form `{{ varname }}` will be substituted with the value of the
-variable `varname`. See the [Jinja2](http://jinja.pocoo.org/docs/dev/templates/)
-documentation for details.
-
-Template substitution in the executable and command-line arguments is also
-supported, but the syntax is `$varname$`.
-
-The actual computation is performed in a temporary directory which is
-automatically deleted.
-
-Badger records the match for each capture group in the _last_ match of each
-regular expression on the standard output, and coerces it to the given type, if
-applicable.
-
-## Command-line arguments
-
-- `-o` `--output`: Set the output file (and format)
-- `-f` `--format`: Set or override the output format
-- `-d` `--dry`: Run 'dry', don't actually run the jobs
-- `-v` `--verbosity`: Set the verbosity for standard output.
-- `-l` `--logverbosity`: Set the verbosity for standard output.
-
-Verbosity levels:
-
-- 0: Nothing.
-- 1: Notifications about jobs that run, which results are captured and whether
-  the return code signals a failure.
-- 2: Print stderr from jobs.
-- 3: Print rendered templates.
-- 4: Print stdout from jobs.
-
-## Example
-
-This setup runs the command `/path/to/binary -2D -mixed file.inp` for each of
-the 27 combinations of the parameters `degree`, `elements` and `timestep`. The
-output contains data for `p_rel_l2`, `cpu_time` and `wall_time` for each such
-combination.
-
-Note the use of `!!str` and single quotes to avoid miscellaneous string
-behaviour that makes writing regexps difficult.
+The configuration file is in YAML format. The following gives a whirlwind
+tour of the possibilities.
 
 ```yaml
-templates: file.inp
-files: file.dat
-executable: /path/to/binary
-cmdargs: -2D -mixed file.inp
+# Define which parameters we are interested in
+# Badger will run a case once for each combination of parameters, so runtime
+# may be a concern
 parameters:
-  degree: [1, 2, 3]
-  elements: [8, 16, 32]
-  timestep: [0.1, 0.05, 0.025]
-dependencies:
-  raiseorder: degree - 1
-  refineu: elements//8 - 1
-  refinev: elements - 1
-  endtime: 10
-parse:
-  - !!str 'Relative \|p-p\^h\|_l2 : (?P<p_rel_l2>[^\s]+)'
-  - !!str 'Total time\s+\|\s+(?P<cpu_time>[^\s]+)\s+\|\s+(?P<wall_time>[^\s]+)'
+
+  # Each parameter has a name and a list of values
+  parameter: [1, 2, 3, 4, 5]
+
+  # Values may be integers, floats or strings
+  float-parameter: [1.2, 1.3, 1.4]
+  string-parameter: [one, two, three]
+
+  # For convenience, we can specify a uniform sampling of an interval like this
+  # This should generate [0.0, 1.0, 2.0, 3.0]
+  uniform-parameter:
+    type: uniform
+    interval: [0.0, 3.0]
+    num: 4
+
+  # There is also support for geometrically graded sampling
+  graded-parameter:
+    type: graded
+    interval: [0.0, 1.0]
+    num: 5
+    grading: 1.2
+
+# We can also define other named values, constants or expressions
+evaluate:
+  some-constant: 1
+
+  # String values are interpreted as code to be evaluated
+  # Parameter values defined above may be given as input
+  expression: 2 * parameter
+
+  # Previously defined values can be re-used
+  new-expression: 4 / expression
+
+# Templates are files which are read, rendered and then written to the
+# temporary working directory set up for each case. When templates are
+# rendered, all parameters, constants and expressions above are available.
+# Template rendering is achieved using Mako:
+# https://www.makotemplates.org/
+# Mako is a powerful templating language, a full account of which is out of
+# scope here.
+templates:
+  # This file has the same name in the working directory as in the source directory
+  - some-template.txt
+
+  # We can use different filenames too
+  - source: input.txt
+    target: output.txt
+
+  # We can even use template substitution in the filenames
+  - source: my-file-${expression}.txt
+    target: output-${parameter}.txt
+
+# Pre-files are also copied to the working directory, but no template
+# substitution is performed. This is useful for e.g. binary data files.
+prefiles:
+  # Otherwise, the same patterns as above are all valid.
+  - some-data.dat
+  - source: input.dat
+    target: output.dat
+  - source: my-file-${expression}.dat
+    target: output-${parameter}.dat
+
+  # Globbing is supported as well
+  # Note that at the moment, globs are not supported for template files
+  - source: some-files*.txt
+    mode: glob
+
+# Post-files work the same way as pre-files, except they are copied back from
+# the working directory to the data directory after the script commands are
+# finished
+postfiles:
+  - some-output.hdf5
+
+# This is where the magic happens. A sequence of commands to execute in the working directory
+script:
+  # A command may be just a string, in which case it is executed via the shell
+  - some command to run with arguments
+
+  # Template substitution is allowed here too. Shell escaping will be
+  # automatically handled.
+  - some command with parameter-dependend arguments ${parameter}
+
+  # We can also specify arguments as a list, in which case the command is
+  # executed as a proper subprocess, not via the shell
+  - [this, is, the, right, way, to, do, it, in, my, opinion, ${parameter}]
+
+  # More sophisticated uses require us to use this form
+  - command: as above
+
+    # A command can optionally be named. By default, the name of a command is
+    # the first argument in the list of arguments (that is, the program that is
+    # executed). If the program name includes a path, the path is stripped so
+    # the name is just the name of the program file.
+    name: some-command
+
+    # Stdout and stderr is captured automatically if the command fails. To
+    # capture it unconditionally, set this to on.
+    capture-output: on
+
+    # To record the runtime of a command, set this to on.
+    capture-walltime: on
+
+    # To capture data from stdout we have to define regular expressions
+    capture:
+      # Use standard Python regular expression syntax
+      # https://docs.python.org/3/library/re.html#regular-expression-syntax
+      # Any NAMED group will be collected and added to the result
+      # This regular expression has groups named a, b and c
+      - a=(?P<a>\S+) b=(?P<b>\S+) c=(?P<c>\S+)
+
+      # By default, we find only the last of many possible matches in the
+      # output.  This can be changed.
+      - pattern: a=(?P<a1>\S+)
+        mode: first
+
+      # We can also collect all matches. In this case the result will be a list.
+      - pattern: a=(?P<a2>\S+)
+        mode: all
+
+      # Since writing regular expressions is tediuos and error-prone, Badger has
+      # some predefined ones.  In this case, we're matching integers...
+      - type: integer
+
+        # This is used as the group name
+        name: somegroup
+
+        # And this is some text that comes before the integer to match.
+        # The resulting regular expression is something like:
+        # someint\s*(?P<somegroup>...)
+        # where ... matches an integer.
+        # This prefix will be safely escaped before use
+        prefix: someint
+
+      # Badger has a predefined regular expression for floats too.
+      - type: float
+        name: someothergroup
+        prefix: somefloat
+
+        # First, last and all also work for these
+        mode: all
+
+# The resulting array has entries for every parameter, constant, evaluated
+# expression and captured regular expression, as well as walltime for each
+# command, if applicable. Badger is often able to automatically determine the
+# type for each of them, but may need help.
+# You can use 'badger check' to see what Badger thinks the types will be.
 types:
-  p_rel_l2: float
-  cpu_time: float
-  wall_time: float
+
+  # In particular, Badger cannot determine the type of regular expression
+  # capture groups (except predefined ones).
+  # Valid values here are str, int and float
+  a1: str
+  a2: str
+
+# Finally, various settings
+settings:
+
+  # To store captured stdout, stderr and files, Badger needs to know the name
+  # template of a directory to store them. For uniqueness, this template should
+  # use all the parameters.  Badger will warn you if this is not set.
+  logdir: ${parameter}-and-so-on
 ```
-
-## Output
-
-The output file and format is given by the input arguments to Badger. When
-applicable, the data is listed in row-major order (the last index changes most
-quickly).
-
-## TODO
-
-Please check out the
-[list of issues](https://github.com/TheBB/badger/issues?q=is:open+is:issue+label:"feature+request")
-labeled 'feature request'.

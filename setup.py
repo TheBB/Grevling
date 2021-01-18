@@ -14,6 +14,7 @@ setup(
     install_requires=[
         'click',
         'fasteners',
+        'mako',
         'numpy',
         'ruamel.yaml',
         'simpleeval',
