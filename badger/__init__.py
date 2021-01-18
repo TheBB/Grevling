@@ -136,24 +136,29 @@ class FileMapping:
         self.template = template
         self.mode = mode
 
-    def copy(self, context, sourcepath, targetpath):
+    def iter_paths(self, context, sourcepath, targetpath):
         if self.mode == 'simple':
-            source = sourcepath / render(self.source, context)
-            target = targetpath / render(self.target, context)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            if not self.template:
-                shutil.copyfile(source, target)
-                return
-            with open(source, 'r') as f:
-                text = f.read()
-            with open(target, 'w') as f:
-                f.write(render(text, context))
+            yield (
+                sourcepath / render(self.source, context),
+                targetpath / render(self.target, context),
+            )
 
         elif self.mode == 'glob':
             target = targetpath / render(self.target, context)
             for path in sourcepath.glob(render(self.source, context)):
                 path = path.relative_to(sourcepath)
-                shutil.copyfile(sourcepath / path, target / path)
+                yield (sourcepath / path, target / path)
+
+    def copy(self, context, sourcepath, targetpath):
+        for source, target in self.iter_paths(context, sourcepath, targetpath):
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if not self.template:
+                shutil.copyfile(source, target)
+                continue
+            with open(source, 'r') as f:
+                text = f.read()
+            with open(target, 'w') as f:
+                f.write(render(text, context))
 
 
 class Capture:

@@ -9,6 +9,7 @@ DATADIR = Path(__file__).parent / 'data'
 
 
 def read_file(path: Path) -> str:
+    print(path)
     with open(path, 'r') as f:
         return f.read()
 
@@ -64,13 +65,13 @@ def test_files():
 
     for a in range(1,4):
         for b in 'abc':
-            path = DATADIR / 'run' / '.badgerdata' / f'{a}-{b}'
+            path = DATADIR / 'run' / 'files' / '.badgerdata' / f'{a}-{b}'
             assert read_file(path / 'template.txt') == f'a={a} b={b} c={2*a-1}\n'
             assert read_file(path / 'other-template.txt') == f'a={a} b={b} c={2*a-1}\n'
             assert read_file(path / 'non-template.txt') == 'a=${alpha} b=${bravo} c=${charlie}\n'
-            assert read_file(path / 'empty1.dat') == ''
-            assert read_file(path / 'empty2.dat') == ''
-            assert read_file(path / 'empty3.dat') == ''
+            assert read_file(path / 'some' / 'deep' / 'directory' / 'empty1.dat') == ''
+            assert read_file(path / 'some' / 'deep' / 'directory' / 'empty2.dat') == ''
+            assert read_file(path / 'some' / 'deep' / 'directory' / 'empty3.dat') == ''
 
 
 def test_capture():

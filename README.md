@@ -115,7 +115,8 @@ prefiles:
     target: output-${parameter}.dat
 
   # Globbing is supported as well
-  # Note that at the moment, globs are not supported for template files
+  # In this case, the target should be a relative subdirectory of the working
+  # directory. The default is '.'
   - source: some-files*.txt
     mode: glob
 
