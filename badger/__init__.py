@@ -152,6 +152,7 @@ class FileMapping:
         elif self.mode == 'glob':
             target = targetpath / render(self.target, context)
             for path in sourcepath.glob(render(self.source, context)):
+                path = path.relative_to(sourcepath)
                 shutil.copyfile(sourcepath / path, target / path)
 
 

@@ -66,3 +66,6 @@ def test_files():
             assert read_file(path / 'template.txt') == f'a={a} b={b} c={2*a-1}\n'
             assert read_file(path / 'other-template.txt') == f'a={a} b={b} c={2*a-1}\n'
             assert read_file(path / 'non-template.txt') == 'a=${alpha} b=${bravo} c=${charlie}\n'
+            assert read_file(path / 'empty1.dat') == ''
+            assert read_file(path / 'empty2.dat') == ''
+            assert read_file(path / 'empty3.dat') == ''

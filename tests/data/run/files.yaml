@@ -10,9 +10,13 @@ templates:
 prefiles:
   - source: template.txt
     target: non-template.txt
+  - source: empty*.dat
+    mode: glob
 postfiles:
   - template.txt
   - other-template.txt
   - non-template.txt
+  - source: empty*.dat
+    mode: glob
 settings:
   logdir: ${alpha}-${bravo}
