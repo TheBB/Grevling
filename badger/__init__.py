@@ -301,7 +301,9 @@ class Case:
     _commands: List[Command]
     _types: NestedDict
 
-    def __init__(self, yamlpath, storagepath=None):
+    def __init__(self, yamlpath='.', storagepath=None):
+        if isinstance(yamlpath, str):
+            yamlpath = Path(yamlpath)
         if yamlpath.is_dir():
             yamlpath = yamlpath / 'badger.yaml'
         self.yamlpath = yamlpath
