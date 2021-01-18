@@ -42,6 +42,7 @@ def test_cat():
     data = case.result_array()
     assert data['a'].dtype == int
     assert data['alpha'].dtype == int
+    assert data['a_auto'].dtype == int
     assert data['b'].dtype == object
     assert data['bravo'].dtype == object
     assert data['c'].dtype == float
@@ -49,6 +50,7 @@ def test_cat():
     assert data['walltime']['cat'].dtype == float
     np.testing.assert_array_equal(data['a'], [[1, 1, 1], [2, 2, 2], [3, 3, 3]])
     np.testing.assert_array_equal(data['alpha'], [[1, 1, 1], [2, 2, 2], [3, 3, 3]])
+    np.testing.assert_array_equal(data['a_auto'], [[1, 1, 1], [2, 2, 2], [3, 3, 3]])
     np.testing.assert_array_equal(data['b'], [['a', 'b', 'c'], ['a', 'b', 'c'], ['a', 'b', 'c']])
     np.testing.assert_array_equal(data['bravo'], [['a', 'b', 'c'], ['a', 'b', 'c'], ['a', 'b', 'c']])
     np.testing.assert_array_equal(data['c'], [[1, 1, 1], [3, 3, 3], [5, 5, 5]])
