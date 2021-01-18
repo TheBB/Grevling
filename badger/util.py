@@ -1,3 +1,4 @@
+import numpy as np
 import numpy.ma as ma
 
 
@@ -30,6 +31,21 @@ def has_data(array: ma.MaskedArray) -> bool:
         if has_data(array[k]):
             return True
     return False
+
+
+def struct_as_dict(array: np.void, types: 'NestedDict') -> dict:
+    retval = {}
+    for k in array.dtype.fields.keys():
+        if isinstance(array[k], ma.core.MaskedConstant):
+            return None
+        if isinstance(array[k], (ma.mvoid, np.void)):
+            subdata = struct_as_dict(array[k], types[k])
+            if subdata is None:
+                return None
+            retval[k] = subdata
+        else:
+            retval[k] = types[k](array[k])
+    return retval
 
 
 def completer(options):
