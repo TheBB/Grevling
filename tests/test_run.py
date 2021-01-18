@@ -71,3 +71,35 @@ def test_files():
             assert read_file(path / 'empty1.dat') == ''
             assert read_file(path / 'empty2.dat') == ''
             assert read_file(path / 'empty3.dat') == ''
+
+
+def test_capture():
+    case = Case(DATADIR / 'run' / 'capture')
+    case.clear_cache()
+    case.run()
+
+    data = case.result_array()
+    assert data['alpha'].dtype == float
+    assert data['firstalpha'].dtype == float
+    assert data['lastalpha'].dtype == float
+    assert data['allalpha'].dtype == object
+    assert data['bravo'].dtype == int
+    assert data['firstbravo'].dtype == int
+    assert data['lastbravo'].dtype == int
+    assert data['allbravo'].dtype == object
+    np.testing.assert_allclose(data['alpha'], [[1.234, 1.234, 1.234], [2.345, 2.345, 2.345], [3.456, 3.456, 3.456]])
+    np.testing.assert_allclose(data['firstalpha'], [[1.234, 1.234, 1.234], [2.345, 2.345, 2.345], [3.456, 3.456, 3.456]])
+    np.testing.assert_allclose(data['lastalpha'], [[4.936, 4.936, 4.936], [9.38, 9.38, 9.38], [13.824, 13.824, 13.824]])
+    np.testing.assert_allclose(data['allalpha'].tolist(), [
+        [[1.234, 2.468, 3.702, 4.936], [1.234, 2.468, 3.702, 4.936], [1.234, 2.468, 3.702, 4.936]],
+        [[2.345, 4.690, 7.035, 9.380], [2.345, 4.690, 7.035, 9.380], [2.345, 4.690, 7.035, 9.380]],
+        [[3.456, 6.912, 10.368, 13.824], [3.456, 6.912, 10.368, 13.824], [3.456, 6.912, 10.368, 13.824]]
+    ])
+    np.testing.assert_array_equal(data['bravo'], [[1, 2, 3], [1, 2, 3], [1, 2, 3]])
+    np.testing.assert_array_equal(data['firstbravo'], [[1, 2, 3], [1, 2, 3], [1, 2, 3]])
+    np.testing.assert_array_equal(data['lastbravo'], [[4, 8, 12], [4, 8, 12], [4, 8, 12]])
+    np.testing.assert_array_equal(data['allbravo'].tolist(), [
+        [[1, 2, 3, 4], [2, 4, 6, 8], [3, 6, 9, 12]],
+        [[1, 2, 3, 4], [2, 4, 6, 8], [3, 6, 9, 12]],
+        [[1, 2, 3, 4], [2, 4, 6, 8], [3, 6, 9, 12]],
+    ])

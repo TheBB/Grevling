@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.ma as ma
+from typing_inspect import get_origin
 
 
 def subclasses(cls, root=False):
@@ -44,7 +45,10 @@ def struct_as_dict(array: np.void, types: 'NestedDict') -> dict:
                 return None
             retval[k] = subdata
         else:
-            retval[k] = types[k](array[k])
+            if get_origin(types[k]) == list:
+                retval[k] = array[k]
+            else:
+                retval[k] = types[k](array[k])
     return retval
 
 

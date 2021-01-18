@@ -1,0 +1,32 @@
+parameters:
+  alpha: [1.234, 2.345, 3.456]
+  bravo: [1, 2, 3]
+templates:
+  - template.txt
+script:
+  - command: cat template.txt
+    capture:
+      - type: float
+        name: firstalpha
+        prefix: 'alpha:'
+        mode: first
+      - type: float
+        name: lastalpha
+        prefix: 'alpha:'
+        mode: last
+      - type: float
+        name: allalpha
+        prefix: 'alpha:'
+        mode: all
+      - type: integer
+        name: firstbravo
+        prefix: 'bravo:'
+        mode: first
+      - type: integer
+        name: lastbravo
+        prefix: 'bravo:'
+        mode: last
+      - type: integer
+        name: allbravo
+        prefix: 'bravo:'
+        mode: all

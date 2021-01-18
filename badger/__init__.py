@@ -281,7 +281,12 @@ class ResultCollector(NestedDict):
         self._types = types
 
     def collect(self, name: str, value: Any):
-        self[name] = self._types[name](value)
+        tp = self._types[name]
+        if get_origin(tp) == list:
+            eltype = get_args(tp)[0]
+            self.setdefault(name, []).append(eltype(value))
+        else:
+            self[name] = tp(value)
 
     def commit(self, array):
         for key, value in self.items():
