@@ -38,11 +38,9 @@ def struct_as_dict(array: np.void, types: 'NestedDict') -> dict:
     retval = {}
     for k in array.dtype.fields.keys():
         if isinstance(array[k], ma.core.MaskedConstant):
-            return None
+            return retval
         if isinstance(array[k], (ma.mvoid, np.void)):
             subdata = struct_as_dict(array[k], types[k])
-            if subdata is None:
-                return None
             retval[k] = subdata
         else:
             if get_origin(types[k]) == list:

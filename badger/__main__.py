@@ -110,7 +110,7 @@ def dump(case, fmt, structured, remove_missing, output):
     data = case.result_array()
 
     if fmt == 'json':
-        obj = [struct_as_dict(struct, case._types) for struct in data.flatten()]
+        obj = [struct_as_dict(struct, case._types) or None for struct in data.flatten()]
         if remove_missing:
             obj = [k for k in obj if k is not None]
         if structured:

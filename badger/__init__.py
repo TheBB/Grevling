@@ -198,11 +198,18 @@ class Capture:
     def find_in(self, collector, string):
         matches = self._regex.finditer(string)
         if self._mode == 'first':
-            matches = [next(matches)]
+            try:
+                matches = [next(matches)]
+            except StopIteration:
+                pass
+
         elif self._mode == 'last':
             for match in matches:
                 pass
-            matches = [match]
+            try:
+                matches = [match]
+            except UnboundLocalError:
+                pass
 
         for match in matches:
             for name, value in match.groupdict().items():
@@ -267,6 +274,12 @@ class Command:
                 with open(stderr_path, 'wb') as f:
                     f.write(result.stderr)
 
+            stdout = result.stdout.decode()
+            for capture in self._capture:
+                capture.find_in(collector, stdout)
+            if self._capture_walltime:
+                collector.collect(f'walltime/{self.name}', duration)
+
             if result.returncode:
                 log.error(f"Command returned exit status {result.returncode}")
                 if logdir:
@@ -275,12 +288,6 @@ class Command:
                 return False
             else:
                 log.info(f"Success ({duration:.3g}s)")
-
-        stdout = result.stdout.decode()
-        for capture in self._capture:
-            capture.find_in(collector, stdout)
-        if self._capture_walltime:
-            collector.collect(f'walltime/{self.name}', duration)
 
         return True
 
@@ -528,6 +535,7 @@ class Case:
                 filemap.copy(namespace, self.sourcepath, workpath, sourcename='SRC', targetname='WRK')
             for command in self._commands:
                 if not command.run(collector, namespace, workpath, logdir):
+                    self.commit_result(index, collector)
                     return False
             if logdir:
                 for filemap in self._post_files:

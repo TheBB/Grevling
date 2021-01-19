@@ -113,8 +113,17 @@ def test_failing():
 
     data = case.result_array()
     assert data['retcode'].dtype == int
+    assert data['before'].dtype == int
     assert data['return'].dtype == int
+    assert data['next'].dtype == int
+    assert data['after'].dtype == int
     assert data['retcode'][0] == 0
+    assert data['before'][0] == 12
     assert data['return'][0] == 0
-    assert data.mask['retcode'][1] == True
-    assert data.mask['return'][1] == True
+    assert data['next'][0] == 0
+    assert data['after'][0] == 13
+    assert data['retcode'][1] == 1
+    assert data['before'][1] == 12
+    assert data['return'][1] == 1
+    assert data.mask['next'][1] == True
+    assert data.mask['after'][1] == True
