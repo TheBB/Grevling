@@ -176,7 +176,7 @@ class Capture:
                 'integer': (r'[-+]?[0-9]+', int),
                 'float': (r'[-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?', float),
             }[spec['type']]
-            pattern = re.escape(spec['prefix']) + r'\s*(?P<' + spec['name'] + '>' + pattern + ')'
+            pattern = re.escape(spec['prefix']) + r'\s*[:=]?\s*(?P<' + spec['name'] + '>' + pattern + ')'
             mode = spec.get('mode', 'last')
             type_overrides = {spec['name']: tp}
             return cls(pattern, mode, type_overrides)
