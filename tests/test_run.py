@@ -104,3 +104,17 @@ def test_capture():
         [[1, 2, 3, 4], [2, 4, 6, 8], [3, 6, 9, 12]],
         [[1, 2, 3, 4], [2, 4, 6, 8], [3, 6, 9, 12]],
     ])
+
+
+def test_failing():
+    case = Case(DATADIR / 'run' / 'failing')
+    case.clear_cache()
+    case.run()
+
+    data = case.result_array()
+    assert data['retcode'].dtype == int
+    assert data['return'].dtype == int
+    assert data['retcode'][0] == 0
+    assert data['return'][0] == 0
+    assert data.mask['retcode'][1] == True
+    assert data.mask['return'][1] == True

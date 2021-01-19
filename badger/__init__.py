@@ -303,6 +303,7 @@ class ResultCollector(NestedDict):
 
     def commit(self, array):
         for key, value in self.items():
+            subindex_set(array.mask, key, False)
             subindex_set(array, key, value)
 
 
@@ -406,14 +407,18 @@ class Case:
     def commit_result(self, index, collector):
         with self.acquire_lock():
             results = self.result_array()
-            results.mask.flat[index] = False
             collector.commit(results.flat[index])
-            np.save(self.storagepath / 'results.npy', results, allow_pickle=True)
+            np.save(self.storagepath / 'results.npy', results.data, allow_pickle=True)
+            np.save(self.storagepath / 'results.mask.npy', results.mask, allow_pickle=True)
 
     def result_array(self):
         path = self.storagepath / 'results.npy'
-        if path.is_file():
-            return np.load(path, allow_pickle=True)
+        maskpath = self.storagepath / 'results.mask.npy'
+        if path.is_file() and maskpath.is_file():
+            return ma.array(
+                np.load(path, allow_pickle=True),
+                mask=np.load(maskpath),
+            )
         else:
             return ma.array(
                 np.zeros(self.shape, dtype=self._dtype),

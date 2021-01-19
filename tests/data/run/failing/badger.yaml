@@ -1,0 +1,8 @@
+parameters:
+  retcode: [0, 1]
+script:
+  - command: [sh, -c, 'echo return ${retcode} && return ${retcode}']
+    capture:
+      - type: integer
+        prefix: return
+        name: return

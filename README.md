@@ -30,8 +30,9 @@ Badger stores three kinds of data from a run:
 
 In the first two cases, such files can be found in subdirectories of
 `.badgerdata`, one subdirectory per run. For the latter, these are stored in
-a structured and masked numpy array in `.badgerdata/results.npy`. The easiest
-way to load it is by using:
+a structured and masked numpy array with data in `.badgerdata/results.npy`
+and mask in `.badgerdata/results.mask.npy`. The easiest way to load it is by
+using:
 
 ```python
 from badger import Case
