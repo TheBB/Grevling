@@ -14,8 +14,9 @@ parameters:
   foxtrot: ['a', 'b', 'c']
 evaluate:
   dblalpha: 2 * alpha
-  intasstring: 14
-  floatasstring: 14.0
+constants:
+  int: 14
+  float: 14.0
 templates:
   - somefile
   - source: from

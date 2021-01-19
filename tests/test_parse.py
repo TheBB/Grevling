@@ -24,8 +24,11 @@ def test_parse():
 
     assert case._evaluables == {
         'dblalpha': '2 * alpha',
-        'intasstring': '14',
-        'floatasstring': '14.0',
+    }
+
+    assert case._constants == {
+        'int': 14,
+        'float': 14.0,
     }
 
     assert case._pre_files[0].source == 'somefile'
@@ -111,8 +114,6 @@ def test_parse():
         'echo': float,
         'foxtrot': str,
         'dblalpha': int,
-        'intasstring': int,
-        'floatasstring': float,
         'one': int,
         'first': str,
         'multi': List[str],

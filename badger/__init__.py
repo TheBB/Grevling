@@ -322,6 +322,7 @@ class Case:
 
     _parameters: Dict[str, Parameter]
     _evaluables: Dict[str, str]
+    _constants: Dict[str, Any]
     _pre_files: List[FileMapping]
     _post_files: List[FileMapping]
     _commands: List[Command]
@@ -351,6 +352,7 @@ class Case:
 
         # Read evaluables
         self._evaluables = dict(casedata.get('evaluate', {}))
+        self._constants = dict(casedata.get('constants', {}))
 
         # Read file mappings
         self._pre_files = [FileMapping.load(spec, template=True) for spec in casedata.get('templates', [])]
@@ -396,6 +398,7 @@ class Case:
     def evaluate_context(self, context, verbose=True):
         evaluator = SimpleEval()
         evaluator.names.update(context)
+        evaluator.names.update(self._constants)
         for name, code in self._evaluables.items():
             result = evaluator.eval(code) if isinstance(code, str) else code
             if verbose:
