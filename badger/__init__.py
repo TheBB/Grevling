@@ -399,7 +399,6 @@ class Case:
         evaluator = SimpleEval()
         evaluator.names.update(context)
         evaluator.names.update(self._constants)
-        context.update(self._constants)
         for name, code in self._evaluables.items():
             result = evaluator.eval(code) if isinstance(code, str) else code
             if verbose:
@@ -523,6 +522,8 @@ class Case:
         collector = ResultCollector(self._types)
         for key, value in namespace.items():
             collector.collect(key, value)
+
+        namespace.update(self._constants)
 
         with TemporaryDirectory() as workpath:
             workpath = Path(workpath)
