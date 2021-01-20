@@ -399,6 +399,7 @@ class Case:
         evaluator = SimpleEval()
         evaluator.names.update(context)
         evaluator.names.update(self._constants)
+        context.update(self._constants)
         for name, code in self._evaluables.items():
             result = evaluator.eval(code) if isinstance(code, str) else code
             if verbose:
