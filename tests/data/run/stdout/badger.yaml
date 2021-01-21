@@ -1,0 +1,10 @@
+parameters:
+  retcode: [0, 1]
+script:
+  - command: [sh, -c, 'echo stdout ${retcode} && >&2 echo stderr ${retcode}']
+    name: good
+    capture-output: on
+  - command: [sh, -c, 'echo stdout ${retcode} && >&2 echo stderr ${retcode} && return ${retcode}']
+    name: bad
+settings:
+  logdir: out-${retcode}

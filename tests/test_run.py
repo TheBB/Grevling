@@ -127,3 +127,19 @@ def test_failing():
     assert data['return'][1] == 1
     assert data.mask['next'][1] == True
     assert data.mask['after'][1] == True
+
+
+def test_stdout():
+    case = Case(DATADIR / 'run' / 'stdout')
+    case.clear_cache()
+    case.run()
+
+    path = DATADIR / 'run' / 'stdout' / '.badgerdata'
+    assert read_file(path / 'out-0' / 'good.stdout') == 'stdout 0\n'
+    assert read_file(path / 'out-0' / 'good.stderr') == 'stderr 0\n'
+    assert not (path / 'out-0' / 'bad.stdout').exists()
+    assert not (path / 'out-0' / 'bad.stderr').exists()
+    assert read_file(path / 'out-1' / 'good.stdout') == 'stdout 1\n'
+    assert read_file(path / 'out-1' / 'good.stderr') == 'stderr 1\n'
+    assert read_file(path / 'out-1' / 'bad.stdout') == 'stdout 1\n'
+    assert read_file(path / 'out-1' / 'bad.stderr') == 'stderr 1\n'
