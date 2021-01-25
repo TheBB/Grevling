@@ -149,11 +149,18 @@ class FileMapping:
                 path = path.relative_to(sourcepath)
                 yield (sourcepath / path, target / path)
 
-    def copy(self, context, sourcepath, targetpath, sourcename='SRC', targetname='TGT'):
+    def copy(self, context, sourcepath, targetpath, sourcename='SRC', targetname='TGT', ignore_missing=False):
         for source, target in self.iter_paths(context, sourcepath, targetpath):
             logsrc = Path(sourcename) / source.relative_to(sourcepath)
             logtgt = Path(targetname) / target.relative_to(targetpath)
-            log.debug(logsrc, '->', logtgt)
+
+            if not sourcepath.exists():
+                level = log.warning if ignore_missing else log.error
+                level(f"Missing file: {logsrc}")
+                if not ignore_missing:
+                    return
+            else:
+                log.debug(logsrc, '->', logtgt)
 
             target.parent.mkdir(parents=True, exist_ok=True)
             if not self.template:
@@ -538,13 +545,17 @@ class Case:
 
             for filemap in self._pre_files:
                 filemap.copy(namespace, self.sourcepath, workpath, sourcename='SRC', targetname='WRK')
+
+            success = True
             for command in self._commands:
                 if not command.run(collector, namespace, workpath, logdir):
                     self.commit_result(index, collector)
-                    return False
+                    success = False
+                    break
+
             if logdir:
                 for filemap in self._post_files:
-                    filemap.copy(namespace, workpath, logdir, sourcename='WRK', targetname='LOG')
+                    filemap.copy(namespace, workpath, logdir, sourcename='WRK', targetname='LOG', ignore_missing=not success)
 
         self.commit_result(index, collector)
-        return True
+        return success
