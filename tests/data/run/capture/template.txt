@@ -1,0 +1,8 @@
+First instance of alpha: ${alpha}
+Second instance of alpha: ${2*alpha}
+Third instance of alpha: ${3*alpha}
+Fourth instance of alpha: ${4*alpha}
+First instance of bravo: ${bravo}
+Second instance of bravo: ${2*bravo}
+Third instance of bravo: ${3*bravo}
+Fourth instance of bravo: ${4*bravo}

@@ -1,0 +1,65 @@
+parameters:
+  alpha: [1, 2]
+  bravo: [1.0, 2.0]
+  charlie: [3, 4.5]
+  delta:
+    type: uniform
+    interval: [0.0, 1.0]
+    num: 5
+  echo:
+    type: graded
+    interval: [0.0, 1.0]
+    num: 5
+    grading: 1.2
+  foxtrot: ['a', 'b', 'c']
+evaluate:
+  dblalpha: 2 * alpha
+constants:
+  int: 14
+  float: 14.0
+templates:
+  - somefile
+  - source: from
+    target: to
+  - source: q
+prefiles:
+  - source: a
+    target: b
+  - source: r
+    target: s
+    mode: simple
+postfiles:
+  - source: c
+    target: d
+  - source: m
+    mode: glob
+script:
+  - string command here
+  - [list, command, here]
+  - /usr/bin/nontrivial-name with args
+  - [/usr/bin/nontrivial-name, with, args, as, list]
+  - name: somecommand
+    command: run this thing
+    capture-output: yes
+    capture: oneregex (?P<one>.*)
+  - command: /some/nontrivial-stuff
+    capture-output: no
+    capture:
+      - pattern: multiregex (?P<multi>.*)
+        mode: all
+      - pattern: firstregex (?P<first>.*)
+        mode: first
+      - pattern: lastregex (?P<last>.*)
+        mode: last
+      - type: integer
+        name: someint
+        prefix: someint
+      - type: float
+        name: somefloat
+        prefix: here is a prefix
+        mode: all
+types:
+  one: int
+  last: float
+settings:
+  logdir: loop-de-loop

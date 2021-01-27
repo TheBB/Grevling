@@ -1,0 +1,23 @@
+parameters:
+  alpha: [1, 2, 3]
+  bravo: [a, b, c]
+evaluate:
+  charlie: 2 * alpha - 1
+templates:
+  - template.txt
+  - source: template.txt
+    target: other-template.txt
+prefiles:
+  - source: template.txt
+    target: non-template.txt
+  - source: empty*.dat
+    target: some/deep/directory
+    mode: glob
+postfiles:
+  - template.txt
+  - other-template.txt
+  - non-template.txt
+  - source: some/deep/directory/empty*.dat
+    mode: glob
+settings:
+  logdir: ${alpha}-${bravo}

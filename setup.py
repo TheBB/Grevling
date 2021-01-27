@@ -10,6 +10,22 @@ setup(
     author_email='eivind.fonn@sintef.no',
     license='AGPL3',
     url='https://github.com/TheBB/Badger',
-    packages=['sett'],
-    scripts=['badger'],
+    packages=['badger'],
+    install_requires=[
+        'click',
+        'fasteners',
+        'mako',
+        'numpy',
+        'ruamel.yaml',
+        'simpleeval',
+        'strictyaml',
+        'treelog',
+    ],
+    extras_require={
+        'testing': ['pytest'],
+        'deploy': ['twine', 'cibuildwheel==1.1.0'],
+    },
+    entry_points={
+        'console_scripts': ['badger=badger.__main__:main'],
+    },
 )

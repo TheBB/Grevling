@@ -1,0 +1,22 @@
+parameters:
+  alpha: [1, 2, 3]
+  bravo: ['a', 'b', 'c']
+evaluate:
+  charlie: 2 * alpha - 1
+templates:
+  - template.txt
+script:
+  - command: cat template.txt
+    capture:
+      - a=(?P<a>\S+) b=(?P<b>\S+) c=(?P<c>\S+)
+      - type: integer
+        name: a_auto
+        prefix: a=
+    capture-output: on
+    capture-walltime: on
+types:
+  a: int
+  b: str
+  c: float
+settings:
+  logdir: ${alpha}-${bravo}

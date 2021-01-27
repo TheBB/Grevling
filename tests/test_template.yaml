@@ -1,8 +1,0 @@
-templates: template.temp
-executable: cat
-cmdargs: template.temp
-parameters:
-  alpha: [a, b, c]
-  bravo: [1, 2, 3]
-parse:
-  - !!str '(?P<out>.+)'

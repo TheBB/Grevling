@@ -1,0 +1,16 @@
+parameters:
+  alpha: [1, 2, 3]
+  bravo: ['a', 'b', 'c']
+evaluate:
+  charlie: 2 * alpha - 1
+script:
+  - command: echo a=${alpha} b=${bravo} c=${charlie}
+    capture: a=(?P<a>\S+) b=(?P<b>\S+) c=(?P<c>\S+)
+    capture-output: on
+    capture-walltime: on
+types:
+  a: int
+  b: str
+  c: float
+settings:
+  logdir: ${alpha}-${bravo}
