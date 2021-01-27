@@ -68,33 +68,27 @@ def test_parse():
 
     assert case._commands[0]._command == 'string command here'
     assert case._commands[0].name == 'string'
-    assert case._commands[0]._capture_output == False
     assert case._commands[0]._capture == []
 
     assert case._commands[1]._command == ['list', 'command', 'here']
     assert case._commands[1].name == 'list'
-    assert case._commands[1]._capture_output == False
     assert case._commands[1]._capture == []
 
     assert case._commands[2]._command == '/usr/bin/nontrivial-name with args'
     assert case._commands[2].name == 'nontrivial-name'
-    assert case._commands[2]._capture_output == False
     assert case._commands[2]._capture == []
 
     assert case._commands[3]._command == ['/usr/bin/nontrivial-name', 'with', 'args', 'as', 'list']
     assert case._commands[3].name == 'nontrivial-name'
-    assert case._commands[3]._capture_output == False
     assert case._commands[3]._capture == []
 
     assert case._commands[4]._command == 'run this thing'
     assert case._commands[4].name == 'somecommand'
-    assert case._commands[4]._capture_output == True
     assert case._commands[4]._capture[0]._regex.pattern == 'oneregex (?P<one>.*)'
     assert case._commands[4]._capture[0]._mode == 'last'
 
     assert case._commands[5]._command == '/some/nontrivial-stuff'
     assert case._commands[5].name == 'nontrivial-stuff'
-    assert case._commands[5]._capture_output == False
     assert case._commands[5]._capture[0]._regex.pattern == 'multiregex (?P<multi>.*)'
     assert case._commands[5]._capture[0]._mode == 'all'
     assert case._commands[5]._capture[1]._regex.pattern == 'firstregex (?P<first>.*)'

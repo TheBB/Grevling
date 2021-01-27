@@ -137,8 +137,8 @@ def test_stdout():
     path = DATADIR / 'run' / 'stdout' / '.badgerdata'
     assert read_file(path / 'out-0' / 'good.stdout') == 'stdout 0\n'
     assert read_file(path / 'out-0' / 'good.stderr') == 'stderr 0\n'
-    assert not (path / 'out-0' / 'bad.stdout').exists()
-    assert not (path / 'out-0' / 'bad.stderr').exists()
+    assert read_file(path / 'out-0' / 'bad.stdout') == 'stdout 0\n'
+    assert read_file(path / 'out-0' / 'bad.stderr') == 'stderr 0\n'
     assert read_file(path / 'out-1' / 'good.stdout') == 'stdout 1\n'
     assert read_file(path / 'out-1' / 'good.stderr') == 'stderr 1\n'
     assert read_file(path / 'out-1' / 'bad.stdout') == 'stdout 1\n'
