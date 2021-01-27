@@ -229,11 +229,12 @@ class Command:
     def load(cls, spec):
         if isinstance(spec, (str, list)):
             return cls(spec)
+        if 'capture-output' in spec:
+            del spec['capture-output']
         return call_yaml(cls, spec)
 
-    def __init__(self, command, name=None, capture=None, capture_output=False, capture_walltime=False):
+    def __init__(self, command, name=None, capture=None, capture_walltime=False):
         self._command = command
-        self._capture_output = capture_output
         self._capture_walltime = capture_walltime
 
         if name is None:
@@ -273,7 +274,7 @@ class Command:
                 result = subprocess.run(command, **kwargs)
             duration = duration()
 
-            if logdir and (result.returncode or self._capture_output):
+            if logdir:
                 stdout_path = logdir / f'{self.name}.stdout'
                 with open(stdout_path, 'wb') as f:
                     f.write(result.stdout)
@@ -484,7 +485,7 @@ class Case:
 
     def check(self, interactive=True) -> bool:
         if self._logdir is None:
-            if self._post_files or any(c._capture_output for c in self._commands):
+            if self._post_files:
                 log.error("Error: logdir must be set for capture of stdout, stderr or files")
                 return False
 

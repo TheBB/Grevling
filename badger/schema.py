@@ -4,12 +4,28 @@ import re
 
 from typing import Tuple, Dict
 
+import treelog as log
+
 from strictyaml import (
     ScalarValidator, Optional, Any, Bool, Int, Float, Str, Map,
     MapPattern, Seq, FixedSeq, Validator, OrValidator, YAMLValidationError,
 )
 
 from strictyaml.parser import generic_load
+
+
+class Deprecated(Validator):
+
+    _message: str
+    _inner: Validator
+
+    def __init__(self, message: str, inner: Validator):
+        self._message = message
+        self._inner = inner
+
+    def __call__(self, *args, **kwargs):
+        log.warning(self._message)
+        return self._inner(*args, **kwargs)
 
 
 class Literal(ScalarValidator):
@@ -161,7 +177,7 @@ CASE_SCHEMA = Map({
             'command': Str() | Seq(Str()),
             Optional('name'): Str(),
             Optional('capture'): Capture() | Seq(Capture()),
-            Optional('capture-output'): Bool(),
+            Optional('capture-output'): Deprecated("capture-output is deprecated (now always on)", Bool()),
             Optional('capture-walltime'): Bool(),
         }),
     )),
