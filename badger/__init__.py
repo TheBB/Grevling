@@ -17,7 +17,7 @@ from typing import Dict, List, Any
 from fasteners import InterProcessLock
 import numpy as np
 import numpy.ma as ma
-from simpleeval import SimpleEval
+from simpleeval import SimpleEval, DEFAULT_FUNCTIONS
 import treelog as log
 from typing_inspect import get_origin, get_args
 
@@ -461,7 +461,14 @@ class Case:
         self.storagepath.mkdir(parents=True, exist_ok=True)
 
     def evaluate_context(self, context, verbose=True):
-        evaluator = SimpleEval()
+        evaluator = SimpleEval(functions={**DEFAULT_FUNCTIONS,
+            'log': np.log,
+            'log2': np.log2,
+            'log10': np.log10,
+            'sqrt': np.sqrt,
+            'abs': np.abs,
+            'ord': ord,
+        })
         evaluator.names.update(context)
         evaluator.names.update(self._constants)
         for name, code in self._evaluables.items():
