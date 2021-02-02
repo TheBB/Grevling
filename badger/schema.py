@@ -181,10 +181,18 @@ CASE_SCHEMA = Map({
             Optional('capture-walltime'): Bool(),
         }),
     )),
+    Optional('types'): MapPattern(Str(), Type()),
+    Optional('plots'): Seq(Map({
+        'parameters': MapPattern(Str(), Choice('fixed', 'variate', 'category')),
+        'filename': Str(),
+        'format': Str() | Seq(Str()),
+        'yaxis': Str() | Seq(Str()),
+        Optional('xaxis'): Str(),
+        Optional('type'): Choice('scatter', 'line'),
+    })),
     Optional('settings'): Map({
         Optional('logdir'): Str(),
     }),
-    Optional('types'): MapPattern(Str(), Type()),
 })
 
 

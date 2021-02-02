@@ -300,6 +300,59 @@ class Command:
         return True
 
 
+class Plot:
+
+    _parameters: Dict[str, str]
+    _filename: str
+    _format: List[str]
+    _yaxis: List[str]
+    _xaxis: str
+    _type: str
+
+    @classmethod
+    def load(cls, spec, parameters, types):
+        # All parameters not mentioned are assumed to be fixed
+        for param in parameters:
+            spec['parameters'].setdefault(param, 'fixed')
+
+        # If there is exactly one variate, and the x-axis is not given, assume that is the x-axis
+        variates = [param for param, kind in spec['parameters'] if kind == 'variate']
+        nvariate = len(variates)
+        if nvariate == 1 and 'xaxis' not in spec:
+            spec['xaxis'] = next(iter(variates))
+        elif 'xaxis' not in spec:
+            log.error("Plot x-axis not given, and unable to guess one")
+            return None
+
+        # If the x-axis has list type, the effective number of variates is one higher
+        eff_variates = variates + bool(get_origin(types[spec['xaxis']]) == list)
+
+        # If there are more than one effective variate, the plot must be scatter
+        if eff_variates > 1:
+            if spec.get('type', 'scatter') != 'scatter':
+                log.warning("Line plots can have at most one variate dimension")
+            spec['type'] = 'scatter'
+        elif eff_variates == 0:
+            log.error("Plot has no effective variate dimensions")
+            return
+        else:
+            spec.setdefault('type', 'line')
+
+        for k in ('format', 'yaxis'):
+            if isinstance(spec[k], str):
+                spec[k] = [spec[k]]
+
+        return call_yaml(cls, spec)
+
+    def __init__(self, parameters, filename, format, yaxis, xaxis, type):
+        self._parameters = parameters
+        self._filename = filename
+        self._format = format
+        self._yaxis = yaxis
+        self._xaxis = xaxis
+        self._type = type
+
+
 class ResultCollector(NestedDict):
 
     _types: NestedDict
@@ -334,6 +387,7 @@ class Case:
     _pre_files: List[FileMapping]
     _post_files: List[FileMapping]
     _commands: List[Command]
+    _plots: List[Plot]
     _types: NestedDict
 
     def __init__(self, yamlpath='.', storagepath=None):
@@ -398,6 +452,9 @@ class Case:
         # Read settings
         settings = casedata.get('settings', {})
         self._logdir = settings.get('logdir', None)
+
+        # Construct plot objects
+        self._plots = [Plot.load(spec, self._parameters, self._types) for spec in casedata.get('plots', [])]
 
     def clear_cache(self):
         shutil.rmtree(self.storagepath)
