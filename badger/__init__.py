@@ -12,12 +12,12 @@ import subprocess
 from tempfile import TemporaryDirectory
 from time import time as osclock
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Iterable
 
 from fasteners import InterProcessLock
 import numpy as np
 import numpy.ma as ma
-from simpleeval import SimpleEval, DEFAULT_FUNCTIONS
+from simpleeval import SimpleEval, DEFAULT_FUNCTIONS, NameNotDefined
 import treelog as log
 from typing_inspect import get_origin, get_args
 
@@ -110,6 +110,17 @@ class GradedParameter(Parameter):
             values.append(values[-1] + step)
             step *= grading
         super().__init__(name, np.array(values))
+
+
+class ParameterSpace(dict):
+
+    def subspace(self, *names) -> Iterable[Dict]:
+        params = [self[name] for name in names]
+        for values in product(*params):
+            yield dict(zip(names, values))
+
+    def fullspace(self) -> Iterable[Dict]:
+        yield from self.subspace(*self.keys())
 
 
 class FileMapping:
@@ -381,7 +392,7 @@ class Case:
     sourcepath: Path
     storagepath: Path
 
-    _parameters: Dict[str, Parameter]
+    _parameters: ParameterSpace
     _evaluables: Dict[str, str]
     _constants: Dict[str, Any]
     _pre_files: List[FileMapping]
@@ -407,7 +418,7 @@ class Case:
             casedata = load_and_validate(f.read(), yamlpath)
 
         # Read parameters
-        self._parameters = {}
+        self._parameters = ParameterSpace()
         for name, paramspec in casedata.get('parameters', {}).items():
             param = Parameter.load(name, paramspec)
             self._parameters[param.name] = param
@@ -434,7 +445,7 @@ class Case:
 
         # Guess types of evaluables
         if any(name not in self._types for name in self._evaluables):
-            contexts = list(self.parameters())
+            contexts = list(self._parameters.fullspace())
             for ctx in contexts:
                 self.evaluate_context(ctx, verbose=False)
             for name in self._evaluables:
@@ -475,7 +486,7 @@ class Case:
 
         for name, code in self._evaluables.items():
             try:
-            result = evaluator.eval(code) if isinstance(code, str) else code
+                result = evaluator.eval(code) if isinstance(code, str) else code
             except NameNotDefined as error:
                 if error.name in allowed_missing:
                     allowed_missing.add(name)
@@ -583,12 +594,8 @@ class Case:
 
         return True
 
-    def parameters(self):
-        for values in product(*(param for param in self._parameters.values())):
-            yield dict(zip(self._parameters, values))
-
     def run(self):
-        parameters = list(self.parameters())
+        parameters = list(self._parameters.fullspace())
 
         nsuccess = 0
         for index, namespace in enumerate(log.iter.fraction('parameter', parameters)):
