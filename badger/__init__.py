@@ -23,7 +23,7 @@ from typing_inspect import get_origin, get_args
 
 from badger.render import render
 from badger.schema import load_and_validate
-from badger.util import find_subclass, subindex_set, has_data, completer, NestedDict
+from badger.util import find_subclass, subindex_set, has_data, completer, NestedDict, dict_product
 
 
 __version__ = '0.1.0'
@@ -114,10 +114,21 @@ class GradedParameter(Parameter):
 
 class ParameterSpace(dict):
 
+    def make_index(self, base=None, fill=None, **kwargs):
+        if base is not None:
+            base = list(base)
+        else:
+            base = [fill] * len(self)
+        for i, param in enumerate(self):
+            if param in kwargs:
+                base[i] = kwargs[param]
+        return tuple(base)
+
     def subspace(self, *names) -> Iterable[Dict]:
         params = [self[name] for name in names]
-        for values in product(*params):
-            yield dict(zip(names, values))
+        indexes = [range(len(p)) for p in params]
+        for index, values in zip(dict_product(names, indexes), dict_product(names, params)):
+            yield self.make_index(**index), values
 
     def fullspace(self) -> Iterable[Dict]:
         yield from self.subspace(*self.keys())
@@ -445,7 +456,7 @@ class Case:
 
         # Guess types of evaluables
         if any(name not in self._types for name in self._evaluables):
-            contexts = list(self._parameters.fullspace())
+            contexts = list(ctx for _, ctx in self._parameters.fullspace())
             for ctx in contexts:
                 self.evaluate_context(ctx, verbose=False)
             for name in self._evaluables:
@@ -510,7 +521,7 @@ class Case:
     def commit_result(self, index, collector):
         with self.acquire_lock():
             results = self.result_array()
-            collector.commit(results.flat[index])
+            collector.commit(results[index])
             np.save(self.storagepath / 'results.npy', results.data, allow_pickle=True)
             np.save(self.storagepath / 'results.mask.npy', results.mask, allow_pickle=True)
 
@@ -598,7 +609,7 @@ class Case:
         parameters = list(self._parameters.fullspace())
 
         nsuccess = 0
-        for index, namespace in enumerate(log.iter.fraction('parameter', parameters)):
+        for index, namespace in log.iter.fraction('parameter', parameters):
             nsuccess += self.run_single(index, namespace)
 
         logger = log.user if nsuccess == len(parameters) else log.warning

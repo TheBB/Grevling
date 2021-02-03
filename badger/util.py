@@ -1,6 +1,13 @@
+from itertools import product
+
 import numpy as np
 import numpy.ma as ma
 from typing_inspect import get_origin
+
+
+def dict_product(names, iterables):
+    for values in product(*iterables):
+        yield dict(zip(names, values))
 
 
 def subclasses(cls, root=False):
