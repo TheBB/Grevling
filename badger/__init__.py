@@ -460,7 +460,7 @@ class Case:
         shutil.rmtree(self.storagepath)
         self.storagepath.mkdir(parents=True, exist_ok=True)
 
-    def evaluate_context(self, context, verbose=True):
+    def evaluate_context(self, context, verbose=True, allowed_missing=()):
         evaluator = SimpleEval(functions={**DEFAULT_FUNCTIONS,
             'log': np.log,
             'log2': np.log2,
@@ -471,8 +471,18 @@ class Case:
         })
         evaluator.names.update(context)
         evaluator.names.update(self._constants)
+        allowed_missing = set(allowed_missing)
+
         for name, code in self._evaluables.items():
+            try:
             result = evaluator.eval(code) if isinstance(code, str) else code
+            except NameNotDefined as error:
+                if error.name in allowed_missing:
+                    allowed_missing.add(name)
+                    log.debug(f'Skipped evaluating: {name}')
+                    continue
+                else:
+                    raise
             if verbose:
                 log.debug(f'Evaluated: {name} = {repr(result)}')
             evaluator.names[name] = context[name] = result
