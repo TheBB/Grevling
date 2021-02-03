@@ -21,6 +21,7 @@ from simpleeval import SimpleEval, DEFAULT_FUNCTIONS, NameNotDefined
 import treelog as log
 from typing_inspect import get_origin, get_args
 
+from badger.plotting import PlotBackend
 from badger.render import render
 from badger.schema import load_and_validate
 from badger.util import find_subclass, subindex_set, has_data, completer, NestedDict, dict_product
@@ -390,11 +391,22 @@ class Plot:
         # Collect all the categorized parameters and iterate over all those combinations
         categories = self._parameters_of_kind('category')
         noncats = set(case._parameters.keys()) - set(self._parameters_of_kind('fixed', 'category'))
+        backends = [PlotBackend.get_backend(fmt)() for fmt in self._format]
 
         for sub_index, sub_context in case._parameters.subspace(*categories, base=index):
             sub_context = {**context, **sub_context}
             case.evaluate_context(sub_context, allowed_missing=noncats)
-            name, xaxis, yaxes = self.generate_category(case, sub_context, sub_index)
+
+            cat_name, xaxis, yaxes = self.generate_category(case, sub_context, sub_index)
+
+            for ax_name, data in zip(self._yaxis, yaxes):
+                legend = ax_name if cat_name is None else f'{cat_name} ({ax_name})'
+                for backend in backends:
+                    backend.add_line(legend, xaxis, data)
+
+        filename = case.storagepath / render(self._filename, context)
+        for backend in backends:
+            backend.generate(filename)
 
     def generate_category(self, case: 'Case', context: dict, index):
         # Pick an arbitrary index for ignored parameters
@@ -405,7 +417,11 @@ class Plot:
         yaxes = [data[yaxis].compressed() for yaxis in self._yaxis]
         xaxis = data[self._xaxis].compressed()
 
-        name = ', '.join(f'{k}={repr(context[k])}' for k in self._parameters_of_kind('category'))
+        if any(self._parameters_of_kind('category')):
+            name = ', '.join(f'{k}={repr(context[k])}' for k in self._parameters_of_kind('category'))
+        else:
+            name = None
+
         return name, xaxis, yaxes
 
 

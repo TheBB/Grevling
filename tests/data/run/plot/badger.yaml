@@ -1,0 +1,30 @@
+parameters:
+  i: [1, 2, 3, 4, 5]
+  j: [1, 2, 4, 8, 16]
+  k: [a, b, c]
+evaluate:
+  isq: i**2
+  jlog: log(j)
+  misc: i + j + ord(k)
+constants:
+  pi: 3.1415
+  e: 2.7182
+script:
+  - command: [sh, -c, 'for i in `seq 1 ${i}`; do echo result $i; done']
+    capture:
+      - type: integer
+        name: vresult
+        prefix: result
+        mode: all
+  - command: [sh, -c, 'for i in `seq 1 10`; do echo result $i; done']
+    capture:
+      - type: integer
+        name: fresult
+        prefix: result
+        mode: all
+plots:
+  - parameters:
+      i: variate
+    filename: i-vs-isq
+    format: matplotlib
+    yaxis: isq
