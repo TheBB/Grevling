@@ -26,5 +26,5 @@ plots:
   - parameters:
       i: variate
     filename: i-vs-isq
-    format: matplotlib
+    format: [matplotlib, csv]
     yaxis: isq
