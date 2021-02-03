@@ -114,21 +114,21 @@ class GradedParameter(Parameter):
 
 class ParameterSpace(dict):
 
-    def make_index(self, base=None, fill=None, **kwargs):
-        if base is not None:
-            base = list(base)
+    def make_index(self, _base=None, _fill=None, **kwargs):
+        if _base is not None:
+            base = list(_base)
         else:
-            base = [fill] * len(self)
+            base = [_fill] * len(self)
         for i, param in enumerate(self):
             if param in kwargs:
                 base[i] = kwargs[param]
         return tuple(base)
 
-    def subspace(self, *names) -> Iterable[Dict]:
+    def subspace(self, *names, base=None, fill=None) -> Iterable[Dict]:
         params = [self[name] for name in names]
         indexes = [range(len(p)) for p in params]
         for index, values in zip(dict_product(names, indexes), dict_product(names, params)):
-            yield self.make_index(**index), values
+            yield self.make_index(_base=base, _fill=fill, **index), values
 
     def fullspace(self) -> Iterable[Dict]:
         yield from self.subspace(*self.keys())
@@ -333,12 +333,12 @@ class Plot:
 
     @classmethod
     def load(cls, spec, parameters, types):
-        # All parameters not mentioned are assumed to be fixed
+        # All parameters not mentioned are assumed to be ignored
         for param in parameters:
-            spec['parameters'].setdefault(param, 'fixed')
+            spec['parameters'].setdefault(param, 'ignore')
 
         # If there is exactly one variate, and the x-axis is not given, assume that is the x-axis
-        variates = [param for param, kind in spec['parameters'] if kind == 'variate']
+        variates = [param for param, kind in spec['parameters'].items() if kind == 'variate']
         nvariate = len(variates)
         if nvariate == 1 and 'xaxis' not in spec:
             spec['xaxis'] = next(iter(variates))
@@ -347,7 +347,7 @@ class Plot:
             return None
 
         # If the x-axis has list type, the effective number of variates is one higher
-        eff_variates = variates + bool(get_origin(types[spec['xaxis']]) == list)
+        eff_variates = nvariate + bool(get_origin(types[spec['xaxis']]) == list)
 
         # If there are more than one effective variate, the plot must be scatter
         if eff_variates > 1:
@@ -373,6 +373,40 @@ class Plot:
         self._yaxis = yaxis
         self._xaxis = xaxis
         self._type = type
+
+    def _parameters_of_kind(self, *kinds: str):
+        return [param for param, k in self._parameters.items() if k in kinds]
+
+    def generate_all(self, case: 'Case'):
+        # Collect all the fixed parameters and iterate over all those combinations
+        fixed = self._parameters_of_kind('fixed')
+        unfixed = set(case._parameters.keys()) - set(fixed)
+
+        for index, context in case._parameters.subspace(*fixed, fill=slice(None)):
+            case.evaluate_context(context, allowed_missing=unfixed)
+            self.generate_single(case, context, index)
+
+    def generate_single(self, case: 'Case', context: dict, index):
+        # Collect all the categorized parameters and iterate over all those combinations
+        categories = self._parameters_of_kind('category')
+        noncats = set(case._parameters.keys()) - set(self._parameters_of_kind('fixed', 'category'))
+
+        for sub_index, sub_context in case._parameters.subspace(*categories, base=index):
+            sub_context = {**context, **sub_context}
+            case.evaluate_context(sub_context, allowed_missing=noncats)
+            name, xaxis, yaxes = self.generate_category(case, sub_context, sub_index)
+
+    def generate_category(self, case: 'Case', context: dict, index):
+        # Pick an arbitrary index for ignored parameters
+        ignored = self._parameters_of_kind('ignore')
+        index = case._parameters.make_index(_base=index, **{param: 0 for param in ignored})
+
+        data = case.result_array()[index]
+        yaxes = [data[yaxis].compressed() for yaxis in self._yaxis]
+        xaxis = data[self._xaxis].compressed()
+
+        name = ', '.join(f'{k}={repr(context[k])}' for k in self._parameters_of_kind('category'))
+        return name, xaxis, yaxes
 
 
 class ResultCollector(NestedDict):
@@ -614,6 +648,9 @@ class Case:
 
         logger = log.user if nsuccess == len(parameters) else log.warning
         logger(f"{nsuccess} of {len(parameters)} succeeded")
+
+        for plot in log.iter.fraction('plot', self._plots):
+            plot.generate_all(self)
 
     def run_single(self, index, namespace):
         log.user(', '.join(f'{k}={repr(v)}' for k, v in namespace.items()))

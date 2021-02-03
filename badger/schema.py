@@ -183,7 +183,7 @@ CASE_SCHEMA = Map({
     )),
     Optional('types'): MapPattern(Str(), Type()),
     Optional('plots'): Seq(Map({
-        'parameters': MapPattern(Str(), Choice('fixed', 'variate', 'category')),
+        'parameters': MapPattern(Str(), Choice('fixed', 'variate', 'category', 'ignore', 'mean')),
         'filename': Str(),
         'format': Str() | Seq(Str()),
         'yaxis': Str() | Seq(Str()),
