@@ -24,7 +24,7 @@ from typing_inspect import get_origin, get_args
 from badger.plotting import PlotBackend
 from badger.render import render
 from badger.schema import load_and_validate
-from badger.util import find_subclass, subindex_set, has_data, completer, NestedDict, dict_product
+import badger.util as util
 
 
 __version__ = '0.1.0'
@@ -40,8 +40,6 @@ def time():
 def _numpy_dtype(tp):
     if tp in (int, float):
         return tp
-    if isinstance(tp, NestedDict):
-        return list(tp.items())
     return object
 
 
@@ -76,7 +74,7 @@ class Parameter:
     def load(cls, name, spec):
         if isinstance(spec, list):
             return cls(name, spec)
-        subcls = find_subclass(cls, spec['type'], root=False, attr='__tag__')
+        subcls = util.find_subclass(cls, spec['type'], root=False, attr='__tag__')
         del spec['type']
         return call_yaml(subcls, spec, name)
 
@@ -128,7 +126,7 @@ class ParameterSpace(dict):
     def subspace(self, *names, base=None, fill=None) -> Iterable[Dict]:
         params = [self[name] for name in names]
         indexes = [range(len(p)) for p in params]
-        for index, values in zip(dict_product(names, indexes), dict_product(names, params)):
+        for index, values in zip(util.dict_product(names, indexes), util.dict_product(names, params)):
             yield self.make_index(_base=base, _fill=fill, **index), values
 
     def fullspace(self) -> Iterable[Dict]:
@@ -217,7 +215,7 @@ class Capture:
         self._mode = mode
         self._type_overrides = type_overrides or {}
 
-    def add_types(self, types: NestedDict):
+    def add_types(self, types: Dict[str, Any]):
         for group in self._regex.groupindex.keys():
             single = self._type_overrides.get(group, str)
             if self._mode == 'all':
@@ -272,7 +270,7 @@ class Command:
         elif isinstance(capture, list):
             self._capture.extend(Capture.load(c) for c in capture)
 
-    def add_types(self, types: NestedDict):
+    def add_types(self, types: Dict[str, Any]):
         if self._capture_walltime:
             types[f'walltime/{self.name}'] = float
         for cap in self._capture:
@@ -425,9 +423,9 @@ class Plot:
         return name, xaxis, yaxes
 
 
-class ResultCollector(NestedDict):
+class ResultCollector(dict):
 
-    _types: NestedDict
+    _types: Dict[str, Any]
 
     def __init__(self, types):
         super().__init__()
@@ -443,8 +441,8 @@ class ResultCollector(NestedDict):
 
     def commit(self, array):
         for key, value in self.items():
-            subindex_set(array.mask, key, False)
-            subindex_set(array, key, value)
+            array.mask[key] = False
+            array[key] = value
 
 
 class Case:
@@ -460,7 +458,7 @@ class Case:
     _post_files: List[FileMapping]
     _commands: List[Command]
     _plots: List[Plot]
-    _types: NestedDict
+    _types: Dict[str, Any]
 
     def __init__(self, yamlpath='.', storagepath=None):
         if isinstance(yamlpath, str):
@@ -497,7 +495,7 @@ class Case:
         self._commands = [Command.load(spec) for spec in casedata.get('script', [])]
 
         # Read types
-        self._types = NestedDict(casedata.get('types', {}).items())
+        self._types = dict(casedata.get('types', {}).items())
 
         # Guess types of parameters
         for name, param in self._parameters.items():
@@ -519,7 +517,7 @@ class Case:
             cmd.add_types(self._types)
 
         # Construct numpy dtype of result array
-        self._dtype = self._types.map(_numpy_dtype).as_list_of_tuples()
+        self._dtype = [(name, _numpy_dtype(tp)) for name, tp in self._types.items()]
 
         # Read settings
         settings = casedata.get('settings', {})
@@ -590,13 +588,13 @@ class Case:
             )
 
     def has_data(self):
-        return has_data(self.result_array())
+        return util.has_data(self.result_array())
 
     def _check_decide_diff(self, diff: List[str], prev_file: Path, interactive: bool = True) -> bool:
         decision = None
         decisions = ['exit', 'diff', 'new-delete', 'new-keep', 'old']
         if interactive:
-            readline.set_completer(completer(decisions))
+            readline.set_completer(util.completer(decisions))
             readline.parse_and_bind('tab: complete')
             log.warning("Warning: Badgerfile has changed and data have already been stored")
             log.warning("Pick an option:")
