@@ -113,6 +113,12 @@ class GradedParameter(Parameter):
 
 class ParameterSpace(dict):
 
+    def indexof(self, name: str) -> int:
+        for i, param in enumerate(self):
+            if param == name:
+                return i
+        raise ValueError(name)
+
     def make_index(self, _base=None, _fill=None, **kwargs):
         if _base is not None:
             base = list(_base)
@@ -411,16 +417,26 @@ class Plot:
         ignored = self._parameters_of_kind('ignore')
         index = case._parameters.make_index(_base=index, **{param: 0 for param in ignored})
 
-        data = case.result_array()[index]
-        yaxes = [data[yaxis].compressed() for yaxis in self._yaxis]
-        xaxis = data[self._xaxis].compressed()
+        # Grab a 'thick' index, to preserve parameter <-> axis mapping
+        data = case.result_array()[util.thick_index(index)]
+
+        # Extract only the fields we need
+        fields = [data[n] for n in [self._xaxis, *self._yaxis]]
+
+        # Collapse mean parameters
+        means = self._parameters_of_kind('mean')
+        for mean in means:
+            fields = [util.flexible_mean(f, case._parameters.indexof(mean)) for f in fields]
+
+        # Extract data
+        fields = [f.compressed() for f in fields]
 
         if any(self._parameters_of_kind('category')):
             name = ', '.join(f'{k}={repr(context[k])}' for k in self._parameters_of_kind('category'))
         else:
             name = None
 
-        return name, xaxis, yaxes
+        return name, fields[0], fields[1:]
 
 
 class ResultCollector(dict):

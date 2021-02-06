@@ -11,6 +11,7 @@ constants:
   e: 2.7182
 script:
   - command: [sh, -c, 'for i in `seq 1 ${i}`; do echo result $i; done']
+    capture-walltime: on
     capture:
       - type: integer
         name: vresult
@@ -28,3 +29,10 @@ plots:
     filename: i-vs-isq
     format: [matplotlib, csv]
     yaxis: isq
+  - parameters:
+      i: variate
+      j: mean
+      k: fixed
+    filename: misc-vs-i-${k}
+    format: [matplotlib, csv]
+    yaxis: misc

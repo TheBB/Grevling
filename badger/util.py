@@ -41,11 +41,32 @@ def find_subclass(cls, name, root=False, attr='__tag__'):
     return None
 
 
-def subindex_set(target, key, value):
-    *path, last = key.split('/')
-    for p in path:
-        target = target[p]
-    target[last] = value
+def thick_index(index):
+    return tuple(
+        slice(i, i+1) if isinstance(i, int) else i
+        for i in index
+    )
+
+
+def iter_axis(array, axis):
+    indices = (slice(None),) * axis
+    for i in range(array.shape[axis]):
+        yield array[(*indices, slice(i, i+1))]
+
+
+def flexible_mean(array, axis):
+    return np.mean(array, axis=axis, keepdims=True)
+    # new_shape = list(array.shape)
+    # new_shape[axis] = 1
+    # result = np.zeros_like(array, shape=tuple(new_shape))
+
+    # data = iter_axis(array, axis)
+    # result[:] = next(data)
+    # for d in data:
+    #     result += d
+
+    # result /= array.shape[axis]
+    # return
 
 
 def has_data(array: ma.MaskedArray) -> bool:
