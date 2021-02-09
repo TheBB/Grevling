@@ -9,11 +9,17 @@ from badger import Case
 DATADIR = Path(__file__).parent / 'data'
 
 
+def float_or_none(text):
+    if text == '':
+        return np.nan
+    return float(text)
+
+
 def read_csv(path: Path):
     with open(path, 'r', newline='') as f:
         reader = csv.reader(f)
         headers = next(reader)
-        data = np.array([list(map(float, row)) for row in reader])
+        data = np.array([list(map(float_or_none, row)) for row in reader])
     return headers, data
 
 
@@ -63,4 +69,25 @@ def test_plots():
     np.testing.assert_array_equal(data.T, [
         np.arange(1, 11),
         np.arange(1, 11),
+    ])
+
+    headers, data = read_csv(root / 'vresult.csv')
+    assert headers == [
+        'i=1 (vresult) (x-axis)',
+        'i=1 (vresult)',
+        'i=2 (vresult) (x-axis)',
+        'i=2 (vresult)',
+        'i=3 (vresult) (x-axis)',
+        'i=3 (vresult)',
+        'i=4 (vresult) (x-axis)',
+        'i=4 (vresult)',
+        'i=5 (vresult) (x-axis)',
+        'i=5 (vresult)',
+    ]
+    np.testing.assert_array_equal(data, [
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [np.nan, np.nan, 2, 2, 2, 2, 2, 2, 2, 2],
+        [np.nan, np.nan, np.nan, np.nan, 3, 3, 3, 3, 3, 3],
+        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 4, 4, 4, 4],
+        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 5, 5],
     ])

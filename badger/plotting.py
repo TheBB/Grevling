@@ -50,7 +50,10 @@ class CSVBackend(PlotBackend):
         self.legend.extend([f'{legend} (x-axis)', legend])
 
     def generate(self, filename: Path):
+        maxlen = max(len(c) for c in self.columns)
+        cols = [list(c) + [None] * (maxlen - len(c)) for c in self.columns]
         with open(filename.with_suffix('.csv'), 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(self.legend)
-            writer.writerows(np.array(self.columns).T)
+            for row in zip(*cols):
+                writer.writerow(row)

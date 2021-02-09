@@ -39,3 +39,8 @@ plots:
   - filename: fresult
     format: [matplotlib, csv]
     yaxis: fresult
+  - parameters:
+      i: category
+    filename: vresult
+    format: [matplotlib, csv]
+    yaxis: vresult
