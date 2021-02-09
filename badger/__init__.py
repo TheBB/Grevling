@@ -339,6 +339,7 @@ class Plot:
     @classmethod
     def load(cls, spec, parameters, types):
         # All parameters not mentioned are assumed to be ignored
+        spec.setdefault('parameters', {})
         for param in parameters:
             spec['parameters'].setdefault(param, 'ignore')
 
@@ -348,11 +349,21 @@ class Plot:
         if nvariate == 1 and 'xaxis' not in spec:
             spec['xaxis'] = next(iter(variates))
         elif 'xaxis' not in spec:
-            log.error("Plot x-axis not given, and unable to guess one")
-            return None
+            spec['xaxis'] = None
+
+        # Listify possible scalars
+        for k in ('format', 'yaxis'):
+            if isinstance(spec[k], str):
+                spec[k] = [spec[k]]
+
+        # Either all the axes are list type or none of them are
+        list_type = util.is_list_type(types[spec['yaxis'][0]])
+        assert all(util.is_list_type(types[k]) == list_type for k in spec['yaxis'][1:])
+        if spec['xaxis']:
+            assert util.is_list_type(types[spec['xaxis']]) == list_type
 
         # If the x-axis has list type, the effective number of variates is one higher
-        eff_variates = nvariate + bool(get_origin(types[spec['xaxis']]) == list)
+        eff_variates = nvariate + list_type
 
         # If there are more than one effective variate, the plot must be scatter
         if eff_variates > 1:
@@ -364,10 +375,6 @@ class Plot:
             return
         else:
             spec.setdefault('type', 'line')
-
-        for k in ('format', 'yaxis'):
-            if isinstance(spec[k], str):
-                spec[k] = [spec[k]]
 
         return call_yaml(cls, spec)
 
@@ -421,7 +428,10 @@ class Plot:
         data = case.result_array()[util.thick_index(index)]
 
         # Extract only the fields we need
-        fields = [data[n] for n in [self._xaxis, *self._yaxis]]
+        fieldnames = list(self._yaxis)
+        if self._xaxis:
+            fieldnames.append(self._xaxis)
+        fields = [data[n] for n in fieldnames]
 
         # Collapse mean parameters
         means = self._parameters_of_kind('mean')
@@ -429,14 +439,18 @@ class Plot:
             fields = [util.flexible_mean(f, case._parameters.indexof(mean)) for f in fields]
 
         # Extract data
-        fields = [f.compressed() for f in fields]
+        fields = [util.flatten(f.compressed()) for f in fields]
+
+        if not self._xaxis:
+            length = max(len(f) for f in fields)
+            fields.append(np.arange(1, length + 1))
 
         if any(self._parameters_of_kind('category')):
             name = ', '.join(f'{k}={repr(context[k])}' for k in self._parameters_of_kind('category'))
         else:
             name = None
 
-        return name, fields[0], fields[1:]
+        return name, fields[-1], fields[:-1]
 
 
 class ResultCollector(dict):
@@ -449,7 +463,7 @@ class ResultCollector(dict):
 
     def collect(self, name: str, value: Any):
         tp = self._types[name]
-        if get_origin(tp) == list:
+        if util.is_list_type(tp):
             eltype = get_args(tp)[0]
             self.setdefault(name, []).append(eltype(value))
         else:
@@ -458,7 +472,10 @@ class ResultCollector(dict):
     def commit(self, array):
         for key, value in self.items():
             array.mask[key] = False
-            array[key] = value
+            if util.is_list_type(self._types[key]):
+                array[key] = np.array(value)
+            else:
+                array[key] = value
 
 
 class Case:

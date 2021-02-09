@@ -5,6 +5,16 @@ import numpy.ma as ma
 from typing_inspect import get_origin
 
 
+def flatten(array):
+    while array.dtype == object:
+        array = np.array(array.tolist()).flatten()
+    return array
+
+
+def is_list_type(tp):
+    return get_origin(tp) == list
+
+
 def struct_as_dict(array: np.void, types: 'NestedDict') -> dict:
     retval = {}
     for k in array.dtype.fields.keys():

@@ -36,3 +36,6 @@ plots:
     filename: misc-vs-i-${k}
     format: [matplotlib, csv]
     yaxis: misc
+  - filename: fresult
+    format: [matplotlib, csv]
+    yaxis: fresult
