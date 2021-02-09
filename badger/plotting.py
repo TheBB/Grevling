@@ -32,6 +32,10 @@ class MatplotilbBackend(PlotBackend):
         self.axes.plot(xpoints, ypoints)
         self.legend.append(legend)
 
+    def add_scatter(self, legend: str, xpoints: List[float], ypoints: List[float]):
+        self.axes.scatter(xpoints, ypoints)
+        self.legend.append(legend)
+
     def generate(self, filename: Path):
         self.axes.legend(self.legend)
         self.figure.savefig(filename.with_suffix('.png'))
@@ -48,6 +52,8 @@ class CSVBackend(PlotBackend):
     def add_line(self, legend: str, xpoints: List[float], ypoints: List[float]):
         self.columns.extend([xpoints, ypoints])
         self.legend.extend([f'{legend} (x-axis)', legend])
+
+    add_scatter = add_line
 
     def generate(self, filename: Path):
         maxlen = max(len(c) for c in self.columns)

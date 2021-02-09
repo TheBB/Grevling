@@ -51,3 +51,11 @@ plots:
     filename: vresult
     format: [matplotlib, csv]
     yaxis: vresult
+  - parameters:
+      i: variate
+      j: variate
+      k: variate
+    filename: scatter
+    format: [matplotlib, csv]
+    xaxis: j
+    yaxis: [misc]

@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from difflib import Differ
 import inspect
 from itertools import product
+import operator
 from pathlib import Path
 import pydoc
 import re
@@ -403,6 +404,7 @@ class Plot:
         categories = self._parameters_of_kind('category')
         noncats = set(case._parameters.keys()) - set(self._parameters_of_kind('fixed', 'category'))
         backends = [PlotBackend.get_backend(fmt)() for fmt in self._format]
+        plotter = operator.attrgetter(f'add_{self._type}')
 
         for sub_index, sub_context in case._parameters.subspace(*categories, base=index):
             sub_context = {**context, **sub_context}
@@ -413,7 +415,7 @@ class Plot:
             for ax_name, data in zip(self._yaxis, yaxes):
                 legend = ax_name if cat_name is None else f'{cat_name} ({ax_name})'
                 for backend in backends:
-                    backend.add_line(legend, xaxis, data)
+                    plotter(backend)(legend, xaxis, data)
 
         filename = case.storagepath / render(self._filename, context)
         for backend in backends:
