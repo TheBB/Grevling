@@ -40,6 +40,13 @@ plots:
     format: [matplotlib, csv]
     yaxis: fresult
   - parameters:
+      i: mean
+      j: mean
+      k: mean
+    yaxis: fresult
+    filename: fresult-mean
+    format: [matplotlib, csv]
+  - parameters:
       i: category
     filename: vresult
     format: [matplotlib, csv]

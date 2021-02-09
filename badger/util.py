@@ -65,18 +65,12 @@ def iter_axis(array, axis):
 
 
 def flexible_mean(array, axis):
-    return np.mean(array, axis=axis, keepdims=True)
-    # new_shape = list(array.shape)
-    # new_shape[axis] = 1
-    # result = np.zeros_like(array, shape=tuple(new_shape))
-
-    # data = iter_axis(array, axis)
-    # result[:] = next(data)
-    # for d in data:
-    #     result += d
-
-    # result /= array.shape[axis]
-    # return
+    d = np.sum(array, axis=axis, keepdims=True)
+    if d.dtype == object:
+        d = np.vectorize(lambda z: z/array.shape[axis], otypes=[object])(d)
+    else:
+        d = d / array.shape[axis]
+    return d
 
 
 def has_data(array: ma.MaskedArray) -> bool:

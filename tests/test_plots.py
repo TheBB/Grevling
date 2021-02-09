@@ -91,3 +91,10 @@ def test_plots():
         [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 4, 4, 4, 4],
         [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 5, 5],
     ])
+
+    headers, data = read_csv(root / 'fresult-mean.csv')
+    assert headers == ['fresult (x-axis)', 'fresult']
+    np.testing.assert_array_equal(data.T, [
+        np.arange(1, 11),
+        np.arange(1, 11),
+    ])
