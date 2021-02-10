@@ -13,7 +13,7 @@ import subprocess
 from tempfile import TemporaryDirectory
 from time import time as osclock
 
-from typing import Dict, List, Any, Iterable
+from typing import Dict, List, Any, Iterable, Optional
 
 from fasteners import InterProcessLock
 import numpy as np
@@ -336,6 +336,7 @@ class Plot:
     _yaxis: List[str]
     _xaxis: str
     _type: str
+    _legend: Optional[str]
 
     @classmethod
     def load(cls, spec, parameters, types):
@@ -379,13 +380,14 @@ class Plot:
 
         return call_yaml(cls, spec)
 
-    def __init__(self, parameters, filename, format, yaxis, xaxis, type):
+    def __init__(self, parameters, filename, format, yaxis, xaxis, type, legend=None):
         self._parameters = parameters
         self._filename = filename
         self._format = format
         self._yaxis = yaxis
         self._xaxis = xaxis
         self._type = type
+        self._legend = legend
 
     def _parameters_of_kind(self, *kinds: str):
         return [param for param, k in self._parameters.items() if k in kinds]
@@ -413,7 +415,7 @@ class Plot:
             cat_name, xaxis, yaxes = self.generate_category(case, sub_context, sub_index)
 
             for ax_name, data in zip(self._yaxis, yaxes):
-                legend = ax_name if cat_name is None else f'{cat_name} ({ax_name})'
+                legend = self.generate_legend(sub_context, ax_name)
                 for backend in backends:
                     plotter(backend)(legend, xaxis, data)
 
@@ -453,6 +455,14 @@ class Plot:
             name = None
 
         return name, fields[-1], fields[:-1]
+
+    def generate_legend(self, context: dict, yaxis: str) -> str:
+        if self._legend is not None:
+            return render(self._legend, {**context, 'yaxis': yaxis})
+        if any(self._parameters_of_kind('category')):
+            name = ', '.join(f'{k}={repr(context[k])}' for k in self._parameters_of_kind('category'))
+            return f'{name} ({yaxis})'
+        return yaxis
 
 
 class ResultCollector(dict):

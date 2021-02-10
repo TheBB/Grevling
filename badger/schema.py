@@ -189,6 +189,7 @@ CASE_SCHEMA = Map({
         Optional('parameters'): MapPattern(Str(), Choice('fixed', 'variate', 'category', 'ignore', 'mean')),
         Optional('xaxis'): Str(),
         Optional('type'): Choice('scatter', 'line'),
+        Optional('legend'): Str(),
     })),
     Optional('settings'): Map({
         Optional('logdir'): Str(),

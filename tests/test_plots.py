@@ -74,16 +74,16 @@ def test_plots():
 
     headers, data = read_csv(root / 'vresult.csv')
     assert headers == [
-        'i=1 (vresult) (x-axis)',
-        'i=1 (vresult)',
-        'i=2 (vresult) (x-axis)',
-        'i=2 (vresult)',
-        'i=3 (vresult) (x-axis)',
-        'i=3 (vresult)',
-        'i=4 (vresult) (x-axis)',
-        'i=4 (vresult)',
-        'i=5 (vresult) (x-axis)',
-        'i=5 (vresult)',
+        'i is 1 - vresult (x-axis)',
+        'i is 1 - vresult',
+        'i is 2 - vresult (x-axis)',
+        'i is 2 - vresult',
+        'i is 3 - vresult (x-axis)',
+        'i is 3 - vresult',
+        'i is 4 - vresult (x-axis)',
+        'i is 4 - vresult',
+        'i is 5 - vresult (x-axis)',
+        'i is 5 - vresult',
     ]
     np.testing.assert_array_equal(data, [
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],

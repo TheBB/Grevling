@@ -51,6 +51,7 @@ plots:
     filename: vresult
     format: [matplotlib, csv]
     yaxis: vresult
+    legend: i is ${i} - ${yaxis}
   - parameters:
       i: variate
       j: variate
