@@ -5,6 +5,10 @@ import numpy.ma as ma
 from typing_inspect import get_origin
 
 
+def ignore(*_, **__):
+    pass
+
+
 def flatten(array):
     while array.dtype == object:
         array = np.array(array.tolist()).flatten()

@@ -337,6 +337,9 @@ class Plot:
     _xaxis: str
     _type: str
     _legend: Optional[str]
+    _xlabel: Optional[str]
+    _ylabel: Optional[str]
+    _title: Optional[str]
 
     @classmethod
     def load(cls, spec, parameters, types):
@@ -380,7 +383,8 @@ class Plot:
 
         return call_yaml(cls, spec)
 
-    def __init__(self, parameters, filename, format, yaxis, xaxis, type, legend=None):
+    def __init__(self, parameters, filename, format, yaxis, xaxis, type,
+                 legend=None, xlabel=None, ylabel=None, title=None):
         self._parameters = parameters
         self._filename = filename
         self._format = format
@@ -388,6 +392,9 @@ class Plot:
         self._xaxis = xaxis
         self._type = type
         self._legend = legend
+        self._xlabel = xlabel
+        self._ylabel = ylabel
+        self._title = title
 
     def _parameters_of_kind(self, *kinds: str):
         return [param for param, k in self._parameters.items() if k in kinds]
@@ -418,6 +425,14 @@ class Plot:
                 legend = self.generate_legend(sub_context, ax_name)
                 for backend in backends:
                     plotter(backend)(legend, xaxis, data)
+
+        for attr in ['title', 'xlabel', 'ylabel']:
+            template = getattr(self, f'_{attr}')
+            if template is None:
+                continue
+            text = render(template, context)
+            for backend in backends:
+                getattr(backend, f'set_{attr}')(text)
 
         filename = case.storagepath / render(self._filename, context)
         for backend in backends:

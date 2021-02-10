@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.figure
 
-from badger.util import find_subclass
+from badger.util import find_subclass, ignore
 
 
 class PlotBackend:
@@ -36,6 +36,15 @@ class MatplotilbBackend(PlotBackend):
         self.axes.scatter(xpoints, ypoints)
         self.legend.append(legend)
 
+    def set_title(self, title: str):
+        self.axes.set_title(title)
+
+    def set_xlabel(self, label: str):
+        self.axes.set_xlabel(label)
+
+    def set_ylabel(self, label: str):
+        self.axes.set_ylabel(label)
+
     def generate(self, filename: Path):
         self.axes.legend(self.legend)
         self.figure.savefig(filename.with_suffix('.png'))
@@ -54,6 +63,9 @@ class CSVBackend(PlotBackend):
         self.legend.extend([f'{legend} (x-axis)', legend])
 
     add_scatter = add_line
+    set_title = ignore
+    set_xlabel = ignore
+    set_ylabel = ignore
 
     def generate(self, filename: Path):
         maxlen = max(len(c) for c in self.columns)

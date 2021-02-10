@@ -190,6 +190,9 @@ CASE_SCHEMA = Map({
         Optional('xaxis'): Str(),
         Optional('type'): Choice('scatter', 'line'),
         Optional('legend'): Str(),
+        Optional('xlabel'): Str(),
+        Optional('ylabel'): Str(),
+        Optional('title'): Str(),
     })),
     Optional('settings'): Map({
         Optional('logdir'): Str(),
