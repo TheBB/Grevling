@@ -4,8 +4,6 @@ import csv
 from typing import List
 
 import numpy as np
-import matplotlib as mpl
-import matplotlib.figure
 
 from badger.util import find_subclass, ignore
 
@@ -16,15 +14,27 @@ class PlotBackend:
 
     @staticmethod
     def get_backend(name: str):
-        return find_subclass(PlotBackend, name, attr='name')
+        cls = find_subclass(PlotBackend, name, attr='name')
+        if not cls.available():
+            raise ImportError(f"Additional dependencies required for {name} backend")
+        return cls
 
 
 class MatplotilbBackend(PlotBackend):
 
     name = 'matplotlib'
 
+    @classmethod
+    def available(cls):
+        try:
+            import matplotlib
+            return True
+        except ImportError:
+            return False
+
     def __init__(self):
-        self.figure = mpl.figure.Figure(tight_layout=True)
+        from matplotlib.figure import Figure
+        self.figure = Figure(tight_layout=True)
         self.axes = self.figure.add_subplot(1, 1, 1)
         self.legend = []
 
@@ -53,6 +63,10 @@ class MatplotilbBackend(PlotBackend):
 class CSVBackend(PlotBackend):
 
     name = 'csv'
+
+    @classmethod
+    def available(cls):
+        return True
 
     def __init__(self):
         self.columns = []

@@ -24,6 +24,7 @@ setup(
     extras_require={
         'testing': ['pytest'],
         'deploy': ['twine', 'cibuildwheel==1.1.0'],
+        'matplotlib': ['matplotlib'],
     },
     entry_points={
         'console_scripts': ['badger=badger.__main__:main'],
