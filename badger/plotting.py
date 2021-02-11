@@ -60,6 +60,41 @@ class MatplotilbBackend(PlotBackend):
         self.figure.savefig(filename.with_suffix('.png'))
 
 
+class PlotlyBackend(PlotBackend):
+
+    name = 'plotly'
+
+    @classmethod
+    def available(cls):
+        try:
+            import plotly
+            return True
+        except:
+            return False
+
+    def __init__(self):
+        import plotly.graph_objects as go
+        self.figure = go.Figure()
+
+    def add_line(self, legend: str, xpoints: List[float], ypoints: List[float], mode='lines'):
+        self.figure.add_scatter(x=xpoints, y=ypoints, mode=mode, name=legend)
+
+    def add_scatter(self, *args, **kwargs):
+        self.add_line(*args, **kwargs, mode='markers')
+
+    def set_title(self, title: str):
+        self.figure.layout.title.text = title
+
+    def set_xlabel(self, label: str):
+        self.figure.layout.xaxis.title.text = label
+
+    def set_ylabel(self, label: str):
+        self.figure.layout.yaxis.title.text = label
+
+    def generate(self, filename: Path):
+        self.figure.write_html(str(filename.with_suffix('.html')))
+
+
 class CSVBackend(PlotBackend):
 
     name = 'csv'

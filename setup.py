@@ -25,6 +25,7 @@ setup(
         'testing': ['pytest'],
         'deploy': ['twine', 'cibuildwheel==1.1.0'],
         'matplotlib': ['matplotlib'],
+        'plotly': ['plotly>=4'],
     },
     entry_points={
         'console_scripts': ['badger=badger.__main__:main'],
