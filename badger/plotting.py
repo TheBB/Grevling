@@ -20,6 +20,45 @@ class PlotBackend:
         return cls
 
 
+class MockBackend(PlotBackend):
+
+    name = 'mock'
+    plots = []
+
+    @classmethod
+    def available(cls):
+        return True
+
+    def __init__(self):
+        type(self).plots.append(self)
+        self.objects = []
+        self.meta = {}
+
+    def add_line(self, legend: str, xpoints: List[float], ypoints: List[float], mode='line'):
+        self.objects.append({
+            'legend': legend,
+            'x': xpoints,
+            'y': ypoints,
+            'mode': mode,
+        })
+
+    def add_scatter(self, *args, **kwargs):
+        return self.add_line(*args, **kwargs, mode='scatter')
+
+    def set_title(self, title: str):
+        self.meta['title'] = title
+
+    def set_xlabel(self, label: str):
+        self.meta['xlabel'] = label
+
+    def set_ylabel(self, label: str):
+        self.meta['ylabel'] = label
+
+    def generate(self, filename: Path):
+        print(filename)
+        self.meta['filename'] = filename.name
+
+
 class MatplotilbBackend(PlotBackend):
 
     name = 'matplotlib'

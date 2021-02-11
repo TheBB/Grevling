@@ -27,20 +27,20 @@ plots:
   - parameters:
       i: variate
     filename: i-vs-isq
-    format: [matplotlib, csv, plotly]
+    format: [mock, matplotlib, csv, plotly]
     yaxis: isq
   - parameters:
       i: variate
       j: mean
       k: fixed
     filename: misc-vs-i-${k}
-    format: [matplotlib, csv, plotly]
+    format: [mock, matplotlib, csv, plotly]
     yaxis: misc
     title: This is a plot for k=${k}
     xlabel: x (${k})
     ylabel: y (${k})
   - filename: fresult
-    format: [matplotlib, csv, plotly]
+    format: [mock, matplotlib, csv, plotly]
     yaxis: fresult
   - parameters:
       i: mean
@@ -48,11 +48,11 @@ plots:
       k: mean
     yaxis: fresult
     filename: fresult-mean
-    format: [matplotlib, csv, plotly]
+    format: [mock, matplotlib, csv, plotly]
   - parameters:
       i: category
     filename: vresult
-    format: [matplotlib, csv, plotly]
+    format: [mock, matplotlib, csv, plotly]
     yaxis: vresult
     legend: i is ${i} - ${yaxis}
   - parameters:
@@ -60,6 +60,6 @@ plots:
       j: variate
       k: variate
     filename: scatter
-    format: [matplotlib, csv, plotly]
+    format: [mock, matplotlib, csv, plotly]
     xaxis: j
     yaxis: [misc]

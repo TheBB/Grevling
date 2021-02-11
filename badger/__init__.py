@@ -505,7 +505,6 @@ class Plot:
 
             final_styles = self._styles.supplement(basestyle)
             for ax_name, data, style in zip(self._yaxis, yaxes, final_styles):
-                print(style)
                 legend = self.generate_legend(sub_context, ax_name)
                 for backend in backends:
                     plotter(backend)(legend, xaxis, data)
