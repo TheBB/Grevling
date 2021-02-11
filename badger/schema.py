@@ -100,6 +100,14 @@ def Capture():
     )
 
 
+def Style():
+    """Validator that matches a plot style description."""
+    return Map({
+        'category': Str(),
+        Optional('values'): Seq(Str()),
+    }) | Str()
+
+
 class First(Validator):
     """Validator that validates against a sequence of sub-validators,
     picking the first that matches.
@@ -193,6 +201,11 @@ CASE_SCHEMA = Map({
         Optional('xlabel'): Str(),
         Optional('ylabel'): Str(),
         Optional('title'): Str(),
+        Optional('style'): Map({
+            Optional('color'): Style(),
+            Optional('line'): Style(),
+            Optional('marker'): Style(),
+        })
     })),
     Optional('settings'): Map({
         Optional('logdir'): Str(),

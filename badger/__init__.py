@@ -13,7 +13,7 @@ import subprocess
 from tempfile import TemporaryDirectory
 from time import time as osclock
 
-from typing import Dict, List, Any, Iterable, Optional
+from typing import Dict, List, Any, Iterable, Optional, Set
 
 from fasteners import InterProcessLock
 import numpy as np
@@ -328,6 +328,71 @@ class Command:
         return True
 
 
+class PlotStyleManager:
+
+    _category_to_style: Dict[str, str]
+    _styles = {
+        'color': ['blue', 'red', 'green', 'magenta', 'cyan'],
+        'line': ['solid', 'dash', 'dot', 'dashdot'],
+        'marker': ['none', 'circle', 'triangle', 'square'],
+    }
+    _customized_styles: Set[str]
+
+    def __init__(self):
+        self._category_to_style = dict()
+        self._styles = dict(type(self)._styles)
+        self._customized_styles = set()
+
+    def assigned(self, category: str):
+        return category in self._category_to_style
+
+    def assign(self, category: str, style: Optional[str] = None):
+        if style is None:
+            style = next(
+                s for s, v in self._styles.items()
+                if s not in self._category_to_style.values()
+                and len(v) > 1
+            )
+        self._category_to_style[category] = style
+
+    def set_values(self, style: str, values: List[str]):
+        self._styles[style] = values
+        self._customized_styles.add(style)
+
+    def get_values(self, style: str) -> List[str]:
+        values = list(self._styles[style])
+
+        # Special case: if markers are associated with a category,
+        # and their values have not been customized, remove the
+        # 'none' marker, which comes first so that, by default,
+        # plots don't have markers
+        if style == 'marker' and 'marker' in self._category_to_style.values() and 'marker' not in self._customized_styles:
+            values.remove('none')
+        return values
+
+    def styles(self, space: ParameterSpace, *categories: str) -> Iterable[Dict[str, str]]:
+        names, values = [], []
+        for c in categories:
+            style = self._category_to_style[c]
+            available_values = self.get_values(style)
+            assert len(available_values) >= len(space[c])
+            names.append(style)
+            values.append(available_values[:len(space[c])])
+        yield from util.dict_product(names, values)
+
+    def supplement(self, basestyle: Dict[str, str]):
+        basestyle = dict(basestyle)
+        for style, values in self._styles.items():
+            if style not in basestyle and self._category_to_style.get('yaxis') != style:
+                basestyle[style] = values[0]
+        if 'yaxis' in self._category_to_style:
+            ystyle = self._category_to_style['yaxis']
+            for v in self._styles[ystyle]:
+                yield {**basestyle, ystyle: v}
+        else:
+            yield basestyle
+
+
 class Plot:
 
     _parameters: Dict[str, str]
@@ -340,6 +405,7 @@ class Plot:
     _xlabel: Optional[str]
     _ylabel: Optional[str]
     _title: Optional[str]
+    _styles: PlotStyleManager
 
     @classmethod
     def load(cls, spec, parameters, types):
@@ -384,7 +450,7 @@ class Plot:
         return call_yaml(cls, spec)
 
     def __init__(self, parameters, filename, format, yaxis, xaxis, type,
-                 legend=None, xlabel=None, ylabel=None, title=None):
+                 legend=None, xlabel=None, ylabel=None, title=None, style={}):
         self._parameters = parameters
         self._filename = filename
         self._format = format
@@ -395,6 +461,20 @@ class Plot:
         self._xlabel = xlabel
         self._ylabel = ylabel
         self._title = title
+
+        self._styles = PlotStyleManager()
+        for key, value in style.items():
+            if isinstance(value, dict):
+                self._styles.assign(value['category'], key)
+                if 'values' in value:
+                    self._styles.set_values(key, value['values'])
+            else:
+                self._styles.set_values(key, [value])
+        for param, kind in self._parameters.items():
+            if kind == 'category' and not self._styles.assigned(param):
+                self._styles.assign(param)
+        if len(self._yaxis) > 1 and not self._styles.assigned('yaxis'):
+            self._styles.assign('yaxis')
 
     def _parameters_of_kind(self, *kinds: str):
         return [param for param, k in self._parameters.items() if k in kinds]
@@ -415,13 +495,17 @@ class Plot:
         backends = [PlotBackend.get_backend(fmt)() for fmt in self._format]
         plotter = operator.attrgetter(f'add_{self._type}')
 
-        for sub_index, sub_context in case._parameters.subspace(*categories, base=index):
+        sub_contexts = case._parameters.subspace(*categories, base=index)
+        styles = self._styles.styles(case._parameters, *categories)
+        for (sub_index, sub_context), basestyle in zip(sub_contexts, styles):
             sub_context = {**context, **sub_context}
             case.evaluate_context(sub_context, allowed_missing=noncats)
 
             cat_name, xaxis, yaxes = self.generate_category(case, sub_context, sub_index)
 
-            for ax_name, data in zip(self._yaxis, yaxes):
+            final_styles = self._styles.supplement(basestyle)
+            for ax_name, data, style in zip(self._yaxis, yaxes, final_styles):
+                print(style)
                 legend = self.generate_legend(sub_context, ax_name)
                 for backend in backends:
                     plotter(backend)(legend, xaxis, data)
