@@ -29,6 +29,7 @@ plots:
     filename: i-vs-isq
     format: [mock, matplotlib, csv, plotly]
     yaxis: isq
+    grid: off
   - parameters:
       i: variate
       j: mean

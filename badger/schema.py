@@ -201,6 +201,7 @@ CASE_SCHEMA = Map({
         Optional('xlabel'): Str(),
         Optional('ylabel'): Str(),
         Optional('title'): Str(),
+        Optional('grid'): Bool(),
         Optional('style'): Map({
             Optional('color'): Style(),
             Optional('line'): Style(),

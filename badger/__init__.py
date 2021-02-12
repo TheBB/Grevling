@@ -433,6 +433,7 @@ class Plot:
     _xlabel: Optional[str]
     _ylabel: Optional[str]
     _title: Optional[str]
+    _grid: bool
     _styles: PlotStyleManager
 
     @classmethod
@@ -478,7 +479,8 @@ class Plot:
         return call_yaml(cls, spec)
 
     def __init__(self, parameters, filename, format, yaxis, xaxis, type,
-                 legend=None, xlabel=None, ylabel=None, title=None, style={}):
+                 legend=None, xlabel=None, ylabel=None, title=None, grid=True,
+                 style={}):
         self._parameters = parameters
         self._filename = filename
         self._format = format
@@ -489,6 +491,7 @@ class Plot:
         self._xlabel = xlabel
         self._ylabel = ylabel
         self._title = title
+        self._grid = grid
 
         self._styles = PlotStyleManager(type)
         for key, value in style.items():
@@ -544,6 +547,8 @@ class Plot:
             text = render(template, context)
             for backend in backends:
                 getattr(backend, f'set_{attr}')(text)
+        for backend in backends:
+            backend.set_grid(self._grid)
 
         filename = case.storagepath / render(self._filename, context)
         for backend in backends:

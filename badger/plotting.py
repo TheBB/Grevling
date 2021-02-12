@@ -19,6 +19,11 @@ class PlotBackend:
             raise ImportError(f"Additional dependencies required for {name} backend")
         return cls
 
+    set_title = ignore
+    set_xlabel = ignore
+    set_ylabel = ignore
+    set_grid = ignore
+
 
 class MockBackend(PlotBackend):
 
@@ -54,6 +59,9 @@ class MockBackend(PlotBackend):
 
     def set_ylabel(self, label: str):
         self.meta['ylabel'] = label
+
+    def set_grid(self, value: bool):
+        self.meta['grid'] = value
 
     def generate(self, filename: Path):
         self.meta['filename'] = filename.name
@@ -93,6 +101,9 @@ class MatplotilbBackend(PlotBackend):
 
     def set_ylabel(self, label: str):
         self.axes.set_ylabel(label)
+
+    def set_grid(self, value: bool):
+        self.axes.grid(value)
 
     def generate(self, filename: Path):
         self.axes.legend(self.legend)
@@ -151,9 +162,6 @@ class CSVBackend(PlotBackend):
         self.legend.extend([f'{legend} (x-axis)', legend])
 
     add_scatter = add_line
-    set_title = ignore
-    set_xlabel = ignore
-    set_ylabel = ignore
 
     def generate(self, filename: Path):
         maxlen = max(len(c) for c in self.columns)

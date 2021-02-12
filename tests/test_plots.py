@@ -36,6 +36,7 @@ def test_plots():
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {
         'filename': 'i-vs-isq',
+        'grid': False,
     }
     compare_object(plot.objects[0], {
         'mode': 'line',
@@ -53,6 +54,7 @@ def test_plots():
         'title': 'This is a plot for k=a',
         'xlabel': 'x (a)',
         'ylabel': 'y (a)',
+        'grid': True,
     }
     compare_object(plot.objects[0], {
         'mode': 'line',
@@ -70,6 +72,7 @@ def test_plots():
         'title': 'This is a plot for k=b',
         'xlabel': 'x (b)',
         'ylabel': 'y (b)',
+        'grid': True,
     }
     compare_object(plot.objects[0], {
         'mode': 'line',
@@ -87,6 +90,7 @@ def test_plots():
         'title': 'This is a plot for k=c',
         'xlabel': 'x (c)',
         'ylabel': 'y (c)',
+        'grid': True,
     }
     compare_object(plot.objects[0], {
         'mode': 'line',
@@ -101,6 +105,7 @@ def test_plots():
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {
         'filename': 'fresult',
+        'grid': True,
     }
     compare_object(plot.objects[0], {
         'mode': 'line',
@@ -115,6 +120,7 @@ def test_plots():
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {
         'filename': 'fresult-mean',
+        'grid': True,
     }
     compare_object(plot.objects[0], {
         'mode': 'line',
@@ -129,6 +135,7 @@ def test_plots():
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {
         'filename': 'vresult',
+        'grid': True,
     }
     compare_object(plot.objects[0], {
         'mode': 'line',
@@ -179,6 +186,7 @@ def test_plots():
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {
         'filename': 'scatter',
+        'grid': True,
     }
     compare_object(plot.objects[0], {
         'mode': 'scatter',
