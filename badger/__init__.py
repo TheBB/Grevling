@@ -507,7 +507,7 @@ class Plot:
             for ax_name, data, style in zip(self._yaxis, yaxes, final_styles):
                 legend = self.generate_legend(sub_context, ax_name)
                 for backend in backends:
-                    plotter(backend)(legend, xaxis, data)
+                    plotter(backend)(legend, xpoints=xaxis, ypoints=data, style=style)
 
         for attr in ['title', 'xlabel', 'ylabel']:
             template = getattr(self, f'_{attr}')

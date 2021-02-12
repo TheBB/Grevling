@@ -1,7 +1,7 @@
 from pathlib import Path
 import csv
 
-from typing import List
+from typing import List, Dict
 
 import numpy as np
 
@@ -34,12 +34,13 @@ class MockBackend(PlotBackend):
         self.objects = []
         self.meta = {}
 
-    def add_line(self, legend: str, xpoints: List[float], ypoints: List[float], mode='line'):
+    def add_line(self, legend: str, xpoints: List[float], ypoints: List[float], style: Dict[str, str], mode='line'):
         self.objects.append({
             'legend': legend,
             'x': xpoints,
             'y': ypoints,
             'mode': mode,
+            **style,
         })
 
     def add_scatter(self, *args, **kwargs):
@@ -77,11 +78,11 @@ class MatplotilbBackend(PlotBackend):
         self.axes = self.figure.add_subplot(1, 1, 1)
         self.legend = []
 
-    def add_line(self, legend: str, xpoints: List[float], ypoints: List[float]):
+    def add_line(self, legend: str, xpoints: List[float], ypoints: List[float], style: Dict[str, str]):
         self.axes.plot(xpoints, ypoints)
         self.legend.append(legend)
 
-    def add_scatter(self, legend: str, xpoints: List[float], ypoints: List[float]):
+    def add_scatter(self, legend: str, xpoints: List[float], ypoints: List[float], style: Dict[str, str]):
         self.axes.scatter(xpoints, ypoints)
         self.legend.append(legend)
 
@@ -115,7 +116,7 @@ class PlotlyBackend(PlotBackend):
         import plotly.graph_objects as go
         self.figure = go.Figure()
 
-    def add_line(self, legend: str, xpoints: List[float], ypoints: List[float], mode='lines'):
+    def add_line(self, legend: str, xpoints: List[float], ypoints: List[float], style: Dict[str, str], mode='lines'):
         self.figure.add_scatter(x=xpoints, y=ypoints, mode=mode, name=legend)
 
     def add_scatter(self, *args, **kwargs):
@@ -146,7 +147,7 @@ class CSVBackend(PlotBackend):
         self.columns = []
         self.legend = []
 
-    def add_line(self, legend: str, xpoints: List[float], ypoints: List[float]):
+    def add_line(self, legend: str, xpoints: List[float], ypoints: List[float], style: Dict[str, str]):
         self.columns.extend([xpoints, ypoints])
         self.legend.extend([f'{legend} (x-axis)', legend])
 

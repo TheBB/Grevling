@@ -12,8 +12,8 @@ DATADIR = Path(__file__).parent / 'data'
 
 
 def compare_object(actual, expected, sort_xy=False):
-    assert actual['mode'] == expected['mode']
-    assert actual['legend'] == expected['legend']
+    for k in ['mode', 'legend', 'color', 'line', 'marker']:
+        assert actual[k] == expected[k]
 
     x, y = actual['x'], actual['y']
     if sort_xy:
@@ -33,8 +33,6 @@ def test_plots():
     case.clear_cache()
     case.run()
 
-    root = DATADIR / 'run' / 'plot' / '.badgerdata'
-
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {
         'filename': 'i-vs-isq',
@@ -42,6 +40,9 @@ def test_plots():
     compare_object(plot.objects[0], {
         'mode': 'line',
         'legend': 'isq',
+        'color': 'blue',
+        'line': 'solid',
+        'marker': 'none',
         'x': np.array([1, 2, 3, 4, 5]),
         'y': np.array([1, 4, 9, 16, 25]),
     })
@@ -56,6 +57,9 @@ def test_plots():
     compare_object(plot.objects[0], {
         'mode': 'line',
         'legend': 'misc',
+        'color': 'blue',
+        'line': 'solid',
+        'marker': 'none',
         'x': np.array([1, 2, 3, 4, 5]),
         'y': np.array([1, 2, 3, 4, 5]) + 97 + 31/5,
     })
@@ -70,6 +74,9 @@ def test_plots():
     compare_object(plot.objects[0], {
         'mode': 'line',
         'legend': 'misc',
+        'color': 'blue',
+        'line': 'solid',
+        'marker': 'none',
         'x': np.array([1, 2, 3, 4, 5]),
         'y': np.array([1, 2, 3, 4, 5]) + 98 + 31/5,
     })
@@ -84,6 +91,9 @@ def test_plots():
     compare_object(plot.objects[0], {
         'mode': 'line',
         'legend': 'misc',
+        'color': 'blue',
+        'line': 'solid',
+        'marker': 'none',
         'x': np.array([1, 2, 3, 4, 5]),
         'y': np.array([1, 2, 3, 4, 5]) + 99 + 31/5,
     })
@@ -95,6 +105,9 @@ def test_plots():
     compare_object(plot.objects[0], {
         'mode': 'line',
         'legend': 'fresult',
+        'color': 'blue',
+        'line': 'solid',
+        'marker': 'none',
         'x': np.arange(1, 11),
         'y': np.arange(1, 11),
     })
@@ -106,6 +119,9 @@ def test_plots():
     compare_object(plot.objects[0], {
         'mode': 'line',
         'legend': 'fresult',
+        'color': 'blue',
+        'line': 'solid',
+        'marker': 'none',
         'x': np.arange(1, 11),
         'y': np.arange(1, 11),
     })
@@ -117,30 +133,45 @@ def test_plots():
     compare_object(plot.objects[0], {
         'mode': 'line',
         'legend': 'i is 1 - vresult',
+        'color': 'blue',
+        'line': 'solid',
+        'marker': 'none',
         'x': np.array([1]),
         'y': np.array([1]),
     })
     compare_object(plot.objects[1], {
         'mode': 'line',
         'legend': 'i is 2 - vresult',
+        'color': 'red',
+        'line': 'solid',
+        'marker': 'none',
         'x': np.array([1, 2]),
         'y': np.array([1, 2]),
     })
     compare_object(plot.objects[2], {
         'mode': 'line',
         'legend': 'i is 3 - vresult',
+        'color': 'green',
+        'line': 'solid',
+        'marker': 'none',
         'x': np.array([1, 2, 3]),
         'y': np.array([1, 2, 3]),
     })
     compare_object(plot.objects[3], {
         'mode': 'line',
         'legend': 'i is 4 - vresult',
+        'color': 'magenta',
+        'line': 'solid',
+        'marker': 'none',
         'x': np.array([1, 2, 3, 4]),
         'y': np.array([1, 2, 3, 4]),
     })
     compare_object(plot.objects[4], {
         'mode': 'line',
         'legend': 'i is 5 - vresult',
+        'color': 'cyan',
+        'line': 'solid',
+        'marker': 'none',
         'x': np.array([1, 2, 3, 4, 5]),
         'y': np.array([1, 2, 3, 4, 5]),
     })
@@ -152,6 +183,9 @@ def test_plots():
     compare_object(plot.objects[0], {
         'mode': 'scatter',
         'legend': 'misc',
+        'color': 'blue',
+        'line': 'solid',
+        'marker': 'none',
         'x': np.array([
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
             2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
