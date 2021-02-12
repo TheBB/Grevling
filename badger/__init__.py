@@ -432,6 +432,8 @@ class Plot:
     _legend: Optional[str]
     _xlabel: Optional[str]
     _ylabel: Optional[str]
+    _xmode: str
+    _ymode: str
     _title: Optional[str]
     _grid: bool
     _styles: PlotStyleManager
@@ -480,7 +482,7 @@ class Plot:
 
     def __init__(self, parameters, filename, format, yaxis, xaxis, type,
                  legend=None, xlabel=None, ylabel=None, title=None, grid=True,
-                 style={}):
+                 xmode='linear', ymode='linear', style={}):
         self._parameters = parameters
         self._filename = filename
         self._format = format
@@ -490,6 +492,8 @@ class Plot:
         self._legend = legend
         self._xlabel = xlabel
         self._ylabel = ylabel
+        self._xmode = xmode
+        self._ymode = ymode
         self._title = title
         self._grid = grid
 
@@ -548,6 +552,8 @@ class Plot:
             for backend in backends:
                 getattr(backend, f'set_{attr}')(text)
         for backend in backends:
+            backend.set_xmode(self._xmode)
+            backend.set_ymode(self._ymode)
             backend.set_grid(self._grid)
 
         filename = case.storagepath / render(self._filename, context)

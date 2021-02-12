@@ -37,6 +37,8 @@ def test_plots():
     assert plot.meta == {
         'filename': 'i-vs-isq',
         'grid': False,
+        'xmode': 'linear',
+        'ymode': 'linear',
     }
     compare_object(plot.objects[0], {
         'mode': 'line',
@@ -55,6 +57,8 @@ def test_plots():
         'xlabel': 'x (a)',
         'ylabel': 'y (a)',
         'grid': True,
+        'xmode': 'log',
+        'ymode': 'linear',
     }
     compare_object(plot.objects[0], {
         'mode': 'line',
@@ -73,6 +77,8 @@ def test_plots():
         'xlabel': 'x (b)',
         'ylabel': 'y (b)',
         'grid': True,
+        'xmode': 'log',
+        'ymode': 'linear',
     }
     compare_object(plot.objects[0], {
         'mode': 'line',
@@ -91,6 +97,8 @@ def test_plots():
         'xlabel': 'x (c)',
         'ylabel': 'y (c)',
         'grid': True,
+        'xmode': 'log',
+        'ymode': 'linear',
     }
     compare_object(plot.objects[0], {
         'mode': 'line',
@@ -106,6 +114,8 @@ def test_plots():
     assert plot.meta == {
         'filename': 'fresult',
         'grid': True,
+        'xmode': 'linear',
+        'ymode': 'log',
     }
     compare_object(plot.objects[0], {
         'mode': 'line',
@@ -121,6 +131,8 @@ def test_plots():
     assert plot.meta == {
         'filename': 'fresult-mean',
         'grid': True,
+        'xmode': 'log',
+        'ymode': 'log',
     }
     compare_object(plot.objects[0], {
         'mode': 'line',
@@ -136,6 +148,8 @@ def test_plots():
     assert plot.meta == {
         'filename': 'vresult',
         'grid': True,
+        'xmode': 'linear',
+        'ymode': 'linear',
     }
     compare_object(plot.objects[0], {
         'mode': 'line',
@@ -187,6 +201,8 @@ def test_plots():
     assert plot.meta == {
         'filename': 'scatter',
         'grid': True,
+        'xmode': 'linear',
+        'ymode': 'linear',
     }
     compare_object(plot.objects[0], {
         'mode': 'scatter',

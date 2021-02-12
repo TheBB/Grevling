@@ -22,6 +22,8 @@ class PlotBackend:
     set_title = ignore
     set_xlabel = ignore
     set_ylabel = ignore
+    set_xmode = ignore
+    set_ymode = ignore
     set_grid = ignore
 
 
@@ -59,6 +61,12 @@ class MockBackend(PlotBackend):
 
     def set_ylabel(self, label: str):
         self.meta['ylabel'] = label
+
+    def set_xmode(self, value: str):
+        self.meta['xmode'] = value
+
+    def set_ymode(self, value: str):
+        self.meta['ymode'] = value
 
     def set_grid(self, value: bool):
         self.meta['grid'] = value
@@ -102,6 +110,12 @@ class MatplotilbBackend(PlotBackend):
     def set_ylabel(self, label: str):
         self.axes.set_ylabel(label)
 
+    def set_xmode(self, value: str):
+        self.axes.set_xscale(value)
+
+    def set_ymode(self, value: str):
+        self.axes.set_yscale(value)
+
     def set_grid(self, value: bool):
         self.axes.grid(value)
 
@@ -140,6 +154,12 @@ class PlotlyBackend(PlotBackend):
 
     def set_ylabel(self, label: str):
         self.figure.layout.yaxis.title.text = label
+
+    def set_xmode(self, value: str):
+        self.figure.layout.xaxis.type = value
+
+    def set_ymode(self, value: str):
+        self.figure.layout.yaxis.type = value
 
     def generate(self, filename: Path):
         self.figure.write_html(str(filename.with_suffix('.html')))

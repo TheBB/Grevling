@@ -40,9 +40,11 @@ plots:
     title: This is a plot for k=${k}
     xlabel: x (${k})
     ylabel: y (${k})
+    xmode: log
   - filename: fresult
     format: [mock, matplotlib, csv, plotly]
     yaxis: fresult
+    ymode: log
   - parameters:
       i: mean
       j: mean
@@ -50,6 +52,8 @@ plots:
     yaxis: fresult
     filename: fresult-mean
     format: [mock, matplotlib, csv, plotly]
+    xmode: log
+    ymode: log
   - parameters:
       i: category
     filename: vresult

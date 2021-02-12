@@ -200,6 +200,8 @@ CASE_SCHEMA = Map({
         Optional('legend'): Str(),
         Optional('xlabel'): Str(),
         Optional('ylabel'): Str(),
+        Optional('xmode'): Choice('linear', 'log'),
+        Optional('ymode'): Choice('linear', 'log'),
         Optional('title'): Str(),
         Optional('grid'): Bool(),
         Optional('style'): Map({
