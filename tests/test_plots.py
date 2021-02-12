@@ -184,8 +184,8 @@ def test_plots():
         'mode': 'scatter',
         'legend': 'misc',
         'color': 'blue',
-        'line': 'solid',
-        'marker': 'none',
+        'line': 'none',
+        'marker': 'circle',
         'x': np.array([
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
             2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,

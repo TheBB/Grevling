@@ -15,6 +15,7 @@ from time import time as osclock
 
 from typing import Dict, List, Any, Iterable, Optional, Set
 
+from bidict import bidict
 from fasteners import InterProcessLock
 import numpy as np
 import numpy.ma as ma
@@ -330,45 +331,72 @@ class Command:
 
 class PlotStyleManager:
 
-    _category_to_style: Dict[str, str]
-    _styles = {
-        'color': ['blue', 'red', 'green', 'magenta', 'cyan'],
-        'line': ['solid', 'dash', 'dot', 'dashdot'],
-        'marker': ['none', 'circle', 'triangle', 'square'],
+    _category_to_style: bidict
+    _custom_styles: Dict[str, List[str]]
+    _mode: str
+    _defaults = {
+        'color': {
+            'category': {
+                None: ['blue', 'red', 'green', 'magenta', 'cyan'],
+            },
+            'single': {
+                None: ['blue'],
+            },
+        },
+        'line': {
+            'category': {
+                'line': ['solid', 'dash', 'dot', 'dashdot'],
+                'scatter': ['none'],
+            },
+            'single': {
+                'line': ['solid'],
+                'scatter': ['none'],
+            },
+        },
+        'marker': {
+            'category': {
+                None: ['circle', 'triangle', 'square'],
+            },
+            'single': {
+                'line': ['none'],
+                'scatter': ['circle'],
+            },
+        },
     }
-    _customized_styles: Set[str]
 
-    def __init__(self):
-        self._category_to_style = dict()
-        self._styles = dict(type(self)._styles)
-        self._customized_styles = set()
+    def __init__(self, mode: str):
+        self._category_to_style = bidict()
+        self._custom_styles = dict()
+        self._mode = mode
 
     def assigned(self, category: str):
         return category in self._category_to_style
 
     def assign(self, category: str, style: Optional[str] = None):
         if style is None:
-            style = next(
-                s for s, v in self._styles.items()
-                if s not in self._category_to_style.values()
-                and len(v) > 1
-            )
+            candidates = list(s for s in self._defaults if s not in self._category_to_style.inverse)
+            if self._mode == 'scatter':
+                try:
+                    candidates.remove('line')
+                except ValueError:
+                    pass
+            assert candidates
+            style = candidates[0]
+        assert style != 'line' or self._mode != 'scatter'
         self._category_to_style[category] = style
 
     def set_values(self, style: str, values: List[str]):
-        self._styles[style] = values
-        self._customized_styles.add(style)
+        self._custom_styles[style] = values
 
     def get_values(self, style: str) -> List[str]:
-        values = list(self._styles[style])
-
-        # Special case: if markers are associated with a category,
-        # and their values have not been customized, remove the
-        # 'none' marker, which comes first so that, by default,
-        # plots don't have markers
-        if style == 'marker' and 'marker' in self._category_to_style.values() and 'marker' not in self._customized_styles:
-            values.remove('none')
-        return values
+        # Prioritize user customizations
+        if style in self._custom_styles:
+            return self._custom_styles[style]
+        getter = lambda d, k: d.get(k, d.get(None, []))
+        s = getter(self._defaults, style)
+        s = getter(s, 'category' if style in self._category_to_style.inverse else 'single')
+        s = getter(s, self._mode)
+        return s
 
     def styles(self, space: ParameterSpace, *categories: str) -> Iterable[Dict[str, str]]:
         names, values = [], []
@@ -382,12 +410,12 @@ class PlotStyleManager:
 
     def supplement(self, basestyle: Dict[str, str]):
         basestyle = dict(basestyle)
-        for style, values in self._styles.items():
+        for style in self._defaults:
             if style not in basestyle and self._category_to_style.get('yaxis') != style:
-                basestyle[style] = values[0]
+                basestyle[style] = self.get_values(style)[0]
         if 'yaxis' in self._category_to_style:
             ystyle = self._category_to_style['yaxis']
-            for v in self._styles[ystyle]:
+            for v in self.get_values(ystyle):
                 yield {**basestyle, ystyle: v}
         else:
             yield basestyle
@@ -462,7 +490,7 @@ class Plot:
         self._ylabel = ylabel
         self._title = title
 
-        self._styles = PlotStyleManager()
+        self._styles = PlotStyleManager(type)
         for key, value in style.items():
             if isinstance(value, dict):
                 self._styles.assign(value['category'], key)

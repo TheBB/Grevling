@@ -56,7 +56,6 @@ class MockBackend(PlotBackend):
         self.meta['ylabel'] = label
 
     def generate(self, filename: Path):
-        print(filename)
         self.meta['filename'] = filename.name
 
 

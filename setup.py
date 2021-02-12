@@ -12,6 +12,7 @@ setup(
     url='https://github.com/TheBB/Badger',
     packages=['badger'],
     install_requires=[
+        'bidict',
         'click',
         'fasteners',
         'mako',
