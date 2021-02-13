@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from contextlib import contextmanager
 from difflib import Differ
 import inspect
@@ -18,7 +19,7 @@ from typing import Dict, List, Any, Iterable, Optional, Set
 from bidict import bidict
 from fasteners import InterProcessLock
 import numpy as np
-import numpy.ma as ma
+import pandas as pd
 from simpleeval import SimpleEval, DEFAULT_FUNCTIONS, NameNotDefined
 import treelog as log
 from typing_inspect import get_origin, get_args
@@ -43,6 +44,14 @@ def _numpy_dtype(tp):
     if tp in (int, float):
         return tp
     return object
+
+
+def _pandas_dtype(tp):
+    if tp == int:
+        return pd.Int64Dtype()
+    if util.is_list_type(tp):
+        return object
+    return tp
 
 
 def _typename(tp) -> str:
@@ -70,7 +79,7 @@ def call_yaml(func, mapping, *args, **kwargs):
     return func(*binding.args, **binding.kwargs)
 
 
-class Parameter:
+class Parameter(Sequence):
 
     @classmethod
     def load(cls, name, spec):
@@ -134,8 +143,8 @@ class ParameterSpace(dict):
     def subspace(self, *names, base=None, fill=None) -> Iterable[Dict]:
         params = [self[name] for name in names]
         indexes = [range(len(p)) for p in params]
-        for index, values in zip(util.dict_product(names, indexes), util.dict_product(names, params)):
-            yield self.make_index(_base=base, _fill=fill, **index), values
+        for values in util.dict_product(names, params):
+            yield self.make_index(_base=base, _fill=fill, **values), values
 
     def fullspace(self) -> Iterable[Dict]:
         yield from self.subspace(*self.keys())
@@ -514,6 +523,9 @@ class Plot:
     def _parameters_of_kind(self, *kinds: str):
         return [param for param, k in self._parameters.items() if k in kinds]
 
+    def _parameters_not_of_kind(self, *kinds: str):
+        return [param for param, k in self._parameters.items() if k not in kinds]
+
     def generate_all(self, case: 'Case'):
         # Collect all the fixed parameters and iterate over all those combinations
         fixed = self._parameters_of_kind('fixed')
@@ -563,24 +575,30 @@ class Plot:
     def generate_category(self, case: 'Case', context: dict, index):
         # Pick an arbitrary index for ignored parameters
         ignored = self._parameters_of_kind('ignore')
-        index = case._parameters.make_index(_base=index, **{param: 0 for param in ignored})
+        index = case._parameters.make_index(_base=index, **{param: case._parameters[param][0] for param in ignored})
 
-        # Grab a 'thick' index, to preserve parameter <-> axis mapping
-        data = case.result_array()[util.thick_index(index)]
+        with case.dataframe(modify=False) as df:
+            data = df[df['_done']].loc[index, :]
+            if isinstance(data, pd.Series):
+                data = data.to_frame().T
 
         # Extract only the fields we need
         fieldnames = list(self._yaxis)
         if self._xaxis:
             fieldnames.append(self._xaxis)
-        fields = [data[n] for n in fieldnames]
+        data = data[fieldnames]
 
         # Collapse mean parameters
         means = self._parameters_of_kind('mean')
-        for mean in means:
-            fields = [util.flexible_mean(f, case._parameters.indexof(mean)) for f in fields]
+        if means:
+            non_means = self._parameters_not_of_kind('mean')
+            if non_means:
+                data = data.groupby(level=non_means).aggregate(util.flexible_mean)
+            else:
+                data = data.aggregate(util.flexible_mean)
 
         # Extract data
-        fields = [util.flatten(f.compressed()) for f in fields]
+        fields = [util.flatten(data[f].to_numpy()) for f in fieldnames]
 
         if not self._xaxis:
             length = max(len(f) for f in fields)
@@ -618,13 +636,13 @@ class ResultCollector(dict):
         else:
             self[name] = tp(value)
 
-    def commit(self, array):
+    def commit(self, data, index):
+        data.at[index, '_done'] = True
         for key, value in self.items():
-            array.mask[key] = False
             if util.is_list_type(self._types[key]):
-                array[key] = np.array(value)
+                data.at[index, key] = value
             else:
-                array[key] = value
+                data.at[index, key] = value
 
 
 class Case:
@@ -699,7 +717,7 @@ class Case:
             cmd.add_types(self._types)
 
         # Construct numpy dtype of result array
-        self._dtype = [(name, _numpy_dtype(tp)) for name, tp in self._types.items()]
+        # self._dtype = [(name, _numpy_dtype(tp)) for name, tp in self._types.items()]
 
         # Read settings
         settings = casedata.get('settings', {})
@@ -743,34 +761,38 @@ class Case:
     def shape(self):
         return tuple(map(len, self._parameters.values()))
 
+    def _load_dataframe(self):
+        path = self.storagepath / 'dataframe.parquet'
+        if path.is_file():
+            return pd.read_parquet(path, engine='pyarrow')
+        index = pd.MultiIndex.from_product(self._parameters.values(), names=self._parameters.keys())
+        data = {
+            '_done': False,
+        }
+        data.update({
+            k: pd.Series([], dtype=_pandas_dtype(v))
+            for k, v in self._types.items()
+        })
+        return pd.DataFrame(index=index, data=data)
+
+    def _save_dataframe(self, df: pd.DataFrame):
+        df.to_parquet(self.storagepath / 'dataframe.parquet', engine='pyarrow', index=True)
+
     @contextmanager
-    def acquire_lock(self):
+    def dataframe(self, modify=True):
         with InterProcessLock(self.storagepath / 'lockfile'):
-            yield
+            df = self._load_dataframe()
+            yield df
+            if modify:
+                self._save_dataframe(df)
 
-    def commit_result(self, index, collector):
-        with self.acquire_lock():
-            results = self.result_array()
-            collector.commit(results[index])
-            np.save(self.storagepath / 'results.npy', results.data, allow_pickle=True)
-            np.save(self.storagepath / 'results.mask.npy', results.mask, allow_pickle=True)
-
-    def result_array(self):
-        path = self.storagepath / 'results.npy'
-        maskpath = self.storagepath / 'results.mask.npy'
-        if path.is_file() and maskpath.is_file():
-            return ma.array(
-                np.load(path, allow_pickle=True),
-                mask=np.load(maskpath),
-            )
-        else:
-            return ma.array(
-                np.zeros(self.shape, dtype=self._dtype),
-                mask=np.ones(self.shape, dtype=bool)
-            )
+    def commit_result(self, index, collector: ResultCollector):
+        with self.dataframe() as df:
+            collector.commit(df, index)
 
     def has_data(self):
-        return util.has_data(self.result_array())
+        with self.dataframe(modify=False) as df:
+            return df['_done'].any()
 
     def _check_decide_diff(self, diff: List[str], prev_file: Path, interactive: bool = True) -> bool:
         decision = None

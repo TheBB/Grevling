@@ -48,12 +48,19 @@ plots:
   - parameters:
       i: mean
       j: mean
-      k: mean
+      k: ignore
     yaxis: fresult
     filename: fresult-mean
     format: [mock, matplotlib, csv, plotly]
     xmode: log
     ymode: log
+  - parameters:
+      i: mean
+      j: mean
+      k: ignore
+    yaxis: fresult
+    filename: fresult-allmean
+    format: [mock, matplotlib, csv, plotly]
   - parameters:
       i: category
     filename: vresult

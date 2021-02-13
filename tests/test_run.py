@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 from badger import Case
 
@@ -13,25 +14,35 @@ def read_file(path: Path) -> str:
         return f.read()
 
 
+def check_df(left, right):
+    to_remove = [c for c in left.columns if c.startswith('walltime/')]
+    pd.testing.assert_frame_equal(
+        left.drop(columns=to_remove).sort_index(axis=1),
+        right.sort_index(axis=1)
+    )
+
+
 def test_echo():
     case = Case(DATADIR / 'run' / 'echo')
     case.clear_cache()
     case.run()
 
-    data = case.result_array()
-    assert data['a'].dtype == int
-    assert data['alpha'].dtype == int
-    assert data['b'].dtype == object
-    assert data['bravo'].dtype == object
-    assert data['c'].dtype == float
-    assert data['charlie'].dtype == int
-    assert data['walltime/echo'].dtype == float
-    np.testing.assert_array_equal(data['a'], [[1, 1, 1], [2, 2, 2], [3, 3, 3]])
-    np.testing.assert_array_equal(data['alpha'], [[1, 1, 1], [2, 2, 2], [3, 3, 3]])
-    np.testing.assert_array_equal(data['b'], [['a', 'b', 'c'], ['a', 'b', 'c'], ['a', 'b', 'c']])
-    np.testing.assert_array_equal(data['bravo'], [['a', 'b', 'c'], ['a', 'b', 'c'], ['a', 'b', 'c']])
-    np.testing.assert_array_equal(data['c'], [[1, 1, 1], [3, 3, 3], [5, 5, 5]])
-    np.testing.assert_array_equal(data['charlie'], [[1, 1, 1], [3, 3, 3], [5, 5, 5]])
+    with case.dataframe(modify=False) as data:
+        check_df(data, pd.DataFrame(
+            index=pd.MultiIndex.from_product(
+                [[1, 2, 3], ['a', 'b', 'c']],
+                names=['alpha', 'bravo'],
+            ),
+            data={
+                '_done': [True] * 9,
+                'alpha': pd.array([1, 1, 1, 2, 2, 2, 3, 3, 3], dtype=pd.Int64Dtype()),
+                'bravo': ['a', 'b', 'c', 'a', 'b', 'c', 'a', 'b', 'c'],
+                'charlie': pd.array([1, 1, 1, 3, 3, 3, 5, 5, 5], dtype=pd.Int64Dtype()),
+                'a': pd.array([1, 1, 1, 2, 2, 2, 3, 3, 3], dtype=pd.Int64Dtype()),
+                'b': ['a', 'b', 'c', 'a', 'b', 'c', 'a', 'b', 'c'],
+                'c': [1., 1., 1., 3., 3., 3., 5., 5., 5.],
+            }
+        ))
 
 
 def test_cat():
@@ -39,22 +50,23 @@ def test_cat():
     case.clear_cache()
     case.run()
 
-    data = case.result_array()
-    assert data['a'].dtype == int
-    assert data['alpha'].dtype == int
-    assert data['a_auto'].dtype == int
-    assert data['b'].dtype == object
-    assert data['bravo'].dtype == object
-    assert data['c'].dtype == float
-    assert data['charlie'].dtype == int
-    assert data['walltime/cat'].dtype == float
-    np.testing.assert_array_equal(data['a'], [[1, 1, 1], [2, 2, 2], [3, 3, 3]])
-    np.testing.assert_array_equal(data['alpha'], [[1, 1, 1], [2, 2, 2], [3, 3, 3]])
-    np.testing.assert_array_equal(data['a_auto'], [[1, 1, 1], [2, 2, 2], [3, 3, 3]])
-    np.testing.assert_array_equal(data['b'], [['a', 'b', 'c'], ['a', 'b', 'c'], ['a', 'b', 'c']])
-    np.testing.assert_array_equal(data['bravo'], [['a', 'b', 'c'], ['a', 'b', 'c'], ['a', 'b', 'c']])
-    np.testing.assert_array_equal(data['c'], [[1, 1, 1], [3, 3, 3], [5, 5, 5]])
-    np.testing.assert_array_equal(data['charlie'], [[1, 1, 1], [3, 3, 3], [5, 5, 5]])
+    with case.dataframe(modify=False) as data:
+        check_df(data, pd.DataFrame(
+            index=pd.MultiIndex.from_product(
+                [[1, 2, 3], ['a', 'b', 'c']],
+                names=['alpha', 'bravo'],
+            ),
+            data={
+                '_done': [True] * 9,
+                'alpha': pd.array([1, 1, 1, 2, 2, 2, 3, 3, 3], dtype=pd.Int64Dtype()),
+                'bravo': ['a', 'b', 'c', 'a', 'b', 'c', 'a', 'b', 'c'],
+                'charlie': pd.array([1, 1, 1, 3, 3, 3, 5, 5, 5], dtype=pd.Int64Dtype()),
+                'a': pd.array([1, 1, 1, 2, 2, 2, 3, 3, 3], dtype=pd.Int64Dtype()),
+                'b': ['a', 'b', 'c', 'a', 'b', 'c', 'a', 'b', 'c'],
+                'c': [1., 1., 1., 3., 3., 3., 5., 5., 5.],
+                'a_auto': pd.array([1, 1, 1, 2, 2, 2, 3, 3, 3], dtype=pd.Int64Dtype()),
+            }
+        ))
 
 
 def test_files():
@@ -78,31 +90,32 @@ def test_capture():
     case.clear_cache()
     case.run()
 
-    data = case.result_array()
-    assert data['alpha'].dtype == float
-    assert data['firstalpha'].dtype == float
-    assert data['lastalpha'].dtype == float
-    assert data['allalpha'].dtype == object
-    assert data['bravo'].dtype == int
-    assert data['firstbravo'].dtype == int
-    assert data['lastbravo'].dtype == int
-    assert data['allbravo'].dtype == object
-    np.testing.assert_allclose(data['alpha'], [[1.234, 1.234, 1.234], [2.345, 2.345, 2.345], [3.456, 3.456, 3.456]])
-    np.testing.assert_allclose(data['firstalpha'], [[1.234, 1.234, 1.234], [2.345, 2.345, 2.345], [3.456, 3.456, 3.456]])
-    np.testing.assert_allclose(data['lastalpha'], [[4.936, 4.936, 4.936], [9.38, 9.38, 9.38], [13.824, 13.824, 13.824]])
-    np.testing.assert_allclose(data['allalpha'].tolist(), [
-        [[1.234, 2.468, 3.702, 4.936], [1.234, 2.468, 3.702, 4.936], [1.234, 2.468, 3.702, 4.936]],
-        [[2.345, 4.690, 7.035, 9.380], [2.345, 4.690, 7.035, 9.380], [2.345, 4.690, 7.035, 9.380]],
-        [[3.456, 6.912, 10.368, 13.824], [3.456, 6.912, 10.368, 13.824], [3.456, 6.912, 10.368, 13.824]]
-    ])
-    np.testing.assert_array_equal(data['bravo'], [[1, 2, 3], [1, 2, 3], [1, 2, 3]])
-    np.testing.assert_array_equal(data['firstbravo'], [[1, 2, 3], [1, 2, 3], [1, 2, 3]])
-    np.testing.assert_array_equal(data['lastbravo'], [[4, 8, 12], [4, 8, 12], [4, 8, 12]])
-    np.testing.assert_array_equal(data['allbravo'].tolist(), [
-        [[1, 2, 3, 4], [2, 4, 6, 8], [3, 6, 9, 12]],
-        [[1, 2, 3, 4], [2, 4, 6, 8], [3, 6, 9, 12]],
-        [[1, 2, 3, 4], [2, 4, 6, 8], [3, 6, 9, 12]],
-    ])
+    with case.dataframe(modify=False) as data:
+        check_df(data, pd.DataFrame(
+            index=pd.MultiIndex.from_product(
+                [[1.234, 2.345, 3.456], [1, 2, 3]],
+                names=['alpha', 'bravo'],
+            ),
+            data={
+                '_done': [True] * 9,
+                'alpha': [1.234, 1.234, 1.234, 2.345, 2.345, 2.345, 3.456, 3.456, 3.456],
+                'bravo': pd.array([1, 2, 3, 1, 2, 3, 1, 2, 3], dtype=pd.Int64Dtype()),
+                'firstalpha': [1.234, 1.234, 1.234, 2.345, 2.345, 2.345, 3.456, 3.456, 3.456],
+                'lastalpha': [4.936, 4.936, 4.936, 9.38, 9.38, 9.38, 13.824, 13.824, 13.824],
+                'allalpha': [
+                    [1.234, 2.468, 3.702, 4.936], [1.234, 2.468, 3.702, 4.936], [1.234, 2.468, 3.702, 4.936],
+                    [2.345, 4.690, 7.035, 9.380], [2.345, 4.690, 7.035, 9.380], [2.345, 4.690, 7.035, 9.380],
+                    [3.456, 6.912, 10.368, 13.824], [3.456, 6.912, 10.368, 13.824], [3.456, 6.912, 10.368, 13.824]
+                ],
+                'firstbravo': pd.array([1, 2, 3, 1, 2, 3, 1, 2, 3], dtype=pd.Int64Dtype()),
+                'lastbravo': pd.array([4, 8, 12, 4, 8, 12, 4, 8, 12], dtype=pd.Int64Dtype()),
+                'allbravo': [
+                    [1, 2, 3, 4], [2, 4, 6, 8], [3, 6, 9, 12],
+                    [1, 2, 3, 4], [2, 4, 6, 8], [3, 6, 9, 12],
+                    [1, 2, 3, 4], [2, 4, 6, 8], [3, 6, 9, 12],
+                ],
+            }
+        ))
 
 
 def test_failing():
@@ -110,22 +123,18 @@ def test_failing():
     case.clear_cache()
     case.run()
 
-    data = case.result_array()
-    assert data['retcode'].dtype == int
-    assert data['before'].dtype == int
-    assert data['return'].dtype == int
-    assert data['next'].dtype == int
-    assert data['after'].dtype == int
-    assert data['retcode'][0] == 0
-    assert data['before'][0] == 12
-    assert data['return'][0] == 0
-    assert data['next'][0] == 0
-    assert data['after'][0] == 13
-    assert data['retcode'][1] == 1
-    assert data['before'][1] == 12
-    assert data['return'][1] == 1
-    assert data.mask['next'][1] == True
-    assert data.mask['after'][1] == True
+    with case.dataframe(modify=False) as data:
+        check_df(data, pd.DataFrame(
+            index=pd.Int64Index([0, 1], name='retcode'),
+            data={
+                '_done': [True, True],
+                'retcode': pd.array([0, 1], dtype=pd.Int64Dtype()),
+                'before': pd.array([12, 12], dtype=pd.Int64Dtype()),
+                'return': pd.array([0, 1], dtype=pd.Int64Dtype()),
+                'next': pd.array([0, pd.NA], dtype=pd.Int64Dtype()),
+                'after': pd.array([13, pd.NA], dtype=pd.Int64Dtype()),
+            }
+        ))
 
 
 def test_stdout():

@@ -17,9 +17,12 @@ setup(
         'fasteners',
         'mako',
         'numpy',
+        'pandas',
+        'pyarrow',
         'ruamel.yaml',
         'simpleeval',
         'strictyaml',
+        'tables',
         'treelog',
     ],
     extras_require={

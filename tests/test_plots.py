@@ -146,6 +146,23 @@ def test_plots():
 
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {
+        'filename': 'fresult-allmean',
+        'grid': True,
+        'xmode': 'linear',
+        'ymode': 'linear',
+    }
+    compare_object(plot.objects[0], {
+        'mode': 'line',
+        'legend': 'fresult',
+        'color': 'blue',
+        'line': 'solid',
+        'marker': 'none',
+        'x': np.arange(1, 11),
+        'y': np.arange(1, 11),
+    })
+
+    plot = MockBackend.plots.pop(0)
+    assert plot.meta == {
         'filename': 'vresult',
         'grid': True,
         'xmode': 'linear',

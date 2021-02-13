@@ -9,6 +9,12 @@ def ignore(*_, **__):
     pass
 
 
+def flexible_mean(obj):
+    if obj.dtype == object:
+        return list(obj.apply(np.array).mean())
+    return obj.mean()
+
+
 def flatten(array):
     while array.dtype == object:
         array = np.array(array.tolist()).flatten()
@@ -53,37 +59,6 @@ def find_subclass(cls, name, root=False, attr='__tag__'):
         if hasattr(sub, attr) and getattr(sub, attr) == name:
             return sub
     return None
-
-
-def thick_index(index):
-    return tuple(
-        slice(i, i+1) if isinstance(i, int) else i
-        for i in index
-    )
-
-
-def iter_axis(array, axis):
-    indices = (slice(None),) * axis
-    for i in range(array.shape[axis]):
-        yield array[(*indices, slice(i, i+1))]
-
-
-def flexible_mean(array, axis):
-    d = np.sum(array, axis=axis, keepdims=True)
-    if d.dtype == object:
-        d = np.vectorize(lambda z: z/array.shape[axis], otypes=[object])(d)
-    else:
-        d = d / array.shape[axis]
-    return d
-
-
-def has_data(array: ma.MaskedArray) -> bool:
-    if array.dtype.fields is None:
-        return array.count() > 0
-    for k in array.dtype.fields.keys():
-        if has_data(array[k]):
-            return True
-    return False
 
 
 def completer(options):
