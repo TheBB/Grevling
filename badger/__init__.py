@@ -24,7 +24,7 @@ from simpleeval import SimpleEval, DEFAULT_FUNCTIONS, NameNotDefined
 import treelog as log
 from typing_inspect import get_origin, get_args
 
-from badger.plotting import PlotBackend
+from badger.plotting import Backends
 from badger.render import render
 from badger.schema import load_and_validate
 import badger.util as util
@@ -539,7 +539,7 @@ class Plot:
         # Collect all the categorized parameters and iterate over all those combinations
         categories = self._parameters_of_kind('category')
         noncats = set(case._parameters.keys()) - set(self._parameters_of_kind('fixed', 'category'))
-        backends = [PlotBackend.get_backend(fmt)() for fmt in self._format]
+        backends = Backends(*self._format)
         plotter = operator.attrgetter(f'add_{self._type}')
 
         sub_contexts = case._parameters.subspace(*categories, base=index)
@@ -553,24 +553,20 @@ class Plot:
             final_styles = self._styles.supplement(basestyle)
             for ax_name, data, style in zip(self._yaxis, yaxes, final_styles):
                 legend = self.generate_legend(sub_context, ax_name)
-                for backend in backends:
-                    plotter(backend)(legend, xpoints=xaxis, ypoints=data, style=style)
+                plotter(backends)(legend, xpoints=xaxis, ypoints=data, style=style)
 
         for attr in ['title', 'xlabel', 'ylabel']:
             template = getattr(self, f'_{attr}')
             if template is None:
                 continue
             text = render(template, context)
-            for backend in backends:
-                getattr(backend, f'set_{attr}')(text)
-        for backend in backends:
-            backend.set_xmode(self._xmode)
-            backend.set_ymode(self._ymode)
-            backend.set_grid(self._grid)
+            getattr(backends, f'set_{attr}')(text)
+        backends.set_xmode(self._xmode)
+        backends.set_ymode(self._ymode)
+        backends.set_grid(self._grid)
 
         filename = case.storagepath / render(self._filename, context)
-        for backend in backends:
-            backend.generate(filename)
+        backends.generate(filename)
 
     def generate_category(self, case: 'Case', context: dict, index):
         # Pick an arbitrary index for ignored parameters

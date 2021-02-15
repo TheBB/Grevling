@@ -8,6 +8,18 @@ import numpy as np
 from badger.util import find_subclass, ignore
 
 
+class Backends:
+
+    def __init__(self, *names: str):
+        self._backends = [PlotBackend.get_backend(name)() for name in names]
+
+    def __getattr__(self, attr: str):
+        def inner(*args, **kwargs):
+            for backend in self._backends:
+                getattr(backend, attr)(*args, **kwargs)
+        return inner
+
+
 class PlotBackend:
 
     name: str
