@@ -718,7 +718,7 @@ class Case:
 
         # Read settings
         settings = casedata.get('settings', {})
-        self._logdir = settings.get('logdir', None)
+        self._logdir = settings.get('logdir', '${_index}')
 
         # Construct plot objects
         self._plots = [Plot.load(spec, self._parameters, self._types) for spec in casedata.get('plots', [])]
