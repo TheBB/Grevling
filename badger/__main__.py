@@ -10,7 +10,6 @@ import treelog as log
 from strictyaml import YAMLValidationError
 
 import badger
-from badger.util import struct_as_dict
 
 
 class CustomClickException(click.ClickException):
@@ -99,21 +98,21 @@ def run(case):
     case.run()
 
 
+class PandasEncoder(json.JSONEncoder):
+
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.ndarray) and obj.ndim == 1:
+            return list(obj)
+        return super().default(obj)
+
+
 @main.command()
 @click.option('--fmt', '-f', default='json', type=click.Choice(['json']))
-@click.option('--structured', 'structured', flag_value=True)
-@click.option('--flat', 'structured', flag_value=False)
-@click.option('--filter/--no-filter', 'remove_missing', default=True)
 @click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
 @click.argument('output', type=click.File('w'))
-def dump(case, fmt, structured, remove_missing, output):
-    data = case.result_array()
-
-    if fmt == 'json':
-        obj = [struct_as_dict(struct, case._types) or None for struct in data.flatten()]
-        if remove_missing:
-            obj = [k for k in obj if k is not None]
-        if structured:
-            obj = np.array(obj, dtype=object).reshape(data.shape).tolist()
-        json.dump(obj, output, sort_keys=True, indent=4)
-        output.write('\n')
+def dump(case, fmt, output):
+    with case.dataframe(modify=False) as data:
+        if fmt == 'json':
+            json.dump(data.to_dict('records'), output, sort_keys=True, indent=4, cls=PandasEncoder)

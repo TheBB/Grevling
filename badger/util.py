@@ -25,22 +25,6 @@ def is_list_type(tp):
     return get_origin(tp) == list
 
 
-def struct_as_dict(array: np.void, types: 'NestedDict') -> dict:
-    retval = {}
-    for k in array.dtype.fields.keys():
-        if isinstance(array[k], ma.core.MaskedConstant):
-            return retval
-        if isinstance(array[k], (ma.mvoid, np.void)):
-            subdata = struct_as_dict(array[k], types[k])
-            retval[k] = subdata
-        else:
-            if get_origin(types[k]) == list:
-                retval[k] = array[k]
-            else:
-                retval[k] = types[k](array[k])
-    return retval
-
-
 def dict_product(names, iterables):
     for values in product(*iterables):
         yield dict(zip(names, values))
