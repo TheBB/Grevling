@@ -217,88 +217,88 @@ settings:
 plots:
 
   # Each parameter interacts with the plot in a specfic way.
-  parameters:
+  - parameters:
 
-    # For parameters that are 'fixed', Badger will produce one separate plot
-    # for each of the values of that parameter.
-    some-parameter: fixed
+      # For parameters that are 'fixed', Badger will produce one separate plot
+      # for each of the values of that parameter.
+      some-parameter: fixed
 
-    # Parameters that are 'category' will generate multiple graphs in a
-    # single plot, differentiated by colors, markers or line styles.
-    some-parameter: category
+      # Parameters that are 'category' will generate multiple graphs in a
+      # single plot, differentiated by colors, markers or line styles.
+      some-parameter: category
 
-    # Parameters that are designated as 'variate' place their data points
-    # in different locations on the x-axis.
-    some-parameter: variate
+      # Parameters that are designated as 'variate' place their data points
+      # in different locations on the x-axis.
+      some-parameter: variate
 
-    # If a parameter is 'mean', the data will be averaged over all values of
-    # that parameter.
-    some-parameter: mean
+      # If a parameter is 'mean', the data will be averaged over all values of
+      # that parameter.
+      some-parameter: mean
 
-    # For parameters that are 'ignore', the user asserts that this parameter
-    # does NOT influence the data plotted. In this case Badger will pick an
-    # arbitrary value for that parameter. This is the default setting for
-    # unmentioned parameters.
-    some-parameter: ignore
+      # For parameters that are 'ignore', the user asserts that this parameter
+      # does NOT influence the data plotted. In this case Badger will pick an
+      # arbitrary value for that parameter. This is the default setting for
+      # unmentioned parameters.
+      some-parameter: ignore
 
-  # Give the name of the parameter, evaluable or captured result to use for
-  # plotting on the x-axis. If this is omitted, and there is exactly one
-  # parameter that is 'variate', the value of that parameter will be used.
-  # Otherwise, xaxis must be provided. The xaxis value may also be a list type
-  # (e.g. from a capture group with mode 'all'), in which case it effetively
-  # functions as an additional variate parameter.
-  xaxis: something
+    # Give the name of the parameter, evaluable or captured result to use for
+    # plotting on the x-axis. If this is omitted, and there is exactly one
+    # parameter that is 'variate', the value of that parameter will be used.
+    # Otherwise, xaxis must be provided. The xaxis value may also be a list type
+    # (e.g. from a capture group with mode 'all'), in which case it effetively
+    # functions as an additional variate parameter.
+    xaxis: something
 
-  # Give the names of the parameters, evaluables or captured results to use
-  # for plotting on the y-axis. If there is more than one, this effectively
-  # functions as an additional categorical parameter.
-  yaxis:
-    - first
-    - second
-    - third
+    # Give the names of the parameters, evaluables or captured results to use
+    # for plotting on the y-axis. If there is more than one, this effectively
+    # functions as an additional categorical parameter.
+    yaxis:
+      - first
+      - second
+      - third
 
-  # For each of the three style categories (color, marker and line) you may
-  # either provide a fixed value or tie it to a category (any parameter given
-  # as 'category', or 'yaxis' if there are multiple y-axes). For categorical
-  # styles, you may also provide a list of values. Badger will attempt to tie
-  # categorical parameters to styles automatically if not explicitly provided.
-  style:
-    color:
-      category: some-parameter
-    line: solid
-    marker:
-      category: yaxis
-      values: [circle, square, triangle]
+    # For each of the three style categories (color, marker and line) you may
+    # either provide a fixed value or tie it to a category (any parameter given
+    # as 'category', or 'yaxis' if there are multiple y-axes). For categorical
+    # styles, you may also provide a list of values. Badger will attempt to tie
+    # categorical parameters to styles automatically if not explicitly provided.
+    style:
+      color:
+        category: some-parameter
+      line: solid
+      marker:
+        category: yaxis
+        values: [circle, square, triangle]
 
-  # If there are more than one effective variate parameters (that is, including
-  # the 'xaxis' specification), the default plot style is 'scatter'. Otherwise
-  # it is 'line'.
-  type: line
+    # If there are more than one effective variate parameters (that is, including
+    # the 'xaxis' specification), the default plot style is 'scatter'. Otherwise
+    # it is 'line'.
+    type: line
 
-  # For the filename template you can use any parameter values designated as
-  # 'fixed', or evaluables that only depend on such. Don't add a file extension.
-  # The plots are stored in the .badgerdata folder.
-  filename: plot-${some-parameter}
+    # For the filename template you can use any parameter values designated as
+    # 'fixed', or evaluables that only depend on such. Don't add a file extension.
+    # The plots are stored in the .badgerdata folder.
+    filename: plot-${some-parameter}
 
-  # Specify the backends to use. Some are optional dependencies!
-  format:
-    - matplotlib   # Create png files
-                   # pip install matplotlib
-    - plotly       # Create html files that can be used interactively in a browser
-                   # pip install plotly>=4
-    - csv          # For use with e.g. Excel or TiKZ/PGFPlots
+    # Specify the backends to use. Some are optional dependencies!
+    format:
+      - matplotlib   # Create png files
+                     # pip install matplotlib
+      - plotly       # Create html files that can be used interactively in a browser
+                     # pip install plotly>=4
+      - csv          # For use with e.g. Excel or TiKZ/PGFPlots
 
-  # For these you can use templates that depend on fixed and/or categorical
-  # parameters, as the case may be.
-  legend: ...
-  xlabel: ...
-  ylabel: ...
-  title: ...
+    # For these you can use templates that depend on fixed and/or categorical
+    # parameters, as the case may be.
+    legend: ...
+    xlabel: ...
+    ylabel: ...
+    title: ...
 
-  # Plot linearly or logarithmically
-  xmode: linear
-  ymode: log
+    # Plot linearly or logarithmically
+    xmode: linear
+    ymode: log
 
-  # Turn grid on or off (default on)
-  grid: off
+    # Turn grid on or off (default on)
+    grid: off
 ```
