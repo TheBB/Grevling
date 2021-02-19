@@ -1,7 +1,9 @@
+from collections.abc import Sequence
 from contextlib import contextmanager
 from difflib import Differ
 import inspect
 from itertools import product
+import operator
 from pathlib import Path
 import pydoc
 import re
@@ -12,18 +14,20 @@ import subprocess
 from tempfile import TemporaryDirectory
 from time import time as osclock
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Iterable, Optional, Set
 
+from bidict import bidict
 from fasteners import InterProcessLock
 import numpy as np
-import numpy.ma as ma
-from simpleeval import SimpleEval
+import pandas as pd
+from simpleeval import SimpleEval, DEFAULT_FUNCTIONS, NameNotDefined
 import treelog as log
 from typing_inspect import get_origin, get_args
 
+from badger.plotting import Backends
 from badger.render import render
 from badger.schema import load_and_validate
-from badger.util import find_subclass, subindex_set, has_data, completer, NestedDict
+import badger.util as util
 
 
 __version__ = '0.1.0'
@@ -39,9 +43,15 @@ def time():
 def _numpy_dtype(tp):
     if tp in (int, float):
         return tp
-    if isinstance(tp, NestedDict):
-        return list(tp.items())
     return object
+
+
+def _pandas_dtype(tp):
+    if tp == int:
+        return pd.Int64Dtype()
+    if util.is_list_type(tp):
+        return object
+    return tp
 
 
 def _typename(tp) -> str:
@@ -69,13 +79,13 @@ def call_yaml(func, mapping, *args, **kwargs):
     return func(*binding.args, **binding.kwargs)
 
 
-class Parameter:
+class Parameter(Sequence):
 
     @classmethod
     def load(cls, name, spec):
         if isinstance(spec, list):
             return cls(name, spec)
-        subcls = find_subclass(cls, spec['type'], root=False, attr='__tag__')
+        subcls = util.find_subclass(cls, spec['type'], root=False, attr='__tag__')
         del spec['type']
         return call_yaml(subcls, spec, name)
 
@@ -110,6 +120,34 @@ class GradedParameter(Parameter):
             values.append(values[-1] + step)
             step *= grading
         super().__init__(name, np.array(values))
+
+
+class ParameterSpace(dict):
+
+    def indexof(self, name: str) -> int:
+        for i, param in enumerate(self):
+            if param == name:
+                return i
+        raise ValueError(name)
+
+    def make_index(self, _base=None, _fill=None, **kwargs):
+        if _base is not None:
+            base = list(_base)
+        else:
+            base = [_fill] * len(self)
+        for i, param in enumerate(self):
+            if param in kwargs:
+                base[i] = kwargs[param]
+        return tuple(base)
+
+    def subspace(self, *names, base=None, fill=None) -> Iterable[Dict]:
+        params = [self[name] for name in names]
+        indexes = [range(len(p)) for p in params]
+        for values in util.dict_product(names, params):
+            yield self.make_index(_base=base, _fill=fill, **values), values
+
+    def fullspace(self) -> Iterable[Dict]:
+        yield from self.subspace(*self.keys())
 
 
 class FileMapping:
@@ -194,7 +232,7 @@ class Capture:
         self._mode = mode
         self._type_overrides = type_overrides or {}
 
-    def add_types(self, types: NestedDict):
+    def add_types(self, types: Dict[str, Any]):
         for group in self._regex.groupindex.keys():
             single = self._type_overrides.get(group, str)
             if self._mode == 'all':
@@ -249,7 +287,7 @@ class Command:
         elif isinstance(capture, list):
             self._capture.extend(Capture.load(c) for c in capture)
 
-    def add_types(self, types: NestedDict):
+    def add_types(self, types: Dict[str, Any]):
         if self._capture_walltime:
             types[f'walltime/{self.name}'] = float
         for cap in self._capture:
@@ -300,9 +338,287 @@ class Command:
         return True
 
 
-class ResultCollector(NestedDict):
+class PlotStyleManager:
 
-    _types: NestedDict
+    _category_to_style: bidict
+    _custom_styles: Dict[str, List[str]]
+    _mode: str
+    _defaults = {
+        'color': {
+            'category': {
+                None: ['blue', 'red', 'green', 'magenta', 'cyan'],
+            },
+            'single': {
+                None: ['blue'],
+            },
+        },
+        'line': {
+            'category': {
+                'line': ['solid', 'dash', 'dot', 'dashdot'],
+                'scatter': ['none'],
+            },
+            'single': {
+                'line': ['solid'],
+                'scatter': ['none'],
+            },
+        },
+        'marker': {
+            'category': {
+                None: ['circle', 'triangle', 'square'],
+            },
+            'single': {
+                'line': ['none'],
+                'scatter': ['circle'],
+            },
+        },
+    }
+
+    def __init__(self, mode: str):
+        self._category_to_style = bidict()
+        self._custom_styles = dict()
+        self._mode = mode
+
+    def assigned(self, category: str):
+        return category in self._category_to_style
+
+    def assign(self, category: str, style: Optional[str] = None):
+        if style is None:
+            candidates = list(s for s in self._defaults if s not in self._category_to_style.inverse)
+            if self._mode == 'scatter':
+                try:
+                    candidates.remove('line')
+                except ValueError:
+                    pass
+            assert candidates
+            style = candidates[0]
+        assert style != 'line' or self._mode != 'scatter'
+        self._category_to_style[category] = style
+
+    def set_values(self, style: str, values: List[str]):
+        self._custom_styles[style] = values
+
+    def get_values(self, style: str) -> List[str]:
+        # Prioritize user customizations
+        if style in self._custom_styles:
+            return self._custom_styles[style]
+        getter = lambda d, k: d.get(k, d.get(None, []))
+        s = getter(self._defaults, style)
+        s = getter(s, 'category' if style in self._category_to_style.inverse else 'single')
+        s = getter(s, self._mode)
+        return s
+
+    def styles(self, space: ParameterSpace, *categories: str) -> Iterable[Dict[str, str]]:
+        names, values = [], []
+        for c in categories:
+            style = self._category_to_style[c]
+            available_values = self.get_values(style)
+            assert len(available_values) >= len(space[c])
+            names.append(style)
+            values.append(available_values[:len(space[c])])
+        yield from util.dict_product(names, values)
+
+    def supplement(self, basestyle: Dict[str, str]):
+        basestyle = dict(basestyle)
+        for style in self._defaults:
+            if style not in basestyle and self._category_to_style.get('yaxis') != style:
+                basestyle[style] = self.get_values(style)[0]
+        if 'yaxis' in self._category_to_style:
+            ystyle = self._category_to_style['yaxis']
+            for v in self.get_values(ystyle):
+                yield {**basestyle, ystyle: v}
+        else:
+            yield basestyle
+
+
+class Plot:
+
+    _parameters: Dict[str, str]
+    _filename: str
+    _format: List[str]
+    _yaxis: List[str]
+    _xaxis: str
+    _type: str
+    _legend: Optional[str]
+    _xlabel: Optional[str]
+    _ylabel: Optional[str]
+    _xmode: str
+    _ymode: str
+    _title: Optional[str]
+    _grid: bool
+    _styles: PlotStyleManager
+
+    @classmethod
+    def load(cls, spec, parameters, types):
+        # All parameters not mentioned are assumed to be ignored
+        spec.setdefault('parameters', {})
+        for param in parameters:
+            spec['parameters'].setdefault(param, 'ignore')
+
+        # If there is exactly one variate, and the x-axis is not given, assume that is the x-axis
+        variates = [param for param, kind in spec['parameters'].items() if kind == 'variate']
+        nvariate = len(variates)
+        if nvariate == 1 and 'xaxis' not in spec:
+            spec['xaxis'] = next(iter(variates))
+        elif 'xaxis' not in spec:
+            spec['xaxis'] = None
+
+        # Listify possible scalars
+        for k in ('format', 'yaxis'):
+            if isinstance(spec[k], str):
+                spec[k] = [spec[k]]
+
+        # Either all the axes are list type or none of them are
+        list_type = util.is_list_type(types[spec['yaxis'][0]])
+        assert all(util.is_list_type(types[k]) == list_type for k in spec['yaxis'][1:])
+        if spec['xaxis']:
+            assert util.is_list_type(types[spec['xaxis']]) == list_type
+
+        # If the x-axis has list type, the effective number of variates is one higher
+        eff_variates = nvariate + list_type
+
+        # If there are more than one effective variate, the plot must be scatter
+        if eff_variates > 1:
+            if spec.get('type', 'scatter') != 'scatter':
+                log.warning("Line plots can have at most one variate dimension")
+            spec['type'] = 'scatter'
+        elif eff_variates == 0:
+            log.error("Plot has no effective variate dimensions")
+            return
+        else:
+            spec.setdefault('type', 'line')
+
+        return call_yaml(cls, spec)
+
+    def __init__(self, parameters, filename, format, yaxis, xaxis, type,
+                 legend=None, xlabel=None, ylabel=None, title=None, grid=True,
+                 xmode='linear', ymode='linear', style={}):
+        self._parameters = parameters
+        self._filename = filename
+        self._format = format
+        self._yaxis = yaxis
+        self._xaxis = xaxis
+        self._type = type
+        self._legend = legend
+        self._xlabel = xlabel
+        self._ylabel = ylabel
+        self._xmode = xmode
+        self._ymode = ymode
+        self._title = title
+        self._grid = grid
+
+        self._styles = PlotStyleManager(type)
+        for key, value in style.items():
+            if isinstance(value, dict):
+                self._styles.assign(value['category'], key)
+                if 'values' in value:
+                    self._styles.set_values(key, value['values'])
+            else:
+                self._styles.set_values(key, [value])
+        for param, kind in self._parameters.items():
+            if kind == 'category' and not self._styles.assigned(param):
+                self._styles.assign(param)
+        if len(self._yaxis) > 1 and not self._styles.assigned('yaxis'):
+            self._styles.assign('yaxis')
+
+    def _parameters_of_kind(self, *kinds: str):
+        return [param for param, k in self._parameters.items() if k in kinds]
+
+    def _parameters_not_of_kind(self, *kinds: str):
+        return [param for param, k in self._parameters.items() if k not in kinds]
+
+    def generate_all(self, case: 'Case'):
+        # Collect all the fixed parameters and iterate over all those combinations
+        fixed = self._parameters_of_kind('fixed')
+        unfixed = set(case._parameters.keys()) - set(fixed)
+
+        for index, context in case._parameters.subspace(*fixed, fill=slice(None)):
+            case.evaluate_context(context, allowed_missing=unfixed)
+            self.generate_single(case, context, index)
+
+    def generate_single(self, case: 'Case', context: dict, index):
+        # Collect all the categorized parameters and iterate over all those combinations
+        categories = self._parameters_of_kind('category')
+        noncats = set(case._parameters.keys()) - set(self._parameters_of_kind('fixed', 'category'))
+        backends = Backends(*self._format)
+        plotter = operator.attrgetter(f'add_{self._type}')
+
+        sub_contexts = case._parameters.subspace(*categories, base=index)
+        styles = self._styles.styles(case._parameters, *categories)
+        for (sub_index, sub_context), basestyle in zip(sub_contexts, styles):
+            sub_context = {**context, **sub_context}
+            case.evaluate_context(sub_context, allowed_missing=noncats)
+
+            cat_name, xaxis, yaxes = self.generate_category(case, sub_context, sub_index)
+
+            final_styles = self._styles.supplement(basestyle)
+            for ax_name, data, style in zip(self._yaxis, yaxes, final_styles):
+                legend = self.generate_legend(sub_context, ax_name)
+                plotter(backends)(legend, xpoints=xaxis, ypoints=data, style=style)
+
+        for attr in ['title', 'xlabel', 'ylabel']:
+            template = getattr(self, f'_{attr}')
+            if template is None:
+                continue
+            text = render(template, context)
+            getattr(backends, f'set_{attr}')(text)
+        backends.set_xmode(self._xmode)
+        backends.set_ymode(self._ymode)
+        backends.set_grid(self._grid)
+
+        filename = case.storagepath / render(self._filename, context)
+        backends.generate(filename)
+
+    def generate_category(self, case: 'Case', context: dict, index):
+        # Pick an arbitrary index for ignored parameters
+        ignored = self._parameters_of_kind('ignore')
+        index = case._parameters.make_index(_base=index, **{param: case._parameters[param][0] for param in ignored})
+
+        with case.dataframe(modify=False) as df:
+            data = df[df['_done']].loc[index, :]
+            if isinstance(data, pd.Series):
+                data = data.to_frame().T
+
+        # Extract only the fields we need
+        fieldnames = list(self._yaxis)
+        if self._xaxis:
+            fieldnames.append(self._xaxis)
+        data = data[fieldnames]
+
+        # Collapse mean parameters
+        means = self._parameters_of_kind('mean')
+        if means:
+            non_means = self._parameters_not_of_kind('mean')
+            if non_means:
+                data = data.groupby(level=non_means).aggregate(util.flexible_mean)
+            else:
+                data = data.aggregate(util.flexible_mean)
+
+        # Extract data
+        fields = [util.flatten(data[f].to_numpy()) for f in fieldnames]
+
+        if not self._xaxis:
+            length = max(len(f) for f in fields)
+            fields.append(np.arange(1, length + 1))
+
+        if any(self._parameters_of_kind('category')):
+            name = ', '.join(f'{k}={repr(context[k])}' for k in self._parameters_of_kind('category'))
+        else:
+            name = None
+
+        return name, fields[-1], fields[:-1]
+
+    def generate_legend(self, context: dict, yaxis: str) -> str:
+        if self._legend is not None:
+            return render(self._legend, {**context, 'yaxis': yaxis})
+        if any(self._parameters_of_kind('category')):
+            name = ', '.join(f'{k}={repr(context[k])}' for k in self._parameters_of_kind('category'))
+            return f'{name} ({yaxis})'
+        return yaxis
+
+
+class ResultCollector(dict):
+
+    _types: Dict[str, Any]
 
     def __init__(self, types):
         super().__init__()
@@ -310,16 +626,19 @@ class ResultCollector(NestedDict):
 
     def collect(self, name: str, value: Any):
         tp = self._types[name]
-        if get_origin(tp) == list:
+        if util.is_list_type(tp):
             eltype = get_args(tp)[0]
             self.setdefault(name, []).append(eltype(value))
         else:
             self[name] = tp(value)
 
-    def commit(self, array):
+    def commit(self, data, index):
+        data.at[index, '_done'] = True
         for key, value in self.items():
-            subindex_set(array.mask, key, False)
-            subindex_set(array, key, value)
+            if util.is_list_type(self._types[key]):
+                data.at[index, key] = value
+            else:
+                data.at[index, key] = value
 
 
 class Case:
@@ -328,13 +647,14 @@ class Case:
     sourcepath: Path
     storagepath: Path
 
-    _parameters: Dict[str, Parameter]
+    _parameters: ParameterSpace
     _evaluables: Dict[str, str]
     _constants: Dict[str, Any]
     _pre_files: List[FileMapping]
     _post_files: List[FileMapping]
     _commands: List[Command]
-    _types: NestedDict
+    _plots: List[Plot]
+    _types: Dict[str, Any]
 
     def __init__(self, yamlpath='.', storagepath=None):
         if isinstance(yamlpath, str):
@@ -353,7 +673,7 @@ class Case:
             casedata = load_and_validate(f.read(), yamlpath)
 
         # Read parameters
-        self._parameters = {}
+        self._parameters = ParameterSpace()
         for name, paramspec in casedata.get('parameters', {}).items():
             param = Parameter.load(name, paramspec)
             self._parameters[param.name] = param
@@ -371,7 +691,11 @@ class Case:
         self._commands = [Command.load(spec) for spec in casedata.get('script', [])]
 
         # Read types
-        self._types = NestedDict(casedata.get('types', {}).items())
+        self._types = {
+            '_index': int,
+            '_done': bool,
+        }
+        self._types.update(casedata.get('types', {}))
 
         # Guess types of parameters
         for name, param in self._parameters.items():
@@ -380,7 +704,7 @@ class Case:
 
         # Guess types of evaluables
         if any(name not in self._types for name in self._evaluables):
-            contexts = list(self.parameters())
+            contexts = list(ctx for _, ctx in self._parameters.fullspace())
             for ctx in contexts:
                 self.evaluate_context(ctx, verbose=False)
             for name in self._evaluables:
@@ -392,23 +716,40 @@ class Case:
         for cmd in self._commands:
             cmd.add_types(self._types)
 
-        # Construct numpy dtype of result array
-        self._dtype = self._types.map(_numpy_dtype).as_list_of_tuples()
-
         # Read settings
         settings = casedata.get('settings', {})
-        self._logdir = settings.get('logdir', None)
+        self._logdir = settings.get('logdir', '${_index}')
+
+        # Construct plot objects
+        self._plots = [Plot.load(spec, self._parameters, self._types) for spec in casedata.get('plots', [])]
 
     def clear_cache(self):
         shutil.rmtree(self.storagepath)
         self.storagepath.mkdir(parents=True, exist_ok=True)
 
-    def evaluate_context(self, context, verbose=True):
-        evaluator = SimpleEval()
+    def evaluate_context(self, context, verbose=True, allowed_missing=()):
+        evaluator = SimpleEval(functions={**DEFAULT_FUNCTIONS,
+            'log': np.log,
+            'log2': np.log2,
+            'log10': np.log10,
+            'sqrt': np.sqrt,
+            'abs': np.abs,
+            'ord': ord,
+        })
         evaluator.names.update(context)
         evaluator.names.update(self._constants)
+        allowed_missing = set(allowed_missing)
+
         for name, code in self._evaluables.items():
-            result = evaluator.eval(code) if isinstance(code, str) else code
+            try:
+                result = evaluator.eval(code) if isinstance(code, str) else code
+            except NameNotDefined as error:
+                if error.name in allowed_missing:
+                    allowed_missing.add(name)
+                    log.debug(f'Skipped evaluating: {name}')
+                    continue
+                else:
+                    raise
             if verbose:
                 log.debug(f'Evaluated: {name} = {repr(result)}')
             evaluator.names[name] = context[name] = result
@@ -417,40 +758,44 @@ class Case:
     def shape(self):
         return tuple(map(len, self._parameters.values()))
 
+    def _load_dataframe(self):
+        path = self.storagepath / 'dataframe.parquet'
+        if path.is_file():
+            return pd.read_parquet(path, engine='pyarrow')
+        index = pd.MultiIndex.from_product(self._parameters.values(), names=self._parameters.keys())
+        data = {
+            '_done': False,
+        }
+        data.update({
+            k: pd.Series([], dtype=_pandas_dtype(v))
+            for k, v in self._types.items()
+        })
+        return pd.DataFrame(index=index, data=data)
+
+    def _save_dataframe(self, df: pd.DataFrame):
+        df.to_parquet(self.storagepath / 'dataframe.parquet', engine='pyarrow', index=True)
+
     @contextmanager
-    def acquire_lock(self):
+    def dataframe(self, modify=True):
         with InterProcessLock(self.storagepath / 'lockfile'):
-            yield
+            df = self._load_dataframe()
+            yield df
+            if modify:
+                self._save_dataframe(df)
 
-    def commit_result(self, index, collector):
-        with self.acquire_lock():
-            results = self.result_array()
-            collector.commit(results.flat[index])
-            np.save(self.storagepath / 'results.npy', results.data, allow_pickle=True)
-            np.save(self.storagepath / 'results.mask.npy', results.mask, allow_pickle=True)
-
-    def result_array(self):
-        path = self.storagepath / 'results.npy'
-        maskpath = self.storagepath / 'results.mask.npy'
-        if path.is_file() and maskpath.is_file():
-            return ma.array(
-                np.load(path, allow_pickle=True),
-                mask=np.load(maskpath),
-            )
-        else:
-            return ma.array(
-                np.zeros(self.shape, dtype=self._dtype),
-                mask=np.ones(self.shape, dtype=bool)
-            )
+    def commit_result(self, index, collector: ResultCollector):
+        with self.dataframe() as df:
+            collector.commit(df, index)
 
     def has_data(self):
-        return has_data(self.result_array())
+        with self.dataframe(modify=False) as df:
+            return df['_done'].any()
 
     def _check_decide_diff(self, diff: List[str], prev_file: Path, interactive: bool = True) -> bool:
         decision = None
         decisions = ['exit', 'diff', 'new-delete', 'new-keep', 'old']
         if interactive:
-            readline.set_completer(completer(decisions))
+            readline.set_completer(util.completer(decisions))
             readline.parse_and_bind('tab: complete')
             log.warning("Warning: Badgerfile has changed and data have already been stored")
             log.warning("Pick an option:")
@@ -509,23 +854,23 @@ class Case:
 
         return True
 
-    def parameters(self):
-        for values in product(*(param for param in self._parameters.values())):
-            yield dict(zip(self._parameters, values))
-
     def run(self):
-        parameters = list(self.parameters())
+        parameters = list(self._parameters.fullspace())
 
         nsuccess = 0
-        for index, namespace in enumerate(log.iter.fraction('parameter', parameters)):
-            nsuccess += self.run_single(index, namespace)
+        for num, (index, namespace) in enumerate(log.iter.fraction('parameter', parameters)):
+            nsuccess += self.run_single(num, index, namespace)
 
         logger = log.user if nsuccess == len(parameters) else log.warning
         logger(f"{nsuccess} of {len(parameters)} succeeded")
 
-    def run_single(self, index, namespace):
+        for plot in log.iter.fraction('plot', self._plots):
+            plot.generate_all(self)
+
+    def run_single(self, num, index, namespace):
         log.user(', '.join(f'{k}={repr(v)}' for k, v in namespace.items()))
         self.evaluate_context(namespace)
+        namespace['_index'] = num
 
         collector = ResultCollector(self._types)
         for key, value in namespace.items():

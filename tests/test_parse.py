@@ -101,6 +101,8 @@ def test_parse():
     assert case._commands[5]._capture[4]._mode == 'all'
 
     assert case._types == {
+        '_index': int,
+        '_done': bool,
         'alpha': int,
         'bravo': float,
         'charlie': float,

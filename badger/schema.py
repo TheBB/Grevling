@@ -100,6 +100,14 @@ def Capture():
     )
 
 
+def Style():
+    """Validator that matches a plot style description."""
+    return Map({
+        'category': Str(),
+        Optional('values'): Seq(Str()),
+    }) | Str()
+
+
 class First(Validator):
     """Validator that validates against a sequence of sub-validators,
     picking the first that matches.
@@ -181,10 +189,30 @@ CASE_SCHEMA = Map({
             Optional('capture-walltime'): Bool(),
         }),
     )),
+    Optional('types'): MapPattern(Str(), Type()),
+    Optional('plots'): Seq(Map({
+        'filename': Str(),
+        'format': Str() | Seq(Str()),
+        'yaxis': Str() | Seq(Str()),
+        Optional('parameters'): MapPattern(Str(), Choice('fixed', 'variate', 'category', 'ignore', 'mean')),
+        Optional('xaxis'): Str(),
+        Optional('type'): Choice('scatter', 'line'),
+        Optional('legend'): Str(),
+        Optional('xlabel'): Str(),
+        Optional('ylabel'): Str(),
+        Optional('xmode'): Choice('linear', 'log'),
+        Optional('ymode'): Choice('linear', 'log'),
+        Optional('title'): Str(),
+        Optional('grid'): Bool(),
+        Optional('style'): Map({
+            Optional('color'): Style(),
+            Optional('line'): Style(),
+            Optional('marker'): Style(),
+        })
+    })),
     Optional('settings'): Map({
         Optional('logdir'): Str(),
     }),
-    Optional('types'): MapPattern(Str(), Type()),
 })
 
 
