@@ -280,13 +280,15 @@ plots:
   # The plots are stored in the .badgerdata folder.
   filename: plot-${some-parameter}
 
-  # Specify the backends to use.
+  # Specify the backends to use. Some are optional dependencies!
   format:
     - matplotlib   # Create png files
-    - plotly       # Create html files that can be used interacively in a browser
+                   # pip install matplotlib
+    - plotly       # Create html files that can be used interactively in a browser
+                   # pip install plotly>=4
     - csv          # For use with e.g. Excel or TiKZ/PGFPlots
 
-  # For these you can use templates that depend on fixed or categorical
+  # For these you can use templates that depend on fixed and/or categorical
   # parameters, as the case may be.
   legend: ...
   xlabel: ...
