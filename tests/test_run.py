@@ -35,6 +35,7 @@ def test_echo():
             ),
             data={
                 '_done': [True] * 9,
+                '_index': pd.array([0, 1, 2, 3, 4, 5, 6, 7, 8], dtype=pd.Int64Dtype()),
                 'alpha': pd.array([1, 1, 1, 2, 2, 2, 3, 3, 3], dtype=pd.Int64Dtype()),
                 'bravo': ['a', 'b', 'c', 'a', 'b', 'c', 'a', 'b', 'c'],
                 'charlie': pd.array([1, 1, 1, 3, 3, 3, 5, 5, 5], dtype=pd.Int64Dtype()),
@@ -58,6 +59,7 @@ def test_cat():
             ),
             data={
                 '_done': [True] * 9,
+                '_index': pd.array([0, 1, 2, 3, 4, 5, 6, 7, 8], dtype=pd.Int64Dtype()),
                 'alpha': pd.array([1, 1, 1, 2, 2, 2, 3, 3, 3], dtype=pd.Int64Dtype()),
                 'bravo': ['a', 'b', 'c', 'a', 'b', 'c', 'a', 'b', 'c'],
                 'charlie': pd.array([1, 1, 1, 3, 3, 3, 5, 5, 5], dtype=pd.Int64Dtype()),
@@ -98,6 +100,7 @@ def test_capture():
             ),
             data={
                 '_done': [True] * 9,
+                '_index': pd.array([0, 1, 2, 3, 4, 5, 6, 7, 8], dtype=pd.Int64Dtype()),
                 'alpha': [1.234, 1.234, 1.234, 2.345, 2.345, 2.345, 3.456, 3.456, 3.456],
                 'bravo': pd.array([1, 2, 3, 1, 2, 3, 1, 2, 3], dtype=pd.Int64Dtype()),
                 'firstalpha': [1.234, 1.234, 1.234, 2.345, 2.345, 2.345, 3.456, 3.456, 3.456],
@@ -128,6 +131,7 @@ def test_failing():
             index=pd.Int64Index([0, 1], name='retcode'),
             data={
                 '_done': [True, True],
+                '_index': pd.array([0, 1], dtype=pd.Int64Dtype()),
                 'retcode': pd.array([0, 1], dtype=pd.Int64Dtype()),
                 'before': pd.array([12, 12], dtype=pd.Int64Dtype()),
                 'return': pd.array([0, 1], dtype=pd.Int64Dtype()),

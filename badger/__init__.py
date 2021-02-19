@@ -691,7 +691,11 @@ class Case:
         self._commands = [Command.load(spec) for spec in casedata.get('script', [])]
 
         # Read types
-        self._types = dict(casedata.get('types', {}).items())
+        self._types = {
+            '_index': int,
+            '_done': bool,
+        }
+        self._types.update(casedata.get('types', {}))
 
         # Guess types of parameters
         for name, param in self._parameters.items():
@@ -711,9 +715,6 @@ class Case:
         # Fill in types derived from commands
         for cmd in self._commands:
             cmd.add_types(self._types)
-
-        # Construct numpy dtype of result array
-        # self._dtype = [(name, _numpy_dtype(tp)) for name, tp in self._types.items()]
 
         # Read settings
         settings = casedata.get('settings', {})
@@ -857,8 +858,8 @@ class Case:
         parameters = list(self._parameters.fullspace())
 
         nsuccess = 0
-        for index, namespace in log.iter.fraction('parameter', parameters):
-            nsuccess += self.run_single(index, namespace)
+        for num, (index, namespace) in enumerate(log.iter.fraction('parameter', parameters)):
+            nsuccess += self.run_single(num, index, namespace)
 
         logger = log.user if nsuccess == len(parameters) else log.warning
         logger(f"{nsuccess} of {len(parameters)} succeeded")
@@ -866,9 +867,10 @@ class Case:
         for plot in log.iter.fraction('plot', self._plots):
             plot.generate_all(self)
 
-    def run_single(self, index, namespace):
+    def run_single(self, num, index, namespace):
         log.user(', '.join(f'{k}={repr(v)}' for k, v in namespace.items()))
         self.evaluate_context(namespace)
+        namespace['_index'] = num
 
         collector = ResultCollector(self._types)
         for key, value in namespace.items():
