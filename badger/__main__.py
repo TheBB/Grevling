@@ -113,6 +113,7 @@ class PandasEncoder(json.JSONEncoder):
 @click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
 @click.argument('output', type=click.File('w'))
 def dump(case, fmt, output):
-    with case.dataframe(modify=False) as data:
-        if fmt == 'json':
-            json.dump(data.to_dict('records'), output, sort_keys=True, indent=4, cls=PandasEncoder)
+    with case.lock():
+        data = case.load_dataframe()
+    if fmt == 'json':
+        json.dump(data.to_dict('records'), output, sort_keys=True, indent=4, cls=PandasEncoder)

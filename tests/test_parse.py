@@ -102,7 +102,9 @@ def test_parse():
 
     assert case._types == {
         '_index': int,
-        '_done': bool,
+        '_logdir': str,
+        '_started': 'datetime64[ns]',
+        '_finished': 'datetime64[ns]',
         'alpha': int,
         'bravo': float,
         'charlie': float,

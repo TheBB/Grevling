@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from contextlib import contextmanager
+from datetime import datetime
 from difflib import Differ
 import inspect
 from itertools import product
@@ -33,17 +34,17 @@ import badger.util as util
 __version__ = '0.1.0'
 
 
+class Opaque:
+
+    def __init__(self, obj):
+        self.obj = obj
+
+
 @contextmanager
 def time():
     start = osclock()
     yield lambda: end - start
     end = osclock()
-
-
-def _numpy_dtype(tp):
-    if tp in (int, float):
-        return tp
-    return object
 
 
 def _pandas_dtype(tp):
@@ -124,27 +125,11 @@ class GradedParameter(Parameter):
 
 class ParameterSpace(dict):
 
-    def indexof(self, name: str) -> int:
-        for i, param in enumerate(self):
-            if param == name:
-                return i
-        raise ValueError(name)
-
-    def make_index(self, _base=None, _fill=None, **kwargs):
-        if _base is not None:
-            base = list(_base)
-        else:
-            base = [_fill] * len(self)
-        for i, param in enumerate(self):
-            if param in kwargs:
-                base[i] = kwargs[param]
-        return tuple(base)
-
-    def subspace(self, *names, base=None, fill=None) -> Iterable[Dict]:
+    def subspace(self, *names, base=None) -> Iterable[Dict]:
         params = [self[name] for name in names]
         indexes = [range(len(p)) for p in params]
         for values in util.dict_product(names, params):
-            yield self.make_index(_base=base, _fill=fill, **values), values
+            yield values
 
     def fullspace(self) -> Iterable[Dict]:
         yield from self.subspace(*self.keys())
@@ -531,8 +516,8 @@ class Plot:
         fixed = self._parameters_of_kind('fixed')
         unfixed = set(case._parameters.keys()) - set(fixed)
 
-        for index, context in case._parameters.subspace(*fixed, fill=slice(None)):
-            case.evaluate_context(context, allowed_missing=unfixed)
+        for index in case._parameters.subspace(*fixed):
+            context = case.evaluate_context(index.copy(), allowed_missing=unfixed)
             self.generate_single(case, context, index)
 
     def generate_single(self, case: 'Case', context: dict, index):
@@ -542,11 +527,11 @@ class Plot:
         backends = Backends(*self._format)
         plotter = operator.attrgetter(f'add_{self._type}')
 
-        sub_contexts = case._parameters.subspace(*categories, base=index)
+        sub_indices = case._parameters.subspace(*categories, base=index)
         styles = self._styles.styles(case._parameters, *categories)
-        for (sub_index, sub_context), basestyle in zip(sub_contexts, styles):
-            sub_context = {**context, **sub_context}
-            case.evaluate_context(sub_context, allowed_missing=noncats)
+        for sub_index, basestyle in zip(sub_indices, styles):
+            sub_context = case.evaluate_context({**context, **sub_index}, allowed_missing=noncats)
+            sub_index = {**index, **sub_index}
 
             cat_name, xaxis, yaxes = self.generate_category(case, sub_context, sub_index)
 
@@ -569,43 +554,37 @@ class Plot:
         backends.generate(filename)
 
     def generate_category(self, case: 'Case', context: dict, index):
-        # Pick an arbitrary index for ignored parameters
-        ignored = self._parameters_of_kind('ignore')
-        index = case._parameters.make_index(_base=index, **{param: case._parameters[param][0] for param in ignored})
+        # TODO: Pick only finished results
+        data = case.load_dataframe()
+        if isinstance(data, pd.Series):
+            data = data.to_frame().T
+        for name, value in index.items():
+            data = data[data[name] == value]
 
-        with case.dataframe(modify=False) as df:
-            data = df[df['_done']].loc[index, :]
-            if isinstance(data, pd.Series):
-                data = data.to_frame().T
-
-        # Extract only the fields we need
-        fieldnames = list(self._yaxis)
-        if self._xaxis:
-            fieldnames.append(self._xaxis)
-        data = data[fieldnames]
+        # Collapse ignorable parameters
+        for ignore in self._parameters_of_kind('ignore'):
+            others = [p for p in case._parameters if p != ignore]
+            data = data.groupby(by=others).first().reset_index()
 
         # Collapse mean parameters
-        means = self._parameters_of_kind('mean')
-        if means:
-            non_means = self._parameters_not_of_kind('mean')
-            if non_means:
-                data = data.groupby(level=non_means).aggregate(util.flexible_mean)
-            else:
-                data = data.aggregate(util.flexible_mean)
+        for mean in self._parameters_of_kind('mean'):
+            others = [p for p in case._parameters if p != mean]
+            data = data.groupby(by=others).aggregate(util.flexible_mean).reset_index()
 
         # Extract data
-        fields = [util.flatten(data[f].to_numpy()) for f in fieldnames]
-
-        if not self._xaxis:
-            length = max(len(f) for f in fields)
-            fields.append(np.arange(1, length + 1))
+        ydata = [util.flatten(data[f].to_numpy()) for f in self._yaxis]
+        if self._xaxis:
+            xdata = util.flatten(data[self._xaxis].to_numpy())
+        else:
+            length = max(len(f) for f in ydata)
+            xdata = np.arange(1, length + 1)
 
         if any(self._parameters_of_kind('category')):
             name = ', '.join(f'{k}={repr(context[k])}' for k in self._parameters_of_kind('category'))
         else:
             name = None
 
-        return name, fields[-1], fields[:-1]
+        return name, xdata, ydata
 
     def generate_legend(self, context: dict, yaxis: str) -> str:
         if self._legend is not None:
@@ -629,16 +608,17 @@ class ResultCollector(dict):
         if util.is_list_type(tp):
             eltype = get_args(tp)[0]
             self.setdefault(name, []).append(eltype(value))
-        else:
+        elif not isinstance(tp, str):
             self[name] = tp(value)
+        else:
+            self[name] = value
 
-    def commit(self, data, index):
-        data.at[index, '_done'] = True
+    def commit(self, data):
+        index = self['_index']
         for key, value in self.items():
-            if util.is_list_type(self._types[key]):
-                data.at[index, key] = value
-            else:
-                data.at[index, key] = value
+            if key == '_index':
+                continue
+            data.at[index, key] = value
 
 
 class Case:
@@ -693,7 +673,9 @@ class Case:
         # Read types
         self._types = {
             '_index': int,
-            '_done': bool,
+            '_logdir': str,
+            '_started': 'datetime64[ns]',
+            '_finished': 'datetime64[ns]',
         }
         self._types.update(casedata.get('types', {}))
 
@@ -704,7 +686,7 @@ class Case:
 
         # Guess types of evaluables
         if any(name not in self._types for name in self._evaluables):
-            contexts = list(ctx for _, ctx in self._parameters.fullspace())
+            contexts = list(self._parameters.fullspace())
             for ctx in contexts:
                 self.evaluate_context(ctx, verbose=False)
             for name in self._evaluables:
@@ -754,42 +736,40 @@ class Case:
                 log.debug(f'Evaluated: {name} = {repr(result)}')
             evaluator.names[name] = context[name] = result
 
+        return context
+
     @property
     def shape(self):
         return tuple(map(len, self._parameters.values()))
 
-    def _load_dataframe(self):
+    @contextmanager
+    def lock(self):
+        with InterProcessLock(self.storagepath / 'lockfile'):
+            yield
+
+    def load_dataframe(self):
         path = self.storagepath / 'dataframe.parquet'
         if path.is_file():
             return pd.read_parquet(path, engine='pyarrow')
-        index = pd.MultiIndex.from_product(self._parameters.values(), names=self._parameters.keys())
         data = {
-            '_done': False,
-        }
-        data.update({
             k: pd.Series([], dtype=_pandas_dtype(v))
             for k, v in self._types.items()
-        })
-        return pd.DataFrame(index=index, data=data)
+            if k != '_index'
+        }
+        return pd.DataFrame(index=pd.Int64Index([]), data=data)
 
-    def _save_dataframe(self, df: pd.DataFrame):
+    def save_dataframe(self, df: pd.DataFrame):
         df.to_parquet(self.storagepath / 'dataframe.parquet', engine='pyarrow', index=True)
 
-    @contextmanager
-    def dataframe(self, modify=True):
-        with InterProcessLock(self.storagepath / 'lockfile'):
-            df = self._load_dataframe()
-            yield df
-            if modify:
-                self._save_dataframe(df)
-
-    def commit_result(self, index, collector: ResultCollector):
-        with self.dataframe() as df:
-            collector.commit(df, index)
+    def commit_result(self, collector: ResultCollector):
+        with self.lock():
+            data = self.load_dataframe()
+            collector.commit(data)
+            self.save_dataframe(data)
 
     def has_data(self):
-        with self.dataframe(modify=False) as df:
-            return df['_done'].any()
+        df = self.load_dataframe()
+        return df['_done'].any()
 
     def _check_decide_diff(self, diff: List[str], prev_file: Path, interactive: bool = True) -> bool:
         decision = None
@@ -858,8 +838,8 @@ class Case:
         parameters = list(self._parameters.fullspace())
 
         nsuccess = 0
-        for num, (index, namespace) in enumerate(log.iter.fraction('parameter', parameters)):
-            nsuccess += self.run_single(num, index, namespace)
+        for index, namespace in enumerate(log.iter.fraction('parameter', parameters)):
+            nsuccess += self.run_single(index, namespace)
 
         logger = log.user if nsuccess == len(parameters) else log.warning
         logger(f"{nsuccess} of {len(parameters)} succeeded")
@@ -867,10 +847,17 @@ class Case:
         for plot in log.iter.fraction('plot', self._plots):
             plot.generate_all(self)
 
-    def run_single(self, num, index, namespace):
+    def run_single(self, index, namespace):
         log.user(', '.join(f'{k}={repr(v)}' for k, v in namespace.items()))
         self.evaluate_context(namespace)
-        namespace['_index'] = num
+        namespace['_index'] = index
+
+        if self._logdir:
+            logdir = self.storagepath / render(self._logdir, namespace)
+            logdir.mkdir(parents=True, exist_ok=True)
+        else:
+            logdir = None
+        namespace['_logdir'] = logdir
 
         collector = ResultCollector(self._types)
         for key, value in namespace.items():
@@ -881,12 +868,6 @@ class Case:
         with TemporaryDirectory() as workpath:
             workpath = Path(workpath)
 
-            if self._logdir:
-                logdir = self.storagepath / render(self._logdir, namespace)
-                logdir.mkdir(parents=True, exist_ok=True)
-            else:
-                logdir = None
-
             log.debug(f"Using SRC='{self.sourcepath}', WRK='{workpath}', LOG='{logdir}'")
 
             for filemap in self._pre_files:
@@ -895,7 +876,6 @@ class Case:
             success = True
             for command in self._commands:
                 if not command.run(collector, namespace, workpath, logdir):
-                    self.commit_result(index, collector)
                     success = False
                     break
 
@@ -903,5 +883,6 @@ class Case:
                 for filemap in self._post_files:
                     filemap.copy(namespace, workpath, logdir, sourcename='WRK', targetname='LOG', ignore_missing=not success)
 
-        self.commit_result(index, collector)
+        collector.collect('_finished', pd.Timestamp.now())
+        self.commit_result(collector)
         return success

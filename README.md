@@ -35,8 +35,7 @@ Parquet format. The easiest way to load it is by using:
 
 ```python
 from badger import Case
-with Case(path).dataframe(modify=False) as data:
-    ...
+data = case.load_dataframe()
 ```
 
 ## Structure of a badger file
