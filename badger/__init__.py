@@ -4,6 +4,7 @@ from datetime import datetime
 from difflib import Differ
 import inspect
 from itertools import product
+import json
 import operator
 from pathlib import Path
 import pydoc
@@ -297,13 +298,12 @@ class Command:
                 result = subprocess.run(command, **kwargs)
             duration = duration()
 
-            if logdir:
-                stdout_path = logdir / f'{self.name}.stdout'
-                with open(stdout_path, 'wb') as f:
-                    f.write(result.stdout)
-                stderr_path = logdir / f'{self.name}.stderr'
-                with open(stderr_path, 'wb') as f:
-                    f.write(result.stderr)
+            stdout_path = logdir / f'{self.name}.stdout'
+            with open(stdout_path, 'wb') as f:
+                f.write(result.stdout)
+            stderr_path = logdir / f'{self.name}.stderr'
+            with open(stderr_path, 'wb') as f:
+                f.write(result.stderr)
 
             stdout = result.stdout.decode()
             for capture in self._capture:
@@ -313,9 +313,8 @@ class Command:
 
             if result.returncode:
                 log.error(f"Command returned exit status {result.returncode}")
-                if logdir:
-                    log.error(f"stdout stored in {stdout_path}")
-                    log.error(f"stderr stored in {stderr_path}")
+                log.error(f"stdout stored in {stdout_path}")
+                log.error(f"stderr stored in {stderr_path}")
                 return False
             else:
                 log.info(f"Success ({duration:.3g}s)")
@@ -603,17 +602,28 @@ class ResultCollector(dict):
         super().__init__()
         self._types = types
 
+    def collect_from_file(self, path: Path):
+        with open(path / 'badgercontext.json', 'r') as f:
+            data = json.load(f)
+        for key, value in data.items():
+            self.collect(key, value)
+
     def collect(self, name: str, value: Any):
         tp = self._types[name]
-        if util.is_list_type(tp):
+        if util.is_list_type(tp) and not isinstance(value, list):
             eltype = get_args(tp)[0]
             self.setdefault(name, []).append(eltype(value))
-        elif not isinstance(tp, str):
+        elif not isinstance(tp, str) and not util.is_list_type(tp):
             self[name] = tp(value)
         else:
             self[name] = value
 
-    def commit(self, data):
+    def commit_to_file(self):
+        logdir = Path(self['_logdir'])
+        with open(logdir / 'badgercontext.json', 'w') as f:
+            json.dump(self, f, sort_keys=True, indent=4, cls=util.JSONEncoder)
+
+    def commit_to_dataframe(self, data):
         index = self['_index']
         for key, value in self.items():
             if key == '_index':
@@ -635,6 +645,7 @@ class Case:
     _commands: List[Command]
     _plots: List[Plot]
     _types: Dict[str, Any]
+    _logdir: str
 
     def __init__(self, yamlpath='.', storagepath=None):
         if isinstance(yamlpath, str):
@@ -838,30 +849,40 @@ class Case:
         parameters = list(self._parameters.fullspace())
 
         nsuccess = 0
-        for index, namespace in enumerate(log.iter.fraction('parameter', parameters)):
-            nsuccess += self.run_single(index, namespace)
+        for index, namespace in enumerate(log.iter.fraction('instance', parameters)):
+            nsuccess += self.run_single(namespace, index=index)
 
         logger = log.user if nsuccess == len(parameters) else log.warning
         logger(f"{nsuccess} of {len(parameters)} succeeded")
 
+    def collect(self):
+        with self.lock():
+            data = self.load_dataframe()
+            for path in log.iter.fraction('instance', list(self.storagepath.iterdir())):
+                if not (path / 'badgercontext.json').exists():
+                    continue
+                collector = ResultCollector(self._types)
+                collector.collect_from_file(path)
+                collector.commit_to_dataframe(data)
+            data = data.sort_index()
+            self.save_dataframe(data)
+
+    def plot(self):
         for plot in log.iter.fraction('plot', self._plots):
             plot.generate_all(self)
 
-    def run_single(self, index, namespace):
+    def run_single(self, namespace, index=None):
         log.user(', '.join(f'{k}={repr(v)}' for k, v in namespace.items()))
         self.evaluate_context(namespace)
-        namespace['_index'] = index
 
-        if self._logdir:
-            logdir = self.storagepath / render(self._logdir, namespace)
-            logdir.mkdir(parents=True, exist_ok=True)
-        else:
-            logdir = None
-        namespace['_logdir'] = logdir
+        namespace['_index'] = index
+        namespace['_logdir'] = logdir = self.storagepath / render(self._logdir, namespace)
+        logdir.mkdir(parents=True, exist_ok=True)
 
         collector = ResultCollector(self._types)
         for key, value in namespace.items():
             collector.collect(key, value)
+        collector.collect('_started', pd.Timestamp.now())
 
         namespace.update(self._constants)
 
@@ -879,10 +900,9 @@ class Case:
                     success = False
                     break
 
-            if logdir:
-                for filemap in self._post_files:
-                    filemap.copy(namespace, workpath, logdir, sourcename='WRK', targetname='LOG', ignore_missing=not success)
+            for filemap in self._post_files:
+                filemap.copy(namespace, workpath, logdir, sourcename='WRK', targetname='LOG', ignore_missing=not success)
 
         collector.collect('_finished', pd.Timestamp.now())
-        self.commit_result(collector)
+        collector.commit_to_file()
         return success

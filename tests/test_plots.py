@@ -32,6 +32,8 @@ def test_plots():
     case = Case(DATADIR / 'run' / 'plot')
     case.clear_cache()
     case.run()
+    case.collect()
+    case.plot()
 
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {

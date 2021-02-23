@@ -96,6 +96,8 @@ def run(case):
     if not case.check(interactive=False):
         sys.exit(1)
     case.run()
+    case.collect()
+    case.plot()
 
 
 class PandasEncoder(json.JSONEncoder):

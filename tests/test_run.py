@@ -26,6 +26,7 @@ def test_echo():
     case = Case(DATADIR / 'run' / 'echo')
     case.clear_cache()
     case.run()
+    case.collect()
 
     data = case.load_dataframe()
     check_df(data, pd.DataFrame(
@@ -45,6 +46,7 @@ def test_cat():
     case = Case(DATADIR / 'run' / 'cat')
     case.clear_cache()
     case.run()
+    case.collect()
 
     data = case.load_dataframe()
     check_df(data, pd.DataFrame(
@@ -81,6 +83,7 @@ def test_capture():
     case = Case(DATADIR / 'run' / 'capture')
     case.clear_cache()
     case.run()
+    case.collect()
 
     data = case.load_dataframe()
     check_df(data, pd.DataFrame(
@@ -110,6 +113,7 @@ def test_failing():
     case = Case(DATADIR / 'run' / 'failing')
     case.clear_cache()
     case.run()
+    case.collect()
 
     data = case.load_dataframe()
     check_df(data, pd.DataFrame(
