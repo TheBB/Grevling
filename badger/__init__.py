@@ -636,6 +636,7 @@ class Case:
     yamlpath: Path
     sourcepath: Path
     storagepath: Path
+    dataframepath: Path
 
     _parameters: ParameterSpace
     _evaluables: Dict[str, str]
@@ -659,6 +660,8 @@ class Case:
             storagepath = self.sourcepath / '.badgerdata'
         storagepath.mkdir(parents=True, exist_ok=True)
         self.storagepath = storagepath
+
+        self.dataframepath = storagepath / 'dataframe.parquet'
 
         with open(yamlpath, mode='r') as f:
             casedata = load_and_validate(f.read(), yamlpath)
@@ -720,6 +723,10 @@ class Case:
         shutil.rmtree(self.storagepath)
         self.storagepath.mkdir(parents=True, exist_ok=True)
 
+    def clear_dataframe(self):
+        with self.lock():
+            self.dataframepath.unlink()
+
     def evaluate_context(self, context, verbose=True, allowed_missing=()):
         evaluator = SimpleEval(functions={**DEFAULT_FUNCTIONS,
             'log': np.log,
@@ -759,9 +766,8 @@ class Case:
             yield
 
     def load_dataframe(self):
-        path = self.storagepath / 'dataframe.parquet'
-        if path.is_file():
-            return pd.read_parquet(path, engine='pyarrow')
+        if self.dataframepath.is_file():
+            return pd.read_parquet(self.dataframepath, engine='pyarrow')
         data = {
             k: pd.Series([], dtype=_pandas_dtype(v))
             for k, v in self._types.items()
@@ -770,7 +776,7 @@ class Case:
         return pd.DataFrame(index=pd.Int64Index([]), data=data)
 
     def save_dataframe(self, df: pd.DataFrame):
-        df.to_parquet(self.storagepath / 'dataframe.parquet', engine='pyarrow', index=True)
+        df.to_parquet(self.dataframepath, engine='pyarrow', index=True)
 
     def commit_result(self, collector: ResultCollector):
         with self.lock():
