@@ -10,6 +10,7 @@ import treelog as log
 from strictyaml import YAMLValidationError
 
 import badger
+from . import util
 
 
 class CustomClickException(click.ClickException):
@@ -90,24 +91,40 @@ def check(case):
     case.check(interactive=True)
 
 
-@main.command()
+@main.command('run-all')
 @click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
-def run(case):
+def run_all(case):
     if not case.check(interactive=False):
         sys.exit(1)
+    case.clear_cache()
     case.run()
     case.collect()
     case.plot()
 
 
-class PandasEncoder(json.JSONEncoder):
+@main.command('run')
+@click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
+def run(case):
+    if not case.check(interactive=False):
+        sys.exit(1)
+    case.run()
 
-    def default(self, obj):
-        if isinstance(obj, np.integer):
-            return int(obj)
-        if isinstance(obj, np.ndarray) and obj.ndim == 1:
-            return list(obj)
-        return super().default(obj)
+
+@main.command('collect')
+@click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
+def collect(case):
+    if not case.check(interactive=False):
+        sys.exit(1)
+    case.clear_dataframe()
+    case.collect()
+
+
+@main.command('plot')
+@click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
+def plot(case):
+    if not case.check(interactive=False):
+        sys.exit(1)
+    case.plot()
 
 
 @main.command()
@@ -118,4 +135,4 @@ def dump(case, fmt, output):
     with case.lock():
         data = case.load_dataframe()
     if fmt == 'json':
-        json.dump(data.to_dict('records'), output, sort_keys=True, indent=4, cls=PandasEncoder)
+        json.dump(data.to_dict('records'), output, sort_keys=True, indent=4, cls=util.JSONEncoder)
