@@ -107,6 +107,7 @@ def run_all(case):
 def run(case):
     if not case.check(interactive=False):
         sys.exit(1)
+    case.clear_cache()
     case.run()
 
 

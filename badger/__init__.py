@@ -725,7 +725,13 @@ class Case:
 
     def clear_dataframe(self):
         with self.lock():
-            self.dataframepath.unlink()
+            self.dataframepath.unlink(missing_ok=True)
+
+    def iter_instancedirs(self):
+        for path in self.storagepath.iterdir():
+            if not (path / 'badgercontext.json').exists():
+                continue
+            yield path
 
     def evaluate_context(self, context, verbose=True, allowed_missing=()):
         evaluator = SimpleEval(functions={**DEFAULT_FUNCTIONS,
@@ -785,8 +791,13 @@ class Case:
             self.save_dataframe(data)
 
     def has_data(self):
-        df = self.load_dataframe()
-        return df['_done'].any()
+        with self.lock():
+            df = self.load_dataframe()
+        if df['_finished'].any():
+            return True
+        if any(self.iter_instancedirs()):
+            return True
+        return False
 
     def _check_decide_diff(self, diff: List[str], prev_file: Path, interactive: bool = True) -> bool:
         decision = None
@@ -864,9 +875,7 @@ class Case:
     def collect(self):
         with self.lock():
             data = self.load_dataframe()
-            for path in log.iter.fraction('instance', list(self.storagepath.iterdir())):
-                if not (path / 'badgercontext.json').exists():
-                    continue
+            for path in log.iter.fraction('instance', list(self.iter_instancedirs())):
                 collector = ResultCollector(self._types)
                 collector.collect_from_file(path)
                 collector.commit_to_dataframe(data)
