@@ -1,8 +1,21 @@
 from itertools import product
+import json
 
 import numpy as np
-import numpy.ma as ma
+import pandas as pd
 from typing_inspect import get_origin
+
+
+class JSONEncoder(json.JSONEncoder):
+
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.ndarray) and obj.ndim == 1:
+            return list(obj)
+        if isinstance(obj, pd.Timestamp):
+            return str(obj)
+        return super().default(obj)
 
 
 def ignore(*_, **__):
