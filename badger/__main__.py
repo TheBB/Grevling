@@ -111,6 +111,14 @@ def run(case):
     case.run()
 
 
+@main.command('capture')
+@click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
+def collect(case):
+    if not case.check(interactive=False):
+        sys.exit(1)
+    case.capture()
+
+
 @main.command('collect')
 @click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
 def collect(case):

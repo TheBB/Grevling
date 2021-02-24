@@ -305,11 +305,7 @@ class Command:
             with open(stderr_path, 'wb') as f:
                 f.write(result.stderr)
 
-            stdout = result.stdout.decode()
-            for capture in self._capture:
-                capture.find_in(collector, stdout)
-            if self._capture_walltime:
-                collector.collect(f'walltime/{self.name}', duration)
+            self.capture(collector, stdout=result.stdout, duration=duration)
 
             if result.returncode:
                 log.error(f"Command returned exit status {result.returncode}")
@@ -320,6 +316,17 @@ class Command:
                 log.info(f"Success ({duration:.3g}s)")
 
         return True
+
+    def capture(self, collector: 'ResultCollector', stdout=None, logdir=None, duration=0.0):
+        if stdout is None:
+            assert logdir is not None
+            with open(logdir / f'{self.name}.stdout', 'rb') as f:
+                stdout = f.read()
+        stdout = stdout.decode()
+        for capture in self._capture:
+            capture.find_in(collector, stdout)
+        if self._capture_walltime:
+            collector.collect(f'walltime/{self.name}', duration)
 
 
 class PlotStyleManager:
@@ -871,6 +878,29 @@ class Case:
 
         logger = log.user if nsuccess == len(parameters) else log.warning
         logger(f"{nsuccess} of {len(parameters)} succeeded")
+
+    def capture(self):
+        parameters = list(self._parameters.fullspace())
+        for index, namespace in enumerate(log.iter.fraction('instance', parameters)):
+            self.evaluate_context(namespace)
+
+            namespace['_index'] = index
+            namespace['_logdir'] = logdir = self.storagepath / render(self._logdir, namespace)
+            if not logdir.exists():
+                continue
+
+            collector = ResultCollector(self._types)
+            for key, value in namespace.items():
+                collector.collect(key, value)
+            collector.collect('_started', pd.Timestamp.now())
+
+            namespace.update(self._constants)
+
+            for command in self._commands:
+                command.capture(collector, logdir=logdir)
+
+            collector.collect('_finished', pd.Timestamp.now())
+            collector.commit_to_file()
 
     def collect(self):
         with self.lock():
