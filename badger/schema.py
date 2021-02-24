@@ -203,6 +203,8 @@ CASE_SCHEMA = Map({
         'yaxis': Str() | Seq(Str()),
         Optional('parameters'): MapPattern(Str(), PlotMode()),
         Optional('xaxis'): Str(),
+        Optional('xlim'): FixedSeq([Scalar(), Scalar()]),
+        Optional('ylim'): FixedSeq([Scalar(), Scalar()]),
         Optional('type'): Choice('scatter', 'line'),
         Optional('legend'): Str(),
         Optional('xlabel'): Str(),
