@@ -102,10 +102,7 @@ def Capture():
 
 def Style():
     """Validator that matches a plot style description."""
-    return Map({
-        'category': Str(),
-        Optional('values'): Seq(Str()),
-    }) | Str()
+    return Str() | Seq(Str())
 
 
 def PlotMode():
