@@ -1,6 +1,7 @@
 from pathlib import Path
 import csv
 
+import treelog as log
 from typing import List, Dict
 
 import numpy as np
@@ -133,7 +134,9 @@ class MatplotilbBackend(PlotBackend):
 
     def generate(self, filename: Path):
         self.axes.legend(self.legend)
-        self.figure.savefig(filename.with_suffix('.png'))
+        filename = filename.with_suffix('.png')
+        log.user(filename)
+        self.figure.savefig(filename)
 
 
 class PlotlyBackend(PlotBackend):
@@ -174,7 +177,9 @@ class PlotlyBackend(PlotBackend):
         self.figure.layout.yaxis.type = value
 
     def generate(self, filename: Path):
-        self.figure.write_html(str(filename.with_suffix('.html')))
+        filename = filename.with_suffix('.html')
+        log.user(filename)
+        self.figure.write_html(str(filename))
 
 
 class CSVBackend(PlotBackend):
@@ -196,9 +201,11 @@ class CSVBackend(PlotBackend):
     add_scatter = add_line
 
     def generate(self, filename: Path):
+        filename = filename.with_suffix('.csv')
+        log.user(filename)
         maxlen = max(len(c) for c in self.columns)
         cols = [list(c) + [None] * (maxlen - len(c)) for c in self.columns]
-        with open(filename.with_suffix('.csv'), 'w', newline='') as f:
+        with open(filename, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(self.legend)
             for row in zip(*cols):

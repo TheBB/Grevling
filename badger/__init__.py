@@ -421,9 +421,26 @@ class PlotStyleManager:
             yield basestyle
 
 
+
+class PlotMode:
+
+    @classmethod
+    def load(cls, spec):
+        if isinstance(spec, str):
+            return cls(spec, None)
+        if spec['mode'] == 'category':
+            return cls('category', spec.get('style'))
+        if spec['mode'] == 'ignore':
+            return cls('ignore', spec.get('value'))
+
+    def __init__(self, kind: str, arg: Any):
+        self.kind = kind
+        self.arg = arg
+
+
 class Plot:
 
-    _parameters: Dict[str, str]
+    _parameters: Dict[str, PlotMode]
     _filename: str
     _format: List[str]
     _yaxis: List[str]
@@ -483,7 +500,7 @@ class Plot:
     def __init__(self, parameters, filename, format, yaxis, xaxis, type,
                  legend=None, xlabel=None, ylabel=None, title=None, grid=True,
                  xmode='linear', ymode='linear', style={}):
-        self._parameters = parameters
+        self._parameters = {name: PlotMode.load(value) for name, value in parameters.items()}
         self._filename = filename
         self._format = format
         self._yaxis = yaxis
@@ -499,30 +516,41 @@ class Plot:
 
         self._styles = PlotStyleManager(type)
         for key, value in style.items():
-            if isinstance(value, dict):
-                self._styles.assign(value['category'], key)
-                if 'values' in value:
-                    self._styles.set_values(key, value['values'])
+            if isinstance(value, list):
+                self._styles.set_values(key, value)
             else:
                 self._styles.set_values(key, [value])
-        for param, kind in self._parameters.items():
-            if kind == 'category' and not self._styles.assigned(param):
-                self._styles.assign(param)
+        for param in self._parameters_of_kind('category'):
+            self._styles.assign(param, self._parameters[param].arg)
         if len(self._yaxis) > 1 and not self._styles.assigned('yaxis'):
             self._styles.assign('yaxis')
 
-    def _parameters_of_kind(self, *kinds: str):
-        return [param for param, k in self._parameters.items() if k in kinds]
+    def _parameters_of_kind(self, *kinds: str, req_arg: Optional[bool] = None):
+        return [
+            param
+            for param, mode in self._parameters.items()
+            if mode.kind in kinds and (
+                req_arg is None or
+                req_arg is True and mode.arg is not None or
+                req_arg is False and mode.arg is None
+            )
+        ]
 
     def _parameters_not_of_kind(self, *kinds: str):
-        return [param for param, k in self._parameters.items() if k not in kinds]
+        return [param for param, mode in self._parameters.items() if mode.kind not in kinds]
 
     def generate_all(self, case: 'Case'):
         # Collect all the fixed parameters and iterate over all those combinations
         fixed = self._parameters_of_kind('fixed')
         unfixed = set(case._parameters.keys()) - set(fixed)
 
+        constants = {
+            param: self._parameters[param].arg
+            for param in self._parameters_of_kind('ignore', req_arg=True)
+        }
+
         for index in case._parameters.subspace(*fixed):
+            index = {**index, **constants}
             context = case.evaluate_context(index.copy(), allowed_missing=unfixed)
             self.generate_single(case, context, index)
 
@@ -568,7 +596,7 @@ class Plot:
             data = data[data[name] == value]
 
         # Collapse ignorable parameters
-        for ignore in self._parameters_of_kind('ignore'):
+        for ignore in self._parameters_of_kind('ignore', req_arg=False):
             others = [p for p in case._parameters if p != ignore]
             data = data.groupby(by=others).first().reset_index()
 
@@ -632,7 +660,7 @@ class ResultCollector(dict):
 
     def commit_to_dataframe(self, data):
         index = self['_index']
-        data = data.append(pd.Series([], name=index))
+        data.loc[index, :] = [None] * data.shape[1]
         for key, value in self.items():
             if key == '_index':
                 continue
@@ -792,12 +820,6 @@ class Case:
 
     def save_dataframe(self, df: pd.DataFrame):
         df.to_parquet(self.dataframepath, engine='pyarrow', index=True)
-
-    def commit_result(self, collector: ResultCollector):
-        with self.lock():
-            data = self.load_dataframe()
-            collector.commit(data)
-            self.save_dataframe(data)
 
     def has_data(self):
         with self.lock():

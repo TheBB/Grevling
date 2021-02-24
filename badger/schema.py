@@ -108,6 +108,16 @@ def Style():
     }) | Str()
 
 
+def PlotMode():
+    """Validator that matches a parameter mode for plotting."""
+    return First(
+        "plot mode",
+        Choice('fixed', 'variate', 'category', 'ignore', 'mean'),
+        Map({'mode': Literal('category'), 'style': Choice('color', 'line', 'marker')}),
+        Map({'mode': Literal('ignore'), 'value': Scalar() | Str()}),
+    )
+
+
 class First(Validator):
     """Validator that validates against a sequence of sub-validators,
     picking the first that matches.
@@ -194,7 +204,7 @@ CASE_SCHEMA = Map({
         'filename': Str(),
         'format': Str() | Seq(Str()),
         'yaxis': Str() | Seq(Str()),
-        Optional('parameters'): MapPattern(Str(), Choice('fixed', 'variate', 'category', 'ignore', 'mean')),
+        Optional('parameters'): MapPattern(Str(), PlotMode()),
         Optional('xaxis'): Str(),
         Optional('type'): Choice('scatter', 'line'),
         Optional('legend'): Str(),

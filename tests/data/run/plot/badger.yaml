@@ -62,7 +62,9 @@ plots:
     filename: fresult-allmean
     format: [mock, matplotlib, csv, plotly]
   - parameters:
-      i: category
+      i:
+        mode: category
+        style: color
     filename: vresult
     format: [mock, matplotlib, csv, plotly]
     yaxis: vresult
