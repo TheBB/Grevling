@@ -107,7 +107,11 @@ class MatplotilbBackend(PlotBackend):
         self.legend = []
 
     def add_line(self, legend: str, xpoints: List[float], ypoints: List[float], style: Dict[str, str]):
-        self.axes.plot(xpoints, ypoints)
+        self.axes.plot(xpoints, ypoints,
+            color=style['color'],
+            linestyle={'dash': 'dashed', 'dot': 'dotted'}.get(style['line'], style['line']),
+            marker={'circle': 'o', 'triangle': '^', 'square': 's'}.get(style['marker']),
+        )
         self.legend.append(legend)
 
     def add_scatter(self, legend: str, xpoints: List[float], ypoints: List[float], style: Dict[str, str]):
