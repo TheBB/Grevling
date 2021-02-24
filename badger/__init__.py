@@ -58,7 +58,7 @@ def _pandas_dtype(tp):
 
 def _typename(tp) -> str:
     try:
-        return {int: 'integer', str: 'string', float: 'float'}[tp]
+        return {int: 'integer', str: 'string', float: 'float', 'datetime64[ns]': 'datetime'}[tp]
     except KeyError:
         base = {list: 'list'}[get_origin(tp)]
         subs = ', '.join(_typename(k) for k in get_args(tp))
