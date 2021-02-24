@@ -29,7 +29,7 @@ def flexible_mean(obj):
 
 
 def flatten(array):
-    while array.dtype == object:
+    if array.dtype == object:
         array = np.array(array.tolist()).flatten()
     return array
 
