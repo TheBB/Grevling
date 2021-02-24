@@ -632,10 +632,12 @@ class ResultCollector(dict):
 
     def commit_to_dataframe(self, data):
         index = self['_index']
+        data = data.append(pd.Series([], name=index))
         for key, value in self.items():
             if key == '_index':
                 continue
             data.at[index, key] = value
+        return data
 
 
 class Case:
@@ -908,7 +910,7 @@ class Case:
             for path in log.iter.fraction('instance', list(self.iter_instancedirs())):
                 collector = ResultCollector(self._types)
                 collector.collect_from_file(path)
-                collector.commit_to_dataframe(data)
+                data = collector.commit_to_dataframe(data)
             data = data.sort_index()
             self.save_dataframe(data)
 
