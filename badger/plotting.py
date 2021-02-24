@@ -1,5 +1,6 @@
 from pathlib import Path
 import csv
+import math
 
 import treelog as log
 from typing import List, Dict
@@ -38,6 +39,8 @@ class PlotBackend:
     set_xmode = ignore
     set_ymode = ignore
     set_grid = ignore
+    set_xlim = ignore
+    set_ylim = ignore
 
 
 class MockBackend(PlotBackend):
@@ -83,6 +86,12 @@ class MockBackend(PlotBackend):
 
     def set_grid(self, value: bool):
         self.meta['grid'] = value
+
+    def set_xlim(self, value: List[float]):
+        self.meta['xlim'] = value
+
+    def set_ylim(self, value: List[float]):
+        self.meta['ylim'] = value
 
     def generate(self, filename: Path):
         self.meta['filename'] = filename.name
@@ -136,6 +145,12 @@ class MatplotilbBackend(PlotBackend):
     def set_grid(self, value: bool):
         self.axes.grid(value)
 
+    def set_xlim(self, value: List[float]):
+        self.axes.set_xlim(value[0], value[1])
+
+    def set_ylim(self, value: List[float]):
+        self.axes.set_ylim(value[0], value[1])
+
     def generate(self, filename: Path):
         self.axes.legend(self.legend)
         filename = filename.with_suffix('.png')
@@ -179,6 +194,18 @@ class PlotlyBackend(PlotBackend):
 
     def set_ymode(self, value: str):
         self.figure.layout.yaxis.type = value
+
+    def set_xlim(self, value: List[float]):
+        if self.figure.layout.xaxis.type == 'log':
+            self.figure.layout.xaxis.range = [math.log10(value[0]), math.log10(value[1])]
+        else:
+            self.figure.layout.xaxis.range = value
+
+    def set_ylim(self, value: List[float]):
+        if self.figure.layout.yaxis.type == 'log':
+            self.figure.layout.yaxis.range = [math.log10(value[0]), math.log10(value[1])]
+        else:
+            self.figure.layout.yaxis.range = value
 
     def generate(self, filename: Path):
         filename = filename.with_suffix('.html')
