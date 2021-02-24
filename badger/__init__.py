@@ -865,9 +865,9 @@ class Case:
         shutil.copyfile(self.yamlpath, prev_file)
 
         if interactive:
-            log.info("Derived types:")
+            log.user("Derived types:")
             for key, value in self._types.items():
-                log.info(f"  {key}: {_typename(value)}")
+                log.user(f"  {key}: {_typename(value)}")
 
         return True
 
