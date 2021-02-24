@@ -454,6 +454,8 @@ class Plot:
     _title: Optional[str]
     _grid: bool
     _styles: PlotStyleManager
+    _xlim: List[float]
+    _ylim: List[float]
 
     @classmethod
     def load(cls, spec, parameters, types):
@@ -499,7 +501,7 @@ class Plot:
 
     def __init__(self, parameters, filename, format, yaxis, xaxis, type,
                  legend=None, xlabel=None, ylabel=None, title=None, grid=True,
-                 xmode='linear', ymode='linear', style={}):
+                 xmode='linear', ymode='linear', xlim=[], ylim=[],style={}):
         self._parameters = {name: PlotMode.load(value) for name, value in parameters.items()}
         self._filename = filename
         self._format = format
@@ -513,6 +515,8 @@ class Plot:
         self._ymode = ymode
         self._title = title
         self._grid = grid
+        self._xlim = xlim
+        self._ylim = ylim
 
         self._styles = PlotStyleManager(type)
         for key, value in style.items():
@@ -585,6 +589,10 @@ class Plot:
         backends.set_xmode(self._xmode)
         backends.set_ymode(self._ymode)
         backends.set_grid(self._grid)
+        if len(self._xlim) >= 2:
+            backends.set_xlim(self._xlim)
+        if len(self._xlim) >= 2:
+            backends.set_ylim(self._ylim)
 
         filename = case.storagepath / render(self._filename, context)
         backends.generate(filename)
