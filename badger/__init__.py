@@ -520,8 +520,10 @@ class Plot:
                 self._styles.set_values(key, value)
             else:
                 self._styles.set_values(key, [value])
-        for param in self._parameters_of_kind('category'):
+        for param in self._parameters_of_kind('category', req_arg=True):
             self._styles.assign(param, self._parameters[param].arg)
+        for param in self._parameters_of_kind('category', req_arg=False):
+            self._styles.assign(param)
         if len(self._yaxis) > 1 and not self._styles.assigned('yaxis'):
             self._styles.assign('yaxis')
 
