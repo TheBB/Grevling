@@ -20,7 +20,9 @@ QUOTERS = {
 
 def render(text, context, mode=None):
     filters = ['str']
-    imports = []
+    imports = [
+        'from numpy import sin, cos',
+    ]
     if mode is not None:
         filters.append(f'quote_{mode}')
         imports.append(f'from badger.render import quote_{mode}')
