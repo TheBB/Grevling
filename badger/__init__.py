@@ -788,6 +788,8 @@ class Case:
             'sqrt': np.sqrt,
             'abs': np.abs,
             'ord': ord,
+            'sin': np.sin,
+            'cos': np.cos,
         })
         evaluator.names.update(context)
         evaluator.names.update(self._constants)
