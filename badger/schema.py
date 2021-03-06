@@ -4,14 +4,14 @@ import re
 
 from typing import Tuple, Dict
 
-import treelog as log
-
 from strictyaml import (
     ScalarValidator, Optional, Any, Bool, Int, Float, Str, Map,
     MapPattern, Seq, FixedSeq, Validator, OrValidator, YAMLValidationError,
 )
 
 from strictyaml.parser import generic_load
+
+from . import util
 
 
 class Deprecated(Validator):
@@ -24,7 +24,7 @@ class Deprecated(Validator):
         self._inner = inner
 
     def __call__(self, *args, **kwargs):
-        log.warning(self._message)
+        util.log.warning(self._message)
         return self._inner(*args, **kwargs)
 
 

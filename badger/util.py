@@ -1,9 +1,89 @@
-from itertools import product
+from contextlib import contextmanager
+from functools import wraps
+import inspect
+from itertools import product, chain
 import json
+import logging
+import multiprocessing
 
+from typing import List
+
+import multiprocessing_logging
 import numpy as np
 import pandas as pd
+import rich.logging
 from typing_inspect import get_origin
+
+
+class LoggerAdapter(logging.LoggerAdapter):
+
+    __context: List[str]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__context = []
+
+    def process(self, msg, kwargs):
+        context = []
+        procname = multiprocessing.current_process().name
+        if procname != 'M':
+            context.append(f'[bold magenta]{procname}[/]')
+        context.extend(self.__context)
+        context.append(msg)
+        msg = ' · '.join(context)
+        kwargs.setdefault('extra', {}).update({
+            'procname': multiprocessing.current_process().name,
+            'markup': True
+        })
+        return msg, kwargs
+
+    def push_context(self, ctx: str):
+        self.__context.append(ctx)
+
+    def pop_context(self):
+        self.__context.pop()
+
+    @contextmanager
+    def with_context(self, ctx: str):
+        self.push_context(ctx)
+        try:
+            yield
+        finally:
+            self.pop_context()
+
+
+def with_context(fmt: str):
+    def decorator(func: callable):
+        signature = inspect.signature(func)
+        @wraps(func)
+        def inner(*args, **kwargs):
+            binding = signature.bind(*args, **kwargs)
+            binding.apply_defaults()
+            context = fmt.format(**binding.arguments)
+            with log.with_context(context):
+                return func(*args, **kwargs)
+        return inner
+    return decorator
+
+
+log: LoggerAdapter = None
+
+def initialize_logging(level='INFO', show_time=False):
+    logging.basicConfig(
+        level=level,
+        format='%(message)s',
+        datefmt='[%X]',
+        handlers=[rich.logging.RichHandler(show_path=False, show_time=show_time)],
+    )
+
+    global log
+    log = LoggerAdapter(logging.getLogger(), {})
+    multiprocessing_logging.install_mp_handler()
+
+
+def initialize_process():
+    proc = multiprocessing.current_process()
+    proc.name = 'W' + ':'.join(map(str, proc._identity))
 
 
 class JSONEncoder(json.JSONEncoder):
