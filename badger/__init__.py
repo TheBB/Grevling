@@ -178,11 +178,11 @@ class FileMapping:
             logsrc = Path(sourcename) / source.relative_to(sourcepath)
             logtgt = Path(targetname) / target.relative_to(targetpath)
 
-            if not sourcepath.exists():
+            if not source.exists():
                 level = log.warning if ignore_missing else log.error
                 level(f"Missing file: {logsrc}")
-                if not ignore_missing:
-                    return
+                if ignore_missing:
+                    continue
             else:
                 log.debug(logsrc, '->', logtgt)
 
