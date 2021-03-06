@@ -791,13 +791,17 @@ class Case:
         })
         evaluator.names.update(context)
         evaluator.names.update(self._constants)
-        allowed_missing = set(allowed_missing)
+        if allowed_missing is not True:
+            allowed_missing = set(allowed_missing)
 
         for name, code in self._evaluables.items():
             try:
                 result = evaluator.eval(code) if isinstance(code, str) else code
             except NameNotDefined as error:
-                if error.name in allowed_missing:
+                if allowed_missing is True:
+                    log.debug(f'Skipped evaluating: {name}')
+                    continue
+                elif error.name in allowed_missing:
                     allowed_missing.add(name)
                     log.debug(f'Skipped evaluating: {name}')
                     continue
