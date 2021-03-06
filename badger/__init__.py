@@ -693,7 +693,9 @@ class Case:
     _commands: List[Command]
     _plots: List[Plot]
     _types: Dict[str, Any]
+
     _logdir: str
+    _ignore_missing: bool
 
     def __init__(self, yamlpath='.', storagepath=None):
         if isinstance(yamlpath, str):
@@ -762,6 +764,7 @@ class Case:
         # Read settings
         settings = casedata.get('settings', {})
         self._logdir = settings.get('logdir', '${_index}')
+        self._ignore_missing = settings.get('ignore-missing-files', False)
 
         # Construct plot objects
         self._plots = [Plot.load(spec, self._parameters, self._types) for spec in casedata.get('plots', [])]
@@ -985,8 +988,9 @@ class Case:
                     success = False
                     break
 
+            ignore_missing = self._ignore_missing or not success
             for filemap in self._post_files:
-                filemap.copy(namespace, workpath, logdir, sourcename='WRK', targetname='LOG', ignore_missing=not success)
+                filemap.copy(namespace, workpath, logdir, sourcename='WRK', targetname='LOG', ignore_missing=ignore_missing)
 
         collector.collect('_finished', pd.Timestamp.now())
         collector.commit_to_file()

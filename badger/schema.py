@@ -221,6 +221,7 @@ CASE_SCHEMA = Map({
     })),
     Optional('settings'): Map({
         Optional('logdir'): Str(),
+        Optional('ignore-missing-files'): Bool(),
     }),
 })
 
