@@ -1,12 +1,12 @@
 from functools import wraps
 import json
+import multiprocessing
 from pathlib import Path
 import sys
 
 import click
 import numpy as np
 from ruamel.yaml.parser import ParserError as YAMLParserError
-import treelog as log
 from strictyaml import YAMLValidationError
 
 import badger
@@ -16,7 +16,7 @@ from . import util
 class CustomClickException(click.ClickException):
 
     def show(self):
-        log.error(str(self))
+        util.log.critical(str(self))
 
 
 class Case(click.Path):
@@ -44,45 +44,18 @@ def print_version(ctx, param, value):
     ctx.exit()
 
 
-def with_logger(logger):
-    def decorator(func):
-        @wraps(func)
-        def inner(*args, **kwargs):
-            with log.set(logger):
-                return func(*args, **kwargs)
-        return inner
-    return decorator
-
-
-class RichOutputLog(log.RichOutputLog):
-
-    def __init__(self, stream):
-        super().__init__()
-        self.stream = stream
-
-    def write(self, text, level):
-        message = ''.join([self._cmap[level.value], text, '\033[0m\n', self._current])
-        click.echo(message, file=self.stream, nl=False)
-
-
 @click.group()
 @click.option('--version', is_flag=True, callback=print_version, expose_value=False, is_eager=True)
-@click.option('--debug', 'verbosity', flag_value='debug')
-@click.option('--info', 'verbosity', flag_value='info')
-@click.option('--user', 'verbosity', flag_value='user', default=True)
-@click.option('--warning', 'verbosity', flag_value='warning')
-@click.option('--error', 'verbosity', flag_value='error')
+@click.option('--debug', 'verbosity', flag_value='DEBUG')
+@click.option('--info', 'verbosity', flag_value='INFO', default=True)
+@click.option('--warning', 'verbosity', flag_value='WARNING')
+@click.option('--error', 'verbosity', flag_value='ERROR')
+@click.option('--critical', 'verbosity', flag_value='CRITICAL')
 @click.option('--rich/--no-rich', default=True)
 @click.pass_context
 def main(ctx, verbosity, rich):
-    if rich:
-        logger = RichOutputLog(sys.stdout)
-    else:
-        logger = log.TeeLog(
-            log.FilterLog(log.StdoutLog(), maxlevel=log.proto.Level.user),
-            log.FilterLog(log.StderrLog(), minlevel=log.proto.Level.warning),
-        )
-    log.current = log.FilterLog(logger, minlevel=getattr(log.proto.Level, verbosity))
+    util.initialize_logging(level=verbosity, show_time=False)
+    multiprocessing.current_process().name = 'M'
 
 
 @main.command()
@@ -104,11 +77,12 @@ def run_all(case):
 
 @main.command('run')
 @click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
-def run(case):
+@click.option('-j', 'nprocs', default=None, type=int)
+def run(case, nprocs):
     if not case.check(interactive=False):
         sys.exit(1)
     case.clear_cache()
-    case.run()
+    case.run(nprocs=nprocs)
 
 
 @main.command('capture')

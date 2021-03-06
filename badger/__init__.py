@@ -5,6 +5,7 @@ from difflib import Differ
 import inspect
 from itertools import product
 import json
+import multiprocessing
 import operator
 from pathlib import Path
 import pydoc
@@ -23,7 +24,6 @@ from fasteners import InterProcessLock
 import numpy as np
 import pandas as pd
 from simpleeval import SimpleEval, DEFAULT_FUNCTIONS, NameNotDefined
-import treelog as log
 from typing_inspect import get_origin, get_args
 
 from badger.plotting import Backends
@@ -179,12 +179,12 @@ class FileMapping:
             logtgt = Path(targetname) / target.relative_to(targetpath)
 
             if not source.exists():
-                level = log.warning if ignore_missing else log.error
+                level = util.log.warning if ignore_missing else util.log.error
                 level(f"Missing file: {logsrc}")
                 if ignore_missing:
                     continue
             else:
-                log.debug(logsrc, '->', logtgt)
+                util.log.debug(logsrc, '->', logtgt)
 
             target.parent.mkdir(parents=True, exist_ok=True)
             if not self.template:
@@ -279,6 +279,7 @@ class Command:
         for cap in self._capture:
             cap.add_types(types)
 
+    @util.with_context('{self.name}')
     def run(self, collector: 'ResultCollector', context: Dict, workpath: Path, logdir: Path) -> bool:
         kwargs = {
             'cwd': workpath,
@@ -292,28 +293,27 @@ class Command:
         else:
             command = [render(arg, context) for arg in self._command]
 
-        with log.context(self.name):
-            log.debug(command if isinstance(command, str) else ' '.join(command))
-            with time() as duration:
-                result = subprocess.run(command, **kwargs)
-            duration = duration()
+        util.log.debug(command if isinstance(command, str) else ' '.join(command))
+        with time() as duration:
+            result = subprocess.run(command, **kwargs)
+        duration = duration()
 
-            stdout_path = logdir / f'{self.name}.stdout'
-            with open(stdout_path, 'wb') as f:
-                f.write(result.stdout)
-            stderr_path = logdir / f'{self.name}.stderr'
-            with open(stderr_path, 'wb') as f:
-                f.write(result.stderr)
+        stdout_path = logdir / f'{self.name}.stdout'
+        with open(stdout_path, 'wb') as f:
+            f.write(result.stdout)
+        stderr_path = logdir / f'{self.name}.stderr'
+        with open(stderr_path, 'wb') as f:
+            f.write(result.stderr)
 
-            self.capture(collector, stdout=result.stdout, duration=duration)
+        self.capture(collector, stdout=result.stdout, duration=duration)
 
-            if result.returncode:
-                log.error(f"Command returned exit status {result.returncode}")
-                log.error(f"stdout stored in {stdout_path}")
-                log.error(f"stderr stored in {stderr_path}")
-                return False
-            else:
-                log.info(f"Success ({duration:.3g}s)")
+        if result.returncode:
+            util.log.error(f"command returned exit status {result.returncode}")
+            util.log.error(f"stdout stored in {stdout_path}")
+            util.log.error(f"stderr stored in {stderr_path}")
+            return False
+        else:
+            util.log.info(f"success ({duration:.3g}s)")
 
         return True
 
@@ -489,10 +489,10 @@ class Plot:
         # If there are more than one effective variate, the plot must be scatter
         if eff_variates > 1:
             if spec.get('type', 'scatter') != 'scatter':
-                log.warning("Line plots can have at most one variate dimension")
+                util.log.warning("Line plots can have at most one variate dimension")
             spec['type'] = 'scatter'
         elif eff_variates == 0:
-            log.error("Plot has no effective variate dimensions")
+            util.log.error("Plot has no effective variate dimensions")
             return
         else:
             spec.setdefault('type', 'line')
@@ -804,16 +804,16 @@ class Case:
                 result = evaluator.eval(code) if isinstance(code, str) else code
             except NameNotDefined as error:
                 if allowed_missing is True:
-                    log.debug(f'Skipped evaluating: {name}')
+                    util.log.debug(f'Skipped evaluating: {name}')
                     continue
                 elif error.name in allowed_missing:
                     allowed_missing.add(name)
-                    log.debug(f'Skipped evaluating: {name}')
+                    util.log.debug(f'Skipped evaluating: {name}')
                     continue
                 else:
                     raise
             if verbose:
-                log.debug(f'Evaluated: {name} = {repr(result)}')
+                util.log.debug(f'Evaluated: {name} = {repr(result)}')
             evaluator.names[name] = context[name] = result
 
         return context
@@ -855,13 +855,13 @@ class Case:
         if interactive:
             readline.set_completer(util.completer(decisions))
             readline.parse_and_bind('tab: complete')
-            log.warning("Warning: Badgerfile has changed and data have already been stored")
-            log.warning("Pick an option:")
-            log.warning("  exit - quit badger and fix the problem manually")
-            log.warning("  diff - view a diff between old and new")
-            log.warning("  new-delete - accept new version and delete existing data (significant changes made)")
-            log.warning("  new-keep - accept new version and keep existing data (no significant changes made)")
-            log.warning("  old - accept old version and exit (re-run badger to load the changed badgerfile)")
+            util.log.warning("Warning: Badgerfile has changed and data have already been stored")
+            util.log.warning("Pick an option:")
+            util.log.warning("  exit - quit badger and fix the problem manually")
+            util.log.warning("  diff - view a diff between old and new")
+            util.log.warning("  new-delete - accept new version and delete existing data (significant changes made)")
+            util.log.warning("  new-keep - accept new version and keep existing data (no significant changes made)")
+            util.log.warning("  old - accept old version and exit (re-run badger to load the changed badgerfile)")
             while decision is None:
                 decision = input('>>> ').strip().lower()
                 if decision not in decisions:
@@ -881,15 +881,15 @@ class Case:
                     shutil.copyfile(prev_file, self.yamlpath)
                     return False
         else:
-            log.error("Error: Badgerfile has changed and data have already been stored")
-            log.error("Try running 'badger check' for more information, or delete .badgerdata if you're sure")
+            util.log.error("Error: Badgerfile has changed and data have already been stored")
+            util.log.error("Try running 'badger check' for more information, or delete .badgerdata if you're sure")
             return False
         return True
 
     def check(self, interactive=True) -> bool:
         if self._logdir is None:
             if self._post_files:
-                log.error("Error: logdir must be set for capture of stdout, stderr or files")
+                util.log.error("Error: logdir must be set for capture of stdout, stderr or files")
                 return False
 
         prev_file = self.storagepath / 'badger.yaml'
@@ -906,25 +906,29 @@ class Case:
         shutil.copyfile(self.yamlpath, prev_file)
 
         if interactive:
-            log.user("Derived types:")
+            util.log.info("Derived types:")
             for key, value in self._types.items():
-                log.user(f"  {key}: {_typename(value)}")
+                util.log.info(f"  {key}: {_typename(value)}")
 
         return True
 
-    def run(self):
+    def run(self, nprocs: Optional[int] = None):
         parameters = list(self._parameters.fullspace())
 
-        nsuccess = 0
-        for index, namespace in enumerate(log.iter.fraction('instance', parameters)):
-            nsuccess += self.run_single(namespace, index=index)
+        if nprocs is None:
+            nsuccess = 0
+            for index, namespace in enumerate(parameters):
+                nsuccess += self.run_single(index, namespace)
+        else:
+            with multiprocessing.Pool(processes=nprocs, initializer=util.initialize_process) as pool:
+                nsuccess = sum(pool.starmap(self.run_single, enumerate(parameters)))
 
-        logger = log.user if nsuccess == len(parameters) else log.warning
+        logger = util.log.info if nsuccess == len(parameters) else util.log.error
         logger(f"{nsuccess} of {len(parameters)} succeeded")
 
     def capture(self):
         parameters = list(self._parameters.fullspace())
-        for index, namespace in enumerate(log.iter.fraction('instance', parameters)):
+        for index, namespace in enumerate(parameters):
             self.evaluate_context(namespace)
 
             namespace['_index'] = index
@@ -948,7 +952,7 @@ class Case:
     def collect(self):
         with self.lock():
             data = self.load_dataframe()
-            for path in log.iter.fraction('instance', list(self.iter_instancedirs())):
+            for path in self.iter_instancedirs():
                 collector = ResultCollector(self._types)
                 collector.collect_from_file(path)
                 data = collector.commit_to_dataframe(data)
@@ -956,11 +960,12 @@ class Case:
             self.save_dataframe(data)
 
     def plot(self):
-        for plot in log.iter.fraction('plot', self._plots):
+        for plot in self._plots:
             plot.generate_all(self)
 
-    def run_single(self, namespace, index=None):
-        log.user(', '.join(f'{k}={repr(v)}' for k, v in namespace.items()))
+    @util.with_context('instance {index}')
+    def run_single(self, index, namespace):
+        util.log.info(', '.join(f'{k}={repr(v)}' for k, v in namespace.items()))
         self.evaluate_context(namespace)
 
         namespace['_index'] = index
@@ -977,7 +982,7 @@ class Case:
         with TemporaryDirectory() as workpath:
             workpath = Path(workpath)
 
-            log.debug(f"Using SRC='{self.sourcepath}', WRK='{workpath}', LOG='{logdir}'")
+            util.log.debug(f"Job {index}: using SRC='{self.sourcepath}', WRK='{workpath}', LOG='{logdir}'")
 
             for filemap in self._pre_files:
                 filemap.copy(namespace, self.sourcepath, workpath, sourcename='SRC', targetname='WRK')

@@ -2,11 +2,11 @@ from pathlib import Path
 import csv
 import math
 
-import treelog as log
 from typing import List, Dict
 
 import numpy as np
 
+from . import util
 from badger.util import find_subclass, ignore
 
 
@@ -154,7 +154,7 @@ class MatplotilbBackend(PlotBackend):
     def generate(self, filename: Path):
         self.axes.legend(self.legend)
         filename = filename.with_suffix('.png')
-        log.user(filename)
+        util.log.info(f'Written: {filename}')
         self.figure.savefig(filename)
 
 
@@ -209,7 +209,7 @@ class PlotlyBackend(PlotBackend):
 
     def generate(self, filename: Path):
         filename = filename.with_suffix('.html')
-        log.user(filename)
+        util.log.info(f'Written: {filename}')
         self.figure.write_html(str(filename))
 
 
@@ -233,7 +233,7 @@ class CSVBackend(PlotBackend):
 
     def generate(self, filename: Path):
         filename = filename.with_suffix('.csv')
-        log.user(filename)
+        util.log.info(f'Written: {filename}')
         maxlen = max(len(c) for c in self.columns)
         cols = [list(c) + [None] * (maxlen - len(c)) for c in self.columns]
         with open(filename, 'w', newline='') as f:
