@@ -25,6 +25,7 @@ setup(
         'simpleeval',
         'strictyaml',
         'tables',
+        'typing-inspect',
     ],
     extras_require={
         'testing': ['pytest'],

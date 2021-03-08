@@ -313,7 +313,7 @@ class Command:
             util.log.error(f"stderr stored in {stderr_path}")
             return False
         else:
-            util.log.info(f"success ({duration:.3g}s)")
+            util.log.info(f"success ({util.format_seconds(duration)})")
 
         return True
 
