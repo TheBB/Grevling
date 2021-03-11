@@ -317,7 +317,7 @@ class Command:
 
         return True
 
-    def capture(self, collector: 'ResultCollector', stdout=None, logdir=None, duration=0.0):
+    def capture(self, collector: 'ResultCollector', stdout=None, logdir=None, duration=None):
         if stdout is None:
             assert logdir is not None
             with open(logdir / f'{self.name}.stdout', 'rb') as f:
@@ -325,7 +325,7 @@ class Command:
         stdout = stdout.decode()
         for capture in self._capture:
             capture.find_in(collector, stdout)
-        if self._capture_walltime:
+        if self._capture_walltime and duration is not None:
             collector.collect(f'walltime/{self.name}', duration)
 
 
@@ -337,7 +337,7 @@ class PlotStyleManager:
     _defaults = {
         'color': {
             'category': {
-                None: ['blue', 'red', 'green', 'magenta', 'cyan'],
+                None: ['blue', 'red', 'green', 'magenta', 'cyan', 'black'],
             },
             'single': {
                 None: ['blue'],
@@ -663,10 +663,20 @@ class ResultCollector(dict):
         else:
             self[name] = value
 
-    def commit_to_file(self):
-        logdir = Path(self['_logdir'])
-        with open(logdir / 'badgercontext.json', 'w') as f:
-            json.dump(self, f, sort_keys=True, indent=4, cls=util.JSONEncoder)
+    def commit_to_file(self, merge=True):
+        path = Path(self['_logdir']) / 'badgercontext.json'
+
+        data = self
+        if merge and path.exists():
+            try:
+                with open(path, 'r') as f:
+                    existing_data = json.load(f)
+            except:
+                pass
+            data = {**existing_data, **data}
+
+        with open(path, 'w') as f:
+            json.dump(data, f, sort_keys=True, indent=4, cls=util.JSONEncoder)
 
     def commit_to_dataframe(self, data):
         index = self['_index']
@@ -939,14 +949,12 @@ class Case:
             collector = ResultCollector(self._types)
             for key, value in namespace.items():
                 collector.collect(key, value)
-            collector.collect('_started', pd.Timestamp.now())
 
             namespace.update(self._constants)
 
             for command in self._commands:
                 command.capture(collector, logdir=logdir)
 
-            collector.collect('_finished', pd.Timestamp.now())
             collector.commit_to_file()
 
     def collect(self):
