@@ -226,6 +226,6 @@ CASE_SCHEMA = Map({
 })
 
 
-def load_and_validate(text: str, path: Path) -> Dict:
+def load_and_validate(text: str, path: Path = Path('')) -> Dict:
     casedata = generic_load(text, schema=CASE_SCHEMA, label=path, allow_flow_style=True)
     return casedata.data

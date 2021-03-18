@@ -35,12 +35,6 @@ import badger.util as util
 __version__ = '0.1.0'
 
 
-class Opaque:
-
-    def __init__(self, obj):
-        self.obj = obj
-
-
 @contextmanager
 def time():
     start = osclock()
@@ -126,7 +120,7 @@ class GradedParameter(Parameter):
 
 class ParameterSpace(dict):
 
-    def subspace(self, *names, base=None) -> Iterable[Dict]:
+    def subspace(self, *names: str) -> Iterable[Dict]:
         params = [self[name] for name in names]
         indexes = [range(len(p)) for p in params]
         for values in util.dict_product(names, params):
@@ -134,6 +128,97 @@ class ParameterSpace(dict):
 
     def fullspace(self) -> Iterable[Dict]:
         yield from self.subspace(*self.keys())
+
+    def size(self, *names: str) -> int:
+        return util.prod(len(self[name]) for name in names)
+
+    def size_fullspace(self) -> int:
+        return self.size(*self.keys())
+
+
+class ContextManager:
+
+    parameters: ParameterSpace
+    evaluables: Dict[str, str]
+    constants = Dict[str, Any]
+    types: Dict[str, Any]
+
+    def __init__(self, data: Dict):
+        self.parameters = ParameterSpace()
+        for name, paramspec in data.get('parameters', {}).items():
+            param = Parameter.load(name, paramspec)
+            self.parameters[param.name] = param
+
+        self.evaluables = dict(data.get('evaluate', {}))
+        self.constants = dict(data.get('constants', {}))
+
+        self.types = {
+            '_index': int,
+            '_logdir': str,
+            '_started': 'datetime64[ns]',
+            '_finished': 'datetime64[ns]',
+        }
+        self.types.update(data.get('types', {}))
+
+        # Guess types of parameters
+        for name, param in self.parameters.items():
+            if name not in self.types:
+                self.types[name] = _guess_eltype(param)
+
+        # Guess types of evaluables
+        if any(name not in self.types for name in self.evaluables):
+            contexts = list(self.parameters.fullspace())
+            for ctx in contexts:
+                self.evaluate_context(ctx, verbose=False)
+            for name in self.evaluables:
+                if name not in self.types:
+                    values = [ctx[name] for ctx in contexts]
+                    self.types[name] = _guess_eltype(values)
+
+    def evaluate_context(self, context, verbose=True, allowed_missing=(), add_constants=True):
+        evaluator = SimpleEval(functions={**DEFAULT_FUNCTIONS,
+            'log': np.log,
+            'log2': np.log2,
+            'log10': np.log10,
+            'sqrt': np.sqrt,
+            'abs': np.abs,
+            'ord': ord,
+            'sin': np.sin,
+            'cos': np.cos,
+        })
+        evaluator.names.update(context)
+        evaluator.names.update(self.constants)
+        if allowed_missing is not True:
+            allowed_missing = set(allowed_missing)
+
+        for name, code in self.evaluables.items():
+            try:
+                result = evaluator.eval(code) if isinstance(code, str) else code
+            except NameNotDefined as error:
+                if allowed_missing is True:
+                    util.log.debug(f'Skipped evaluating: {name}')
+                    continue
+                elif error.name in allowed_missing:
+                    allowed_missing.add(name)
+                    util.log.debug(f'Skipped evaluating: {name}')
+                    continue
+                else:
+                    raise
+            if verbose:
+                util.log.debug(f'Evaluated: {name} = {repr(result)}')
+            evaluator.names[name] = context[name] = result
+
+        if add_constants:
+            context.update(self.constants)
+
+        return context
+
+    def subspace(self, *names: str, **kwargs) -> Iterable[Dict]:
+        for values in self.parameters.subspace(*names):
+            yield self.evaluate_context(values, **kwargs)
+
+    def fullspace(self, **kwargs) -> Iterable[Dict]:
+        yield from self.subspace(*self.parameters, **kwargs)
 
 
 class FileMapping:
@@ -548,29 +633,29 @@ class Plot:
     def generate_all(self, case: 'Case'):
         # Collect all the fixed parameters and iterate over all those combinations
         fixed = self._parameters_of_kind('fixed')
-        unfixed = set(case._parameters.keys()) - set(fixed)
+        unfixed = set(case.parameters.keys()) - set(fixed)
 
         constants = {
             param: self._parameters[param].arg
             for param in self._parameters_of_kind('ignore', req_arg=True)
         }
 
-        for index in case._parameters.subspace(*fixed):
+        for index in case.parameters.subspace(*fixed):
             index = {**index, **constants}
-            context = case.evaluate_context(index.copy(), allowed_missing=unfixed)
+            context = case.context_mgr.evaluate_context(index.copy(), allowed_missing=unfixed)
             self.generate_single(case, context, index)
 
     def generate_single(self, case: 'Case', context: dict, index):
         # Collect all the categorized parameters and iterate over all those combinations
         categories = self._parameters_of_kind('category')
-        noncats = set(case._parameters.keys()) - set(self._parameters_of_kind('fixed', 'category'))
+        noncats = set(case.parameters.keys()) - set(self._parameters_of_kind('fixed', 'category'))
         backends = Backends(*self._format)
         plotter = operator.attrgetter(f'add_{self._type}')
 
-        sub_indices = case._parameters.subspace(*categories, base=index)
-        styles = self._styles.styles(case._parameters, *categories)
+        sub_indices = case.parameters.subspace(*categories)
+        styles = self._styles.styles(case.parameters, *categories)
         for sub_index, basestyle in zip(sub_indices, styles):
-            sub_context = case.evaluate_context({**context, **sub_index}, allowed_missing=noncats)
+            sub_context = case.context_mgr.evaluate_context({**context, **sub_index}, allowed_missing=noncats)
             sub_index = {**index, **sub_index}
 
             cat_name, xaxis, yaxes = self.generate_category(case, sub_context, sub_index)
@@ -607,12 +692,12 @@ class Plot:
 
         # Collapse ignorable parameters
         for ignore in self._parameters_of_kind('ignore', req_arg=False):
-            others = [p for p in case._parameters if p != ignore]
+            others = [p for p in case.parameters if p != ignore]
             data = data.groupby(by=others).first().reset_index()
 
         # Collapse mean parameters
         for mean in self._parameters_of_kind('mean'):
-            others = [p for p in case._parameters if p != mean]
+            others = [p for p in case.parameters if p != mean]
             data = data.groupby(by=others).aggregate(util.flexible_mean).reset_index()
 
         # Extract data
@@ -654,6 +739,8 @@ class ResultCollector(dict):
             self.collect(key, value)
 
     def collect(self, name: str, value: Any):
+        if name not in self._types:
+            return
         tp = self._types[name]
         if util.is_list_type(tp) and not isinstance(value, list):
             eltype = get_args(tp)[0]
@@ -695,19 +782,17 @@ class Case:
     storagepath: Path
     dataframepath: Path
 
-    _parameters: ParameterSpace
-    _evaluables: Dict[str, str]
-    _constants: Dict[str, Any]
+    context_mgr: ContextManager
+
     _pre_files: List[FileMapping]
     _post_files: List[FileMapping]
     _commands: List[Command]
     _plots: List[Plot]
-    _types: Dict[str, Any]
 
     _logdir: str
     _ignore_missing: bool
 
-    def __init__(self, yamlpath='.', storagepath=None):
+    def __init__(self, yamlpath='.', storagepath=None, yamldata=None):
         if isinstance(yamlpath, str):
             yamlpath = Path(yamlpath)
         if yamlpath.is_dir():
@@ -723,17 +808,11 @@ class Case:
         self.dataframepath = storagepath / 'dataframe.parquet'
 
         with open(yamlpath, mode='r') as f:
-            casedata = load_and_validate(f.read(), yamlpath)
+            yamldata = f.read()
+        with open(yamlpath, mode='r') as f:
+            casedata = load_and_validate(yamldata, yamlpath)
 
-        # Read parameters
-        self._parameters = ParameterSpace()
-        for name, paramspec in casedata.get('parameters', {}).items():
-            param = Parameter.load(name, paramspec)
-            self._parameters[param.name] = param
-
-        # Read evaluables
-        self._evaluables = dict(casedata.get('evaluate', {}))
-        self._constants = dict(casedata.get('constants', {}))
+        self.context_mgr = ContextManager(casedata)
 
         # Read file mappings
         self._pre_files = [FileMapping.load(spec, template=True) for spec in casedata.get('templates', [])]
@@ -743,33 +822,9 @@ class Case:
         # Read commands
         self._commands = [Command.load(spec) for spec in casedata.get('script', [])]
 
-        # Read types
-        self._types = {
-            '_index': int,
-            '_logdir': str,
-            '_started': 'datetime64[ns]',
-            '_finished': 'datetime64[ns]',
-        }
-        self._types.update(casedata.get('types', {}))
-
-        # Guess types of parameters
-        for name, param in self._parameters.items():
-            if name not in self._types:
-                self._types[name] = _guess_eltype(param)
-
-        # Guess types of evaluables
-        if any(name not in self._types for name in self._evaluables):
-            contexts = list(self._parameters.fullspace())
-            for ctx in contexts:
-                self.evaluate_context(ctx, verbose=False)
-            for name in self._evaluables:
-                if name not in self._types:
-                    values = [ctx[name] for ctx in contexts]
-                    self._types[name] = _guess_eltype(values)
-
         # Fill in types derived from commands
         for cmd in self._commands:
-            cmd.add_types(self._types)
+            cmd.add_types(self.context_mgr.types)
 
         # Read settings
         settings = casedata.get('settings', {})
@@ -777,7 +832,15 @@ class Case:
         self._ignore_missing = settings.get('ignore-missing-files', False)
 
         # Construct plot objects
-        self._plots = [Plot.load(spec, self._parameters, self._types) for spec in casedata.get('plots', [])]
+        self._plots = [Plot.load(spec, self.parameters, self.types) for spec in casedata.get('plots', [])]
+
+    @property
+    def parameters(self):
+        return self.context_mgr.parameters
+
+    @property
+    def types(self):
+        return self.context_mgr.types
 
     def clear_cache(self):
         shutil.rmtree(self.storagepath)
@@ -793,41 +856,6 @@ class Case:
                 continue
             yield path
 
-    def evaluate_context(self, context, verbose=True, allowed_missing=()):
-        evaluator = SimpleEval(functions={**DEFAULT_FUNCTIONS,
-            'log': np.log,
-            'log2': np.log2,
-            'log10': np.log10,
-            'sqrt': np.sqrt,
-            'abs': np.abs,
-            'ord': ord,
-            'sin': np.sin,
-            'cos': np.cos,
-        })
-        evaluator.names.update(context)
-        evaluator.names.update(self._constants)
-        if allowed_missing is not True:
-            allowed_missing = set(allowed_missing)
-
-        for name, code in self._evaluables.items():
-            try:
-                result = evaluator.eval(code) if isinstance(code, str) else code
-            except NameNotDefined as error:
-                if allowed_missing is True:
-                    util.log.debug(f'Skipped evaluating: {name}')
-                    continue
-                elif error.name in allowed_missing:
-                    allowed_missing.add(name)
-                    util.log.debug(f'Skipped evaluating: {name}')
-                    continue
-                else:
-                    raise
-            if verbose:
-                util.log.debug(f'Evaluated: {name} = {repr(result)}')
-            evaluator.names[name] = context[name] = result
-
-        return context
-
     @property
     def shape(self):
         return tuple(map(len, self._parameters.values()))
@@ -842,7 +870,7 @@ class Case:
             return pd.read_parquet(self.dataframepath, engine='pyarrow')
         data = {
             k: pd.Series([], dtype=_pandas_dtype(v))
-            for k, v in self._types.items()
+            for k, v in self.context_mgr.types.items()
             if k != '_index'
         }
         return pd.DataFrame(index=pd.Int64Index([]), data=data)
@@ -923,24 +951,22 @@ class Case:
         return True
 
     def run(self, nprocs: Optional[int] = None):
-        parameters = list(self._parameters.fullspace())
+        instances = self.context_mgr.fullspace()
 
         if nprocs is None:
             nsuccess = 0
-            for index, namespace in enumerate(parameters):
+            for index, namespace in enumerate(instances):
                 nsuccess += self.run_single(index, namespace)
         else:
             with multiprocessing.Pool(processes=nprocs, initializer=util.initialize_process) as pool:
-                nsuccess = sum(pool.starmap(self.run_single, enumerate(parameters)))
+                nsuccess = sum(pool.starmap(self.run_single, enumerate(instances)))
 
-        logger = util.log.info if nsuccess == len(parameters) else util.log.error
-        logger(f"{nsuccess} of {len(parameters)} succeeded")
+        size = self.parameters.size_fullspace()
+        logger = util.log.info if nsuccess == size else util.log.error
+        logger(f"{nsuccess} of {size} succeeded")
 
     def capture(self):
-        parameters = list(self._parameters.fullspace())
-        for index, namespace in enumerate(parameters):
-            self.evaluate_context(namespace)
-
+        for index, namespace in enumerate(self._context.fullspace()):
             namespace['_index'] = index
             namespace['_logdir'] = logdir = self.storagepath / render(self._logdir, namespace)
             if not logdir.exists():
@@ -961,7 +987,7 @@ class Case:
         with self.lock():
             data = self.load_dataframe()
             for path in self.iter_instancedirs():
-                collector = ResultCollector(self._types)
+                collector = ResultCollector(self.context_mgr.types)
                 collector.collect_from_file(path)
                 data = collector.commit_to_dataframe(data)
             data = data.sort_index()
@@ -973,19 +999,16 @@ class Case:
 
     @util.with_context('instance {index}')
     def run_single(self, index, namespace):
-        util.log.info(', '.join(f'{k}={repr(v)}' for k, v in namespace.items()))
-        self.evaluate_context(namespace)
+        util.log.info(', '.join(f'{k}={repr(namespace[k])}' for k in self.parameters))
 
         namespace['_index'] = index
         namespace['_logdir'] = logdir = self.storagepath / render(self._logdir, namespace)
         logdir.mkdir(parents=True, exist_ok=True)
 
-        collector = ResultCollector(self._types)
+        collector = ResultCollector(self.context_mgr.types)
         for key, value in namespace.items():
             collector.collect(key, value)
         collector.collect('_started', pd.Timestamp.now())
-
-        namespace.update(self._constants)
 
         with TemporaryDirectory() as workpath:
             workpath = Path(workpath)
