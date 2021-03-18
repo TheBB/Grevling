@@ -66,7 +66,8 @@ def with_context(fmt: str):
     return decorator
 
 
-log: LoggerAdapter = None
+logging.basicConfig(level='DEBUG')
+log: LoggerAdapter = LoggerAdapter(logging.getLogger(), {})
 
 def initialize_logging(level='INFO', show_time=False):
     logging.basicConfig(
@@ -74,6 +75,7 @@ def initialize_logging(level='INFO', show_time=False):
         format='%(message)s',
         datefmt='[%X]',
         handlers=[rich.logging.RichHandler(show_path=False, show_time=show_time)],
+        force=True,
     )
 
     global log
@@ -96,6 +98,13 @@ class JSONEncoder(json.JSONEncoder):
         if isinstance(obj, pd.Timestamp):
             return str(obj)
         return super().default(obj)
+
+
+def prod(nums):
+    retval = 1
+    for n in nums:
+        retval *= n
+    return retval
 
 
 def ignore(*_, **__):

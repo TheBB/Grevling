@@ -13,20 +13,20 @@ DATADIR = Path(__file__).parent / 'data'
 def test_parse():
     case = Case(DATADIR / 'valid' / 'diverse.yaml')
 
-    for name, param in case._parameters.items():
+    for name, param in case.parameters.items():
         assert param.name == name
-    assert case._parameters['alpha'].values == [1, 2]
-    assert case._parameters['bravo'].values == [1.0, 2.0]
-    assert case._parameters['charlie'].values == [3, 4.5]
-    np.testing.assert_allclose(case._parameters['delta'].values, [0.0, 0.25, 0.5, 0.75, 1.0], atol=1e-6, rtol=1e-6)
-    np.testing.assert_allclose(case._parameters['echo'].values, [0.0, 0.186289, 0.409836, 0.678092, 1.0], atol=1e-6, rtol=1e-6)
-    assert case._parameters['foxtrot'].values == ['a', 'b', 'c']
+    assert case.parameters['alpha'].values == [1, 2]
+    assert case.parameters['bravo'].values == [1.0, 2.0]
+    assert case.parameters['charlie'].values == [3, 4.5]
+    np.testing.assert_allclose(case.parameters['delta'].values, [0.0, 0.25, 0.5, 0.75, 1.0], atol=1e-6, rtol=1e-6)
+    np.testing.assert_allclose(case.parameters['echo'].values, [0.0, 0.186289, 0.409836, 0.678092, 1.0], atol=1e-6, rtol=1e-6)
+    assert case.parameters['foxtrot'].values == ['a', 'b', 'c']
 
-    assert case._evaluables == {
+    assert case.context_mgr.evaluables == {
         'dblalpha': '2 * alpha',
     }
 
-    assert case._constants == {
+    assert case.context_mgr.constants == {
         'int': 14,
         'float': 14.0,
     }
@@ -100,7 +100,7 @@ def test_parse():
     assert case._commands[5]._capture[4]._regex.pattern.startswith(re.escape('here is a prefix'))
     assert case._commands[5]._capture[4]._mode == 'all'
 
-    assert case._types == {
+    assert case.types == {
         '_index': int,
         '_logdir': str,
         '_started': 'datetime64[ns]',
