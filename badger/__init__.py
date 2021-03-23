@@ -375,8 +375,10 @@ class Command:
         if isinstance(self._command, str):
             kwargs['shell'] = True
             command = render(self._command, context, mode='shell')
+            util.log.debug(command)
         else:
             command = [render(arg, context) for arg in self._command]
+            util.log.debug(' '.join(command))
 
         util.log.debug(command if isinstance(command, str) else ' '.join(command))
         with time() as duration:
