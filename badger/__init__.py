@@ -342,9 +342,10 @@ class Command:
             del spec['capture-output']
         return call_yaml(cls, spec)
 
-    def __init__(self, command, name=None, capture=None, capture_walltime=False):
+    def __init__(self, command, name=None, capture=None, capture_walltime=False, retry_on_fail=False):
         self._command = command
         self._capture_walltime = capture_walltime
+        self._retry_on_fail = retry_on_fail
 
         if name is None:
             exe = shlex.split(command)[0] if isinstance(command, str) else command[0]
@@ -382,7 +383,11 @@ class Command:
 
         util.log.debug(command if isinstance(command, str) else ' '.join(command))
         with time() as duration:
-            result = subprocess.run(command, **kwargs)
+            while True:
+                result = subprocess.run(command, **kwargs)
+                if self._retry_on_fail and result.returncode:
+                    continue
+                break
         duration = duration()
 
         stdout_path = logdir / f'{self.name}.stdout'
