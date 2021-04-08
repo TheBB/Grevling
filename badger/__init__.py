@@ -7,6 +7,7 @@ from itertools import product
 import json
 import multiprocessing
 import operator
+import os
 from pathlib import Path
 import pydoc
 import re
@@ -342,10 +343,11 @@ class Command:
             del spec['capture-output']
         return call_yaml(cls, spec)
 
-    def __init__(self, command, name=None, capture=None, capture_walltime=False, retry_on_fail=False):
+    def __init__(self, command, name=None, capture=None, capture_walltime=False, retry_on_fail=False, env=None):
         self._command = command
         self._capture_walltime = capture_walltime
         self._retry_on_fail = retry_on_fail
+        self._env = env
 
         if name is None:
             exe = shlex.split(command)[0] if isinstance(command, str) else command[0]
@@ -372,6 +374,11 @@ class Command:
             'capture_output': True,
             'shell': False,
         }
+
+        if self._env:
+            kwargs['env'] = os.environ.copy()
+            for k, v in self._env.items():
+                kwargs['env'][k] = render(v, context)
 
         if isinstance(self._command, str):
             kwargs['shell'] = True
