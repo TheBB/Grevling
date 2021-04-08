@@ -270,7 +270,7 @@ class FileMapping:
                 if ignore_missing:
                     continue
             else:
-                util.log.debug(logsrc, '->', logtgt)
+                util.log.debug(f'{logsrc} -> {logtgt}')
 
             target.parent.mkdir(parents=True, exist_ok=True)
             if not self.template:
