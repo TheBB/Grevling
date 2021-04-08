@@ -388,7 +388,6 @@ class Command:
             command = [render(arg, context) for arg in self._command]
             util.log.debug(' '.join(command))
 
-        util.log.debug(command if isinstance(command, str) else ' '.join(command))
         with time() as duration:
             while True:
                 result = subprocess.run(command, **kwargs)
