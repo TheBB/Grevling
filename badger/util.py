@@ -66,7 +66,7 @@ def with_context(fmt: str):
     return decorator
 
 
-logging.basicConfig(level='DEBUG')
+logging.basicConfig(level='INFO')
 log: LoggerAdapter = LoggerAdapter(logging.getLogger(), {})
 
 def initialize_logging(level='INFO', show_time=False):
