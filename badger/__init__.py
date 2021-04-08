@@ -1027,7 +1027,7 @@ class Case:
         with TemporaryDirectory() as workpath:
             workpath = Path(workpath)
 
-            util.log.debug(f"Job {index}: using SRC='{self.sourcepath}', WRK='{workpath}', LOG='{logdir}'")
+            util.log.debug(f"Using SRC='{self.sourcepath}', WRK='{workpath}', LOG='{logdir}'")
 
             for filemap in self._pre_files:
                 filemap.copy(namespace, self.sourcepath, workpath, sourcename='SRC', targetname='WRK')
