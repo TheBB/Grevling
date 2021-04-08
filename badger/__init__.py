@@ -393,6 +393,7 @@ class Command:
             while True:
                 result = subprocess.run(command, **kwargs)
                 if self._retry_on_fail and result.returncode:
+                    util.log.info('Failed, retrying...')
                     continue
                 break
         duration = duration()
