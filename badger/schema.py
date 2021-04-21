@@ -160,6 +160,7 @@ class Type(ScalarValidator):
 
 
 CASE_SCHEMA = Map({
+    Optional('containers'): MapPattern(Str(), Str() | Seq(Str())),
     Optional('parameters'): MapPattern(
         Str(),
         First(
@@ -196,6 +197,7 @@ CASE_SCHEMA = Map({
             Optional('capture-walltime'): Bool(),
             Optional('retry-on-fail'): Bool(),
             Optional('env'): MapPattern(Str(), Str()),
+            Optional('container'): Str(),
         }),
     )),
     Optional('types'): MapPattern(Str(), Type()),

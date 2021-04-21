@@ -338,18 +338,22 @@ class Capture:
 class Command:
 
     @classmethod
-    def load(cls, spec):
+    def load(cls, spec, containers={}):
         if isinstance(spec, (str, list)):
             return cls(spec)
         if 'capture-output' in spec:
             del spec['capture-output']
-        return call_yaml(cls, spec)
+        return call_yaml(cls, spec, container_args=containers)
 
-    def __init__(self, command, name=None, capture=None, capture_walltime=False, retry_on_fail=False, env=None):
+    def __init__(self, command, name=None, capture=None, capture_walltime=False,
+                retry_on_fail=False, env=None, container=None, container_args={}):
         self._command = command
         self._capture_walltime = capture_walltime
         self._retry_on_fail = retry_on_fail
         self._env = env
+
+        self._container = container
+        self._container_args = container_args.get(container)
 
         if name is None:
             exe = shlex.split(command)[0] if isinstance(command, str) else command[0]
@@ -385,11 +389,25 @@ class Command:
         if isinstance(self._command, str):
             kwargs['shell'] = True
             command = render(self._command, context, mode='shell')
-            util.log.debug(command)
         else:
             command = [render(arg, context) for arg in self._command]
-            util.log.debug(' '.join(command))
 
+        if self._container:
+            if isinstance(command, list):
+                command = ' '.join(shlex.quote(c) for c in command)
+            if isinstance(self._container_args, str):
+                args = shlex.split(render(self._container_args, context, mode='shell'))
+            elif isinstance(self._container_args, list):
+                args = [render(arg, context) for arg in self._container_args]
+            else:
+                args = []
+            command = [
+                'docker', 'run', *args, f'-v{workpath}:/badger-workdir', '--workdir', '/badger-workdir',
+                self._container, 'bash', '-c', command,
+            ]
+            kwargs['shell'] = False
+
+        util.log.debug(command if isinstance(command, str) else ' '.join(shlex.quote(c) for c in command))
         with time() as duration:
             while True:
                 result = subprocess.run(command, **kwargs)
@@ -836,7 +854,8 @@ class Case:
         self._post_files = [FileMapping.load(spec) for spec in casedata.get('postfiles', [])]
 
         # Read commands
-        self._commands = [Command.load(spec) for spec in casedata.get('script', [])]
+        containers = casedata.get('containers', {})
+        self._commands = [Command.load(spec, containers) for spec in casedata.get('script', [])]
 
         # Fill in types derived from commands
         for cmd in self._commands:
