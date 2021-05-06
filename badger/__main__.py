@@ -7,6 +7,7 @@ import sys
 import click
 import numpy as np
 from ruamel.yaml.parser import ParserError as YAMLParserError
+from simpleeval import SimpleEval
 from strictyaml import YAMLValidationError
 
 import badger
@@ -78,16 +79,31 @@ def run_all(case):
 @main.command('run')
 @click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
 @click.option('-j', 'nprocs', default=None, type=int)
-def run(case, nprocs):
+@click.option('--azure', flag_value=True, default=False)
+def run(case, nprocs, azure):
     if not case.check(interactive=False):
         sys.exit(1)
     case.clear_cache()
     case.run(nprocs=nprocs)
 
 
+@main.command('run-with')
+@click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
+@click.option('--target', '-t', default='.', type=click.Path())
+@click.argument('context', nargs=-1, type=str)
+def run_with(case, target, context):
+    evaluator = SimpleEval()
+    parsed_context = {}
+    for s in context:
+        k, v = s.split('=', 1)
+        parsed_context[k] = evaluator.eval(v)
+    parsed_context = case.context_mgr.evaluate_context(parsed_context)
+    case.run_single(index=0, namespace=parsed_context, logdir=Path(target))
+
+
 @main.command('capture')
 @click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
-def collect(case):
+def capture(case):
     if not case.check(interactive=False):
         sys.exit(1)
     case.capture()

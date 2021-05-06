@@ -210,7 +210,9 @@ class ContextManager:
             evaluator.names[name] = context[name] = result
 
         if add_constants:
-            context.update(self.constants)
+            for k, v in self.constants.items():
+                if k not in context:
+                    context[k] = v
 
         return context
 
@@ -1012,11 +1014,14 @@ class Case:
             plot.generate_all(self)
 
     @util.with_context('instance {index}')
-    def run_single(self, index, namespace):
+    def run_single(self, index, namespace, logdir=None):
         util.log.info(', '.join(f'{k}={repr(namespace[k])}' for k in self.parameters))
 
         namespace['_index'] = index
-        namespace['_logdir'] = logdir = self.storagepath / render(self._logdir, namespace)
+        if logdir is not None:
+            namespace['_logdir'] = str(logdir)
+        else:
+            namespace['_logdir'] = logdir = self.storagepath / render(self._logdir, namespace)
         logdir.mkdir(parents=True, exist_ok=True)
 
         collector = ResultCollector(self.context_mgr.types)
