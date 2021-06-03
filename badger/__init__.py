@@ -188,7 +188,9 @@ class ContextManager:
             'cos': np.cos,
         })
         evaluator.names.update(context)
-        evaluator.names.update(self.constants)
+        evaluator.names.update({
+            k: v for k, v in self.constants.items() if k not in context
+        })
         if allowed_missing is not True:
             allowed_missing = set(allowed_missing)
 
