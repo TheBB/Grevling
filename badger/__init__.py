@@ -348,11 +348,13 @@ class Command:
         return call_yaml(cls, spec, container_args=containers)
 
     def __init__(self, command, name=None, capture=None, capture_walltime=False,
-                retry_on_fail=False, env=None, container=None, container_args={}):
+                retry_on_fail=False, env=None, container=None, container_args={},
+                allow_failure=False):
         self._command = command
         self._capture_walltime = capture_walltime
         self._retry_on_fail = retry_on_fail
         self._env = env
+        self._allow_failure = allow_failure
 
         self._container = container
         self._container_args = container_args.get(container)
@@ -429,10 +431,11 @@ class Command:
         self.capture(collector, stdout=result.stdout, duration=duration)
 
         if result.returncode:
-            util.log.error(f"command returned exit status {result.returncode}")
-            util.log.error(f"stdout stored in {stdout_path}")
-            util.log.error(f"stderr stored in {stderr_path}")
-            return False
+            level = util.log.warn if self._allow_failure else util.log.error
+            level(f"command returned exit status {result.returncode}")
+            level(f"stdout stored in {stdout_path}")
+            level(f"stderr stored in {stderr_path}")
+            return self._allow_failure
         else:
             util.log.info(f"success ({util.format_seconds(duration)})")
 
