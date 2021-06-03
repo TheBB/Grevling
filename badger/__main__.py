@@ -23,6 +23,8 @@ class CustomClickException(click.ClickException):
 class Case(click.Path):
 
     def convert(self, value, param, ctx):
+        if isinstance(value, badger.Case):
+            return value
         path = Path(super().convert(value, param, ctx))
         if path.is_dir():
             casefile = path / 'badger.yaml'
