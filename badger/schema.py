@@ -198,6 +198,7 @@ CASE_SCHEMA = Map({
             Optional('retry-on-fail'): Bool(),
             Optional('env'): MapPattern(Str(), Str()),
             Optional('container'): Str(),
+            Optional('allow-failure'): Bool(),
         }),
     )),
     Optional('types'): MapPattern(Str(), Type()),
