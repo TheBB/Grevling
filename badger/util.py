@@ -71,7 +71,7 @@ log: LoggerAdapter = LoggerAdapter(logging.getLogger(), {})
 
 def initialize_logging(level='INFO', show_time=False):
     logging.basicConfig(
-        level=level,
+        level=level.upper(),
         format='%(message)s',
         datefmt='[%X]',
         handlers=[rich.logging.RichHandler(show_path=False, show_time=show_time)],
