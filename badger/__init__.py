@@ -11,7 +11,6 @@ import os
 from pathlib import Path
 import pydoc
 import re
-import readline
 import shlex
 import shutil
 import subprocess
@@ -932,6 +931,11 @@ class Case:
         decision = None
         decisions = ['exit', 'diff', 'new-delete', 'new-keep', 'old']
         if interactive:
+            if os.name == 'nt':
+                from pyreadline import Readline
+                readline = Readline()
+            else:
+                import readline
             readline.set_completer(util.completer(decisions))
             readline.parse_and_bind('tab: complete')
             util.log.warning("Warning: Badgerfile has changed and data have already been stored")
