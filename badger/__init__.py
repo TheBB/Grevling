@@ -381,8 +381,9 @@ class Command:
     def run(self, collector: 'ResultCollector', context: Dict, workpath: Path, logdir: Path) -> bool:
         kwargs = {
             'cwd': workpath,
-            'capture_output': True,
             'shell': False,
+            'stdout': subprocess.PIPE,
+            'stderr': subprocess.PIPE,
         }
 
         if self._env:
