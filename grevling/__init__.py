@@ -32,7 +32,7 @@ from .schema import load_and_validate
 from . import util
 
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 
 
 @contextmanager
