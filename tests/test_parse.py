@@ -5,7 +5,7 @@ from typing import List
 
 import numpy as np
 
-from badger import Case
+from grevling import Case
 
 
 DATADIR = Path(__file__).parent / 'data'

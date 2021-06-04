@@ -26,10 +26,10 @@ import pandas as pd
 from simpleeval import SimpleEval, DEFAULT_FUNCTIONS, NameNotDefined
 from typing_inspect import get_origin, get_args
 
-from badger.plotting import Backends
-from badger.render import render
-from badger.schema import load_and_validate
-import badger.util as util
+from .plotting import Backends
+from .render import render
+from .schema import load_and_validate
+from . import util
 
 
 __version__ = '0.1.0'
@@ -406,7 +406,7 @@ class Command:
             else:
                 args = []
             command = [
-                'docker', 'run', *args, f'-v{workpath}:/badger-workdir', '--workdir', '/badger-workdir',
+                'docker', 'run', *args, f'-v{workpath}:/workdir', '--workdir', '/workdir',
                 self._container, 'bash', '-c', command,
             ]
             kwargs['shell'] = False
@@ -772,7 +772,7 @@ class ResultCollector(dict):
         self._types = types
 
     def collect_from_file(self, path: Path):
-        with open(path / 'badgercontext.json', 'r') as f:
+        with open(path / 'grevlingcontext.json', 'r') as f:
             data = json.load(f)
         for key, value in data.items():
             self.collect(key, value)
@@ -790,7 +790,7 @@ class ResultCollector(dict):
             self[name] = value
 
     def commit_to_file(self, merge=True):
-        path = Path(self['_logdir']) / 'badgercontext.json'
+        path = Path(self['_logdir']) / 'grevlingcontext.json'
 
         data = self
         if merge and path.exists():
@@ -835,12 +835,16 @@ class Case:
         if isinstance(yamlpath, str):
             yamlpath = Path(yamlpath)
         if yamlpath.is_dir():
-            yamlpath = yamlpath / 'badger.yaml'
+            for candidate in ['grevling', 'badger']:
+                if (yamlpath / f'{candidate}.yaml').exists():
+                    yamlpath = yamlpath / f'{candidate}.yaml'
+                    break
+        assert yamlpath.is_file()
         self.yamlpath = yamlpath
         self.sourcepath = yamlpath.parent
 
         if storagepath is None:
-            storagepath = self.sourcepath / '.badgerdata'
+            storagepath = self.sourcepath / '.grevlingdata'
         storagepath.mkdir(parents=True, exist_ok=True)
         self.storagepath = storagepath
 
@@ -892,7 +896,7 @@ class Case:
 
     def iter_instancedirs(self):
         for path in self.storagepath.iterdir():
-            if not (path / 'badgercontext.json').exists():
+            if not (path / 'grevlingcontext.json').exists():
                 continue
             yield path
 
@@ -938,13 +942,13 @@ class Case:
                 import readline
             readline.set_completer(util.completer(decisions))
             readline.parse_and_bind('tab: complete')
-            util.log.warning("Warning: Badgerfile has changed and data have already been stored")
+            util.log.warning("Warning: Grevlingfile has changed and data have already been stored")
             util.log.warning("Pick an option:")
-            util.log.warning("  exit - quit badger and fix the problem manually")
+            util.log.warning("  exit - quit grevling and fix the problem manually")
             util.log.warning("  diff - view a diff between old and new")
             util.log.warning("  new-delete - accept new version and delete existing data (significant changes made)")
             util.log.warning("  new-keep - accept new version and keep existing data (no significant changes made)")
-            util.log.warning("  old - accept old version and exit (re-run badger to load the changed badgerfile)")
+            util.log.warning("  old - accept old version and exit (re-run grevling to load the changed grevlingfile)")
             while decision is None:
                 decision = input('>>> ').strip().lower()
                 if decision not in decisions:
@@ -964,8 +968,8 @@ class Case:
                     shutil.copyfile(prev_file, self.yamlpath)
                     return False
         else:
-            util.log.error("Error: Badgerfile has changed and data have already been stored")
-            util.log.error("Try running 'badger check' for more information, or delete .badgerdata if you're sure")
+            util.log.error("Error: Grevlingfile has changed and data have already been stored")
+            util.log.error("Try running 'grevling check' for more information, or delete .grevlingdata if you're sure")
             return False
         return True
 
@@ -975,7 +979,7 @@ class Case:
                 util.log.error("Error: logdir must be set for capture of stdout, stderr or files")
                 return False
 
-        prev_file = self.storagepath / 'badger.yaml'
+        prev_file = self.storagepath / 'grevling.yaml'
         if prev_file.exists():
             with open(self.yamlpath, 'r') as f:
                 new_lines = f.readlines()

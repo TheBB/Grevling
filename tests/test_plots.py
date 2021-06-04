@@ -4,8 +4,8 @@ from pathlib import Path
 
 import numpy as np
 
-from badger import Case
-from badger.plotting import MockBackend
+from grevling import Case
+from grevling.plotting import MockBackend
 
 
 DATADIR = Path(__file__).parent / 'data'

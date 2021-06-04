@@ -3,7 +3,7 @@ from pathlib import Path
 from pytest import raises, mark
 from strictyaml import YAMLValidationError
 
-from badger import Case
+from grevling import Case
 
 
 DATADIR = Path(__file__).parent / 'data'

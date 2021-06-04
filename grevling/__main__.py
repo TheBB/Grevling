@@ -10,7 +10,7 @@ from ruamel.yaml.parser import ParserError as YAMLParserError
 from simpleeval import SimpleEval
 from strictyaml import YAMLValidationError
 
-import badger
+import grevling
 from . import util
 
 
@@ -23,11 +23,14 @@ class CustomClickException(click.ClickException):
 class Case(click.Path):
 
     def convert(self, value, param, ctx):
-        if isinstance(value, badger.Case):
+        if isinstance(value, grevling.Case):
             return value
         path = Path(super().convert(value, param, ctx))
         if path.is_dir():
-            casefile = path / 'badger.yaml'
+            for candidate in ['grevling.yaml', 'badger.yaml']:
+                if (path / candidate).exists():
+                    casefile = path / candidate
+                    break
         else:
             casefile = path
         if not casefile.exists():
@@ -35,7 +38,7 @@ class Case(click.Path):
         if not casefile.is_file():
             raise click.FileError(str(casefile), hint='is not a file')
         try:
-            return badger.Case(path)
+            return grevling.Case(path)
         except (YAMLValidationError, YAMLParserError) as error:
             raise CustomClickException(str(error))
 
@@ -43,7 +46,7 @@ class Case(click.Path):
 def print_version(ctx, param, value):
     if not value or ctx.resilient_parsing:
         return
-    click.echo(badger.__version__)
+    click.echo(grevling.__version__)
     ctx.exit()
 
 

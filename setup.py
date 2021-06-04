@@ -3,14 +3,14 @@
 from distutils.core import setup
 
 setup(
-    name='badger',
+    name='Grevling',
     version='0.1.0',
     description='A batch runner tool',
     author='Eivind Fonn',
     author_email='eivind.fonn@sintef.no',
     license='AGPL3',
-    url='https://github.com/TheBB/Badger',
-    packages=['badger'],
+    url='https://github.com/TheBB/Grevling',
+    packages=['grevling'],
     install_requires=[
         'bidict',
         'click',
@@ -33,6 +33,9 @@ setup(
         'plotly': ['plotly>=4'],
     },
     entry_points={
-        'console_scripts': ['badger=badger.__main__:main'],
+        'console_scripts': [
+            'badger=grevling.__main__:main',
+            'grevling=grevling.__main__:main',
+        ],
     },
 )

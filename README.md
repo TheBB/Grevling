@@ -1,51 +1,51 @@
-# Badger
+# Grevling
 
-Badger is a tool for running parameter studies, where for a given set of
-parameter values, a sequence of commands are run based on input files,
-generating output that should be captured or analyzed. Badger indends, in
-this setting, to replace the ubiquitous bash scripts.
+Grevling (Norwegian for "badger") is a tool for running parameter studies, where
+for a given set of parameter values, a sequence of commands are run based on
+input files, generating output that should be captured or analyzed. Grevling
+intends, in this setting, to replace the ubiquitous bash scripts.
 
 ## Usage
 
-To use Badger most effectively, create a new directory for each study you'd
+To use Grevling most effectively, create a new directory for each study you'd
 like to run. In this directory, add all the files you need to run your study,
-as well as a file called `badger.yaml`. This file describes, essentially,
+as well as a file called `grevling.yaml`. This file describes, essentially,
 which parameter values to run, how to run a case and which output to capture
-for later. Then use `badger run` to run everything automatically.
+for later. Then use `grevling run` to run everything automatically.
 
-Badger stores captured data in a subdirectory called `.badgerdata`. It is
+Grevling stores captured data in a subdirectory called `.grevlingdata`. It is
 safe to delete this directory if anything should go awry. It can be
-regenerated with `badger run`.
+regenerated with `grevling run`.
 
-Badger tries to preserve the integrity of the data directory. If you change
-the `badger.yaml` file with a non-empty data directory, Badger should detect
+Grevling tries to preserve the integrity of the data directory. If you change
+the `grevling.yaml` file with a non-empty data directory, Grevling should detect
 this and refuse to continue. To fix this, delete the data directory, or run
-`badger check` for more information.
+`grevling check` for more information.
 
-Badger stores three kinds of data from a run:
+Grevling stores three kinds of data from a run:
 
 - Standard output and error from commands
 - Captured files
 - Data captured from standard output using regular expressions
 
 In the first two cases, such files can be found in subdirectories of
-`.badgerdata`, one subdirectory per run. For the latter, these are stored in
-a Pandas dataframe in `.badgerdata/dataframe.parquet` using the Apache
+`.grevlingdata`, one subdirectory per run. For the latter, these are stored in
+a Pandas dataframe in `.grevlingdata/dataframe.parquet` using the Apache
 Parquet format. The easiest way to load it is by using:
 
 ```python
-from badger import Case
+from grevling import Case
 data = case.load_dataframe()
 ```
 
-## Structure of a badger file
+## Structure of a grevling file
 
 The configuration file is in YAML format. The following gives a whirlwind
 tour of the possibilities.
 
 ```yaml
 # Define which parameters we are interested in
-# Badger will run a case once for each combination of parameters, so runtime
+# Grevling will run a case once for each combination of parameters, so runtime
 # may be a concern
 parameters:
 
@@ -168,7 +168,7 @@ script:
       - pattern: a=(?P<a2>\S+)
         mode: all
 
-      # Since writing regular expressions is tediuos and error-prone, Badger has
+      # Since writing regular expressions is tediuos and error-prone, Grevling has
       # some predefined ones.  In this case, we're matching integers...
       - type: integer
 
@@ -182,7 +182,7 @@ script:
         # This prefix will be safely escaped before use
         prefix: someint
 
-      # Badger has a predefined regular expression for floats too.
+      # Grevling has a predefined regular expression for floats too.
       - type: float
         name: someothergroup
         prefix: somefloat
@@ -192,12 +192,12 @@ script:
 
 # The resulting array has entries for every parameter, constant, evaluated
 # expression and captured regular expression, as well as walltime for each
-# command, if applicable. Badger is often able to automatically determine the
+# command, if applicable. Grevling is often able to automatically determine the
 # type for each of them, but may need help.
-# You can use 'badger check' to see what Badger thinks the types will be.
+# You can use 'grevling check' to see what Grevling thinks the types will be.
 types:
 
-  # In particular, Badger cannot determine the type of regular expression
+  # In particular, Grevling cannot determine the type of regular expression
   # capture groups (except predefined ones).
   # Valid values here are str, int and float
   a1: str
@@ -206,19 +206,19 @@ types:
 # Finally, various settings
 settings:
 
-  # To store captured stdout, stderr and files, Badger needs to know the name
+  # To store captured stdout, stderr and files, Grevling needs to know the name
   # template of a directory to store them. For uniqueness, this template should
   # use all the parameters, or the single 'magic' parameter '_index' which is
   # guaranteed to be unique.
   logdir: ${parameter}-and-so-on
 
-# Badger can generate some rudimentary plots based on the generated data.
+# Grevling can generate some rudimentary plots based on the generated data.
 plots:
 
   # Each parameter interacts with the plot in a specfic way.
   - parameters:
 
-      # For parameters that are 'fixed', Badger will produce one separate plot
+      # For parameters that are 'fixed', Grevling will produce one separate plot
       # for each of the values of that parameter.
       some-parameter: fixed
 
@@ -235,7 +235,7 @@ plots:
       some-parameter: mean
 
       # For parameters that are 'ignore', the user asserts that this parameter
-      # does NOT influence the data plotted. In this case Badger will pick an
+      # does NOT influence the data plotted. In this case Grevling will pick an
       # arbitrary value for that parameter. This is the default setting for
       # unmentioned parameters.
       some-parameter: ignore
@@ -259,7 +259,7 @@ plots:
     # For each of the three style categories (color, marker and line) you may
     # either provide a fixed value or tie it to a category (any parameter given
     # as 'category', or 'yaxis' if there are multiple y-axes). For categorical
-    # styles, you may also provide a list of values. Badger will attempt to tie
+    # styles, you may also provide a list of values. Grevling will attempt to tie
     # categorical parameters to styles automatically if not explicitly provided.
     style:
       color:
@@ -276,7 +276,7 @@ plots:
 
     # For the filename template you can use any parameter values designated as
     # 'fixed', or evaluables that only depend on such. Don't add a file extension.
-    # The plots are stored in the .badgerdata folder.
+    # The plots are stored in the .grevlingdata folder.
     filename: plot-${some-parameter}
 
     # Specify the backends to use. Some are optional dependencies!
