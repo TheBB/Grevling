@@ -4,7 +4,7 @@ script:
   - command: [sh, -c, 'echo stdout ${retcode} && >&2 echo stderr ${retcode}']
     name: good
     capture-output: on
-  - command: [sh, -c, 'echo stdout ${retcode} && >&2 echo stderr ${retcode} && return ${retcode}']
+  - command: [sh, -c, 'echo stdout ${retcode} && >&2 echo stderr ${retcode} && exit ${retcode}']
     name: bad
 settings:
   logdir: out-${retcode}
