@@ -24,7 +24,6 @@ setup(
         'ruamel.yaml',
         'simpleeval',
         'strictyaml',
-        'tables',
         'typing-inspect',
     ],
     extras_require={
