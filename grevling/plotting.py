@@ -7,7 +7,7 @@ from typing import List, Dict
 import numpy as np
 
 from . import util
-from badger.util import find_subclass, ignore
+from .util import find_subclass, ignore
 
 
 class Backends:

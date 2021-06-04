@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from badger import Case
+from grevling import Case
 
 
 DATADIR = Path(__file__).parent / 'data'
@@ -70,7 +70,7 @@ def test_files():
 
     for a in range(1,4):
         for b in 'abc':
-            path = DATADIR / 'run' / 'files' / '.badgerdata' / f'{a}-{b}'
+            path = case.storagepath / f'{a}-{b}'
             assert read_file(path / 'template.txt') == f'a={a} b={b} c={2*a-1}\n'
             assert read_file(path / 'other-template.txt') == f'a={a} b={b} c={2*a-1}\n'
             assert read_file(path / 'non-template.txt') == 'a=${alpha} b=${bravo} c=${charlie}\n'
@@ -133,7 +133,7 @@ def test_stdout():
     case.clear_cache()
     case.run()
 
-    path = DATADIR / 'run' / 'stdout' / '.badgerdata'
+    path = case.storagepath
     assert read_file(path / 'out-0' / 'good.stdout') == 'stdout 0\n'
     assert read_file(path / 'out-0' / 'good.stderr') == 'stderr 0\n'
     assert read_file(path / 'out-0' / 'bad.stdout') == 'stdout 0\n'

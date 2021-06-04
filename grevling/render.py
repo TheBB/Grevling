@@ -25,7 +25,7 @@ def render(text, context, mode=None):
     ]
     if mode is not None:
         filters.append(f'quote_{mode}')
-        imports.append(f'from badger.render import quote_{mode}')
+        imports.append(f'from grevling.render import quote_{mode}')
 
     template = Template(text, default_filters=filters, imports=imports)
     return template.render(**context, rnd=rnd, sci=sci)
