@@ -124,7 +124,7 @@ def flatten(array):
 
 
 def is_list_type(tp):
-    return get_origin(tp) == list
+    return get_origin(tp) == list or get_origin(tp) == List
 
 
 def dict_product(names, iterables):
