@@ -4,7 +4,7 @@ from distutils.core import setup
 
 setup(
     name='Grevling',
-    version='0.1.0',
+    version='1.0.0',
     description='A batch runner tool',
     author='Eivind Fonn',
     author_email='eivind.fonn@sintef.no',
