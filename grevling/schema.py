@@ -5,7 +5,7 @@ import re
 from typing import Tuple, Dict
 
 from strictyaml import (
-    ScalarValidator, Optional, Any, Bool, Int, Float, Str, Map,
+    ScalarValidator, Optional, Any, Bool, Int, Float, Str, Map, NullNone,
     MapPattern, Seq, FixedSeq, Validator, OrValidator, YAMLValidationError,
 )
 
@@ -41,6 +41,18 @@ class Literal(ScalarValidator):
         if self._expected != chunk.contents:
             chunk.expecting_but_found(f"when expecting {self._expected}", "found non-matching string")
         return chunk.contents
+
+
+class NullNone(ScalarValidator):
+    def validate_scalar(self, chunk):
+        val = chunk.contents
+        if val.lower() != "null":
+            chunk.expecting_but_found("when expecting a 'null', got '{}' instead.".format(val))
+        else:
+            return self.empty(chunk)
+
+    def empty(self, chunk):
+        return None
 
 
 def Choice(*args):
@@ -181,7 +193,7 @@ CASE_SCHEMA = Map({
         ),
     ),
     Optional('evaluate'): MapPattern(Str(), Str()),
-    Optional('constants'): MapPattern(Str(), Int() | Float() | Bool() | Str()),
+    Optional('constants'): MapPattern(Str(), NullNone() | Int() | Float() | Bool() | Str()),
     Optional('templates'): Seq(FileMapping(glob_allowed=True)),
     Optional('prefiles'): Seq(FileMapping(glob_allowed=True)),
     Optional('postfiles'): Seq(FileMapping(glob_allowed=True)),
