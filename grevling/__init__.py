@@ -1067,8 +1067,9 @@ class Case:
 
             util.log.debug(f"Using SRC='{self.sourcepath}', WRK='{workpath}', LOG='{logdir}'")
 
+            ignore_missing = self._ignore_missing
             for filemap in self._pre_files:
-                filemap.copy(namespace, self.sourcepath, workpath, sourcename='SRC', targetname='WRK')
+                filemap.copy(namespace, self.sourcepath, workpath, sourcename='SRC', targetname='WRK', ignore_missing=ignore_missing)
 
             success = True
             for command in self._commands:
