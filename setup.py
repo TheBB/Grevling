@@ -4,7 +4,7 @@ from distutils.core import setup
 
 setup(
     name='Grevling',
-    version='1.2.0',
+    version='1.2.1',
     description='A batch runner tool',
     author='Eivind Fonn',
     author_email='eivind.fonn@sintef.no',
@@ -28,7 +28,7 @@ setup(
     ],
     extras_require={
         'testing': ['pytest'],
-        'deploy': ['twine', 'cibuildwheel==1.2.0'],
+        'deploy': ['twine', 'cibuildwheel==1.2.1'],
         'matplotlib': ['matplotlib'],
         'plotly': ['plotly>=4'],
     },
