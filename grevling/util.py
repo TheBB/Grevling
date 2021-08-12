@@ -159,14 +159,21 @@ def completer(options):
 
 def format_seconds(secs: float):
     if secs < 0.1:
-        return '<0.1s'
+        return '< 0.1 s'
     if secs < 60:
-        return f'{secs:.1f}s'
+        return f'{secs:.1f} s'
     mins, secs = divmod(secs, 60)
     if mins < 60:
-        return f'{mins:.0f}m{secs:.0f}s'
+        return f'{mins:.0f} m {secs:.0f}s'
     hours, mins = divmod(mins, 60)
     if hours < 24:
-        return f'{hours:.0f}h{mins:.0f}m{secs:.0f}s'
+        return f'{hours:.0f} h {mins:.0f} m {secs:.0f} s'
     days, hours = divmod(hours, 24)
-    return f'{days:.0f}d{hours:.0f}h{mins:.0f}m{secs:.0f}s'
+    return f'{days:.0f} d {hours:.0f} h {mins:.0f} m {secs:.0f} s'
+
+
+def call_yaml(func, mapping, *args, **kwargs):
+    signature = inspect.signature(func)
+    mapping = {key.replace('-', '_'): value for key, value in mapping.items()}
+    binding = signature.bind(*args, **kwargs, **mapping)
+    return func(*binding.args, **binding.kwargs)

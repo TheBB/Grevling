@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from distutils.core import setup
+from setuptools import setup, find_packages
 
 setup(
     name='Grevling',
@@ -10,7 +10,7 @@ setup(
     author_email='eivind.fonn@sintef.no',
     license='AGPL3',
     url='https://github.com/TheBB/Grevling',
-    packages=['grevling'],
+    packages=find_packages(),
     install_requires=[
         'bidict',
         'click',

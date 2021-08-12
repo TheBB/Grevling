@@ -1,45 +1,33 @@
-from collections.abc import Sequence
 from contextlib import contextmanager
-from datetime import datetime
 from difflib import Differ
-import inspect
-from itertools import product
-import json
 import multiprocessing
 import operator
 import os
 from pathlib import Path
 import pydoc
-import re
-import shlex
 import shutil
-import subprocess
-from tempfile import TemporaryDirectory
-from time import time as osclock
 
-from typing import Dict, List, Any, Iterable, Optional, Set
+from typing import Dict, List, Any, Iterable, Optional
 
 from bidict import bidict
 from fasteners import InterProcessLock
 import numpy as np
 import pandas as pd
-from simpleeval import SimpleEval, DEFAULT_FUNCTIONS, NameNotDefined
 from typing_inspect import get_origin, get_args
 
 from .plotting import Backends
 from .render import render
 from .schema import load_and_validate
-from . import util
+from .parameters import ParameterSpace
+from .context import ContextManager
+from .filemap import FileMap
+from .capture import ResultCollector
+from .script import ScriptTemplate
+from . import util, api
+from .runner import local as runner
 
 
 __version__ = '1.2.1'
-
-
-@contextmanager
-def time():
-    start = osclock()
-    yield lambda: end - start
-    end = osclock()
 
 
 def _pandas_dtype(tp):
@@ -57,400 +45,6 @@ def _typename(tp) -> str:
         base = {list: 'list'}[get_origin(tp)]
         subs = ', '.join(_typename(k) for k in get_args(tp))
         return f'{base}[{subs}]'
-
-
-def _guess_eltype(collection):
-    if all(isinstance(v, str) for v in collection):
-        return str
-    if all(isinstance(v, int) for v in collection):
-        return int
-    assert all(isinstance(v, (int, float)) for v in collection)
-    return float
-
-
-def call_yaml(func, mapping, *args, **kwargs):
-    signature = inspect.signature(func)
-    mapping = {key.replace('-', '_'): value for key, value in mapping.items()}
-    binding = signature.bind(*args, **kwargs, **mapping)
-    return func(*binding.args, **binding.kwargs)
-
-
-class Parameter(Sequence):
-
-    @classmethod
-    def load(cls, name, spec):
-        if isinstance(spec, list):
-            return cls(name, spec)
-        subcls = util.find_subclass(cls, spec['type'], root=False, attr='__tag__')
-        del spec['type']
-        return call_yaml(subcls, spec, name)
-
-    def __init__(self, name, values):
-        self.name = name
-        self.values = values
-
-    def __len__(self):
-        return len(self.values)
-
-    def __getitem__(self, index):
-        return self.values[index]
-
-
-class UniformParameter(Parameter):
-
-    __tag__ = 'uniform'
-
-    def __init__(self, name, interval, num):
-        super().__init__(name, np.linspace(*interval, num=num))
-
-
-class GradedParameter(Parameter):
-
-    __tag__ = 'graded'
-
-    def __init__(self, name, interval, num, grading):
-        lo, hi = interval
-        step = (hi - lo) * (1 - grading) / (1 - grading ** (num - 1))
-        values = [lo]
-        for _ in range(num - 1):
-            values.append(values[-1] + step)
-            step *= grading
-        super().__init__(name, np.array(values))
-
-
-class ParameterSpace(dict):
-
-    def subspace(self, *names: str) -> Iterable[Dict]:
-        params = [self[name] for name in names]
-        indexes = [range(len(p)) for p in params]
-        for values in util.dict_product(names, params):
-            yield values
-
-    def fullspace(self) -> Iterable[Dict]:
-        yield from self.subspace(*self.keys())
-
-    def size(self, *names: str) -> int:
-        return util.prod(len(self[name]) for name in names)
-
-    def size_fullspace(self) -> int:
-        return self.size(*self.keys())
-
-
-class ContextManager:
-
-    parameters: ParameterSpace
-    evaluables: Dict[str, str]
-    constants = Dict[str, Any]
-    types: Dict[str, Any]
-
-    def __init__(self, data: Dict):
-        self.parameters = ParameterSpace()
-        for name, paramspec in data.get('parameters', {}).items():
-            param = Parameter.load(name, paramspec)
-            self.parameters[param.name] = param
-
-        self.evaluables = dict(data.get('evaluate', {}))
-        self.constants = dict(data.get('constants', {}))
-
-        self.types = {
-            '_index': int,
-            '_logdir': str,
-            '_started': 'datetime64[ns]',
-            '_finished': 'datetime64[ns]',
-        }
-        self.types.update(data.get('types', {}))
-
-        # Guess types of parameters
-        for name, param in self.parameters.items():
-            if name not in self.types:
-                self.types[name] = _guess_eltype(param)
-
-        # Guess types of evaluables
-        if any(name not in self.types for name in self.evaluables):
-            contexts = list(self.parameters.fullspace())
-            for ctx in contexts:
-                self.evaluate_context(ctx, verbose=False)
-            for name in self.evaluables:
-                if name not in self.types:
-                    values = [ctx[name] for ctx in contexts]
-                    self.types[name] = _guess_eltype(values)
-
-    def evaluate_context(self, context, verbose=True, allowed_missing=(), add_constants=True):
-        evaluator = SimpleEval(functions={**DEFAULT_FUNCTIONS,
-            'log': np.log,
-            'log2': np.log2,
-            'log10': np.log10,
-            'sqrt': np.sqrt,
-            'abs': np.abs,
-            'ord': ord,
-            'sin': np.sin,
-            'cos': np.cos,
-        })
-        evaluator.names.update(context)
-        evaluator.names.update({
-            k: v for k, v in self.constants.items() if k not in context
-        })
-        if allowed_missing is not True:
-            allowed_missing = set(allowed_missing)
-
-        for name, code in self.evaluables.items():
-            try:
-                result = evaluator.eval(code) if isinstance(code, str) else code
-            except NameNotDefined as error:
-                if allowed_missing is True:
-                    util.log.debug(f'Skipped evaluating: {name}')
-                    continue
-                elif error.name in allowed_missing:
-                    allowed_missing.add(name)
-                    util.log.debug(f'Skipped evaluating: {name}')
-                    continue
-                else:
-                    raise
-            if verbose:
-                util.log.debug(f'Evaluated: {name} = {repr(result)}')
-            evaluator.names[name] = context[name] = result
-
-        if add_constants:
-            for k, v in self.constants.items():
-                if k not in context:
-                    context[k] = v
-
-        return context
-
-    def subspace(self, *names: str, **kwargs) -> Iterable[Dict]:
-        for values in self.parameters.subspace(*names):
-            yield self.evaluate_context(values, **kwargs)
-
-    def fullspace(self, **kwargs) -> Iterable[Dict]:
-        yield from self.subspace(*self.parameters, **kwargs)
-
-
-class FileMapping:
-
-    source: str
-    target: str
-    template: bool
-    mode: str
-
-    @classmethod
-    def load(cls, spec: dict, **kwargs):
-        if isinstance(spec, str):
-            return cls(spec, spec, **kwargs)
-        return call_yaml(cls, spec, **kwargs)
-
-    def __init__(self, source, target=None, template=False, mode='simple'):
-        if target is None:
-            target = source if mode == 'simple' else '.'
-        if template:
-            mode = 'simple'
-
-        self.source = source
-        self.target = target
-        self.template = template
-        self.mode = mode
-
-    def iter_paths(self, context, sourcepath, targetpath):
-        if self.mode == 'simple':
-            yield (
-                sourcepath / render(self.source, context),
-                targetpath / render(self.target, context),
-            )
-
-        elif self.mode == 'glob':
-            target = targetpath / render(self.target, context)
-            for path in sourcepath.glob(render(self.source, context)):
-                path = path.relative_to(sourcepath)
-                yield (sourcepath / path, target / path)
-
-    def copy(self, context, sourcepath, targetpath, sourcename='SRC', targetname='TGT', ignore_missing=False):
-        for source, target in self.iter_paths(context, sourcepath, targetpath):
-            logsrc = Path(sourcename) / source.relative_to(sourcepath)
-            logtgt = Path(targetname) / target.relative_to(targetpath)
-
-            if not source.exists():
-                level = util.log.warning if ignore_missing else util.log.error
-                level(f"Missing file: {logsrc}")
-                if ignore_missing:
-                    continue
-            else:
-                util.log.debug(f'{logsrc} -> {logtgt}')
-
-            target.parent.mkdir(parents=True, exist_ok=True)
-            if not self.template:
-                shutil.copyfile(source, target)
-                continue
-            with open(source, 'r') as f:
-                text = f.read()
-            with open(target, 'w') as f:
-                f.write(render(text, context))
-
-
-class Capture:
-
-    @classmethod
-    def load(cls, spec):
-        if isinstance(spec, str):
-            return cls(spec)
-        if spec.get('type') in ('integer', 'float'):
-            pattern, tp = {
-                'integer': (r'[-+]?[0-9]+', int),
-                'float': (r'[-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?', float),
-            }[spec['type']]
-            pattern = re.escape(spec['prefix']) + r'\s*[:=]?\s*(?P<' + spec['name'] + '>' + pattern + ')'
-            mode = spec.get('mode', 'last')
-            type_overrides = {spec['name']: tp}
-            return cls(pattern, mode, type_overrides)
-        return call_yaml(cls, spec)
-
-    def __init__(self, pattern, mode='last', type_overrides=None):
-        self._regex = re.compile(pattern)
-        self._mode = mode
-        self._type_overrides = type_overrides or {}
-
-    def add_types(self, types: Dict[str, Any]):
-        for group in self._regex.groupindex.keys():
-            single = self._type_overrides.get(group, str)
-            if self._mode == 'all':
-                types.setdefault(group, List[single])
-            else:
-                types.setdefault(group, single)
-
-    def find_in(self, collector, string):
-        matches = self._regex.finditer(string)
-        if self._mode == 'first':
-            try:
-                matches = [next(matches)]
-            except StopIteration:
-                pass
-
-        elif self._mode == 'last':
-            for match in matches:
-                pass
-            try:
-                matches = [match]
-            except UnboundLocalError:
-                pass
-
-        for match in matches:
-            for name, value in match.groupdict().items():
-                collector.collect(name, value)
-
-
-class Command:
-
-    @classmethod
-    def load(cls, spec, containers={}):
-        if isinstance(spec, (str, list)):
-            return cls(spec)
-        if 'capture-output' in spec:
-            del spec['capture-output']
-        return call_yaml(cls, spec, container_args=containers)
-
-    def __init__(self, command, name=None, capture=None, capture_walltime=False,
-                retry_on_fail=False, env=None, container=None, container_args={},
-                allow_failure=False):
-        self._command = command
-        self._capture_walltime = capture_walltime
-        self._retry_on_fail = retry_on_fail
-        self._env = env
-        self._allow_failure = allow_failure
-
-        self._container = container
-        self._container_args = container_args.get(container)
-
-        if name is None:
-            exe = shlex.split(command)[0] if isinstance(command, str) else command[0]
-            self.name = Path(exe).name
-        else:
-            self.name = name
-
-        self._capture = []
-        if isinstance(capture, (str, dict)):
-            self._capture.append(Capture.load(capture))
-        elif isinstance(capture, list):
-            self._capture.extend(Capture.load(c) for c in capture)
-
-    def add_types(self, types: Dict[str, Any]):
-        if self._capture_walltime:
-            types[f'walltime/{self.name}'] = float
-        for cap in self._capture:
-            cap.add_types(types)
-
-    @util.with_context('{self.name}')
-    def run(self, collector: 'ResultCollector', context: Dict, workpath: Path, logdir: Path) -> bool:
-        kwargs = {
-            'cwd': workpath,
-            'shell': False,
-            'stdout': subprocess.PIPE,
-            'stderr': subprocess.PIPE,
-        }
-
-        if self._env:
-            kwargs['env'] = os.environ.copy()
-            for k, v in self._env.items():
-                kwargs['env'][k] = render(v, context)
-
-        if isinstance(self._command, str):
-            kwargs['shell'] = True
-            command = render(self._command, context, mode='shell')
-        else:
-            command = [render(arg, context) for arg in self._command]
-
-        if self._container:
-            if isinstance(command, list):
-                command = ' '.join(shlex.quote(c) for c in command)
-            if isinstance(self._container_args, str):
-                args = shlex.split(render(self._container_args, context, mode='shell'))
-            elif isinstance(self._container_args, list):
-                args = [render(arg, context) for arg in self._container_args]
-            else:
-                args = []
-            command = [
-                'docker', 'run', *args, f'-v{workpath}:/workdir', '--workdir', '/workdir',
-                self._container, 'bash', '-c', command,
-            ]
-            kwargs['shell'] = False
-
-        util.log.debug(command if isinstance(command, str) else ' '.join(shlex.quote(c) for c in command))
-        with time() as duration:
-            while True:
-                result = subprocess.run(command, **kwargs)
-                if self._retry_on_fail and result.returncode:
-                    util.log.info('Failed, retrying...')
-                    continue
-                break
-        duration = duration()
-
-        stdout_path = logdir / f'{self.name}.stdout'
-        with open(stdout_path, 'wb') as f:
-            f.write(result.stdout)
-        stderr_path = logdir / f'{self.name}.stderr'
-        with open(stderr_path, 'wb') as f:
-            f.write(result.stderr)
-
-        self.capture(collector, stdout=result.stdout, duration=duration)
-
-        if result.returncode:
-            level = util.log.warn if self._allow_failure else util.log.error
-            level(f"command returned exit status {result.returncode}")
-            level(f"stdout stored in {stdout_path}")
-            level(f"stderr stored in {stderr_path}")
-            return self._allow_failure
-        else:
-            util.log.info(f"success ({util.format_seconds(duration)})")
-
-        return True
-
-    def capture(self, collector: 'ResultCollector', stdout=None, logdir=None, duration=None):
-        if stdout is None:
-            assert logdir is not None
-            with open(logdir / f'{self.name}.stdout', 'rb') as f:
-                stdout = f.read()
-        stdout = stdout.decode()
-        for capture in self._capture:
-            capture.find_in(collector, stdout)
-        if self._capture_walltime and duration is not None:
-            collector.collect(f'walltime/{self.name}', duration)
 
 
 class PlotStyleManager:
@@ -621,7 +215,7 @@ class Plot:
         else:
             spec.setdefault('type', 'line')
 
-        return call_yaml(cls, spec)
+        return util.call_yaml(cls, spec)
 
     def __init__(self, parameters, filename, format, yaxis, xaxis, type,
                  legend=None, xlabel=None, ylabel=None, title=None, grid=True,
@@ -763,57 +357,6 @@ class Plot:
         return yaxis
 
 
-class ResultCollector(dict):
-
-    _types: Dict[str, Any]
-
-    def __init__(self, types):
-        super().__init__()
-        self._types = types
-
-    def collect_from_file(self, path: Path):
-        with open(path / 'grevlingcontext.json', 'r') as f:
-            data = json.load(f)
-        for key, value in data.items():
-            self.collect(key, value)
-
-    def collect(self, name: str, value: Any):
-        if name not in self._types:
-            return
-        tp = self._types[name]
-        if util.is_list_type(tp) and not isinstance(value, list):
-            eltype = get_args(tp)[0]
-            self.setdefault(name, []).append(eltype(value))
-        elif not isinstance(tp, str) and not util.is_list_type(tp):
-            self[name] = tp(value)
-        else:
-            self[name] = value
-
-    def commit_to_file(self, merge=True):
-        path = Path(self['_logdir']) / 'grevlingcontext.json'
-
-        data = self
-        if merge and path.exists():
-            try:
-                with open(path, 'r') as f:
-                    existing_data = json.load(f)
-            except:
-                pass
-            data = {**existing_data, **data}
-
-        with open(path, 'w') as f:
-            json.dump(data, f, sort_keys=True, indent=4, cls=util.JSONEncoder)
-
-    def commit_to_dataframe(self, data):
-        index = self['_index']
-        data.loc[index, :] = [None] * data.shape[1]
-        for key, value in self.items():
-            if key == '_index':
-                continue
-            data.at[index, key] = value
-        return data
-
-
 class Case:
 
     yamlpath: Path
@@ -823,9 +366,9 @@ class Case:
 
     context_mgr: ContextManager
 
-    _pre_files: List[FileMapping]
-    _post_files: List[FileMapping]
-    _commands: List[Command]
+    premap: FileMap
+    postmap: FileMap
+    script: ScriptTemplate
     _plots: List[Plot]
 
     _logdir: str
@@ -855,20 +398,17 @@ class Case:
         with open(yamlpath, mode='r') as f:
             casedata = load_and_validate(yamldata, yamlpath)
 
-        self.context_mgr = ContextManager(casedata)
+        self.context_mgr = ContextManager.load(casedata)
 
         # Read file mappings
-        self._pre_files = [FileMapping.load(spec, template=True) for spec in casedata.get('templates', [])]
-        self._pre_files.extend(FileMapping.load(spec) for spec in casedata.get('prefiles', []))
-        self._post_files = [FileMapping.load(spec) for spec in casedata.get('postfiles', [])]
+        self.premap = FileMap.load(casedata.get('prefiles', []), casedata.get('templates', []))
+        self.postmap = FileMap.load(casedata.get('postfiles', []))
 
         # Read commands
-        containers = casedata.get('containers', {})
-        self._commands = [Command.load(spec, containers) for spec in casedata.get('script', [])]
+        self.script = ScriptTemplate.load(casedata.get('script', []), casedata.get('containers', {}))
 
         # Fill in types derived from commands
-        for cmd in self._commands:
-            cmd.add_types(self.context_mgr.types)
+        self.script.add_types(self.context_mgr.types)
 
         # Read settings
         settings = casedata.get('settings', {})
@@ -894,11 +434,11 @@ class Case:
         with self.lock():
             self.dataframepath.unlink(missing_ok=True)
 
-    def iter_instancedirs(self):
+    def iter_instancedirs(self) -> Iterable[api.Workspace]:
         for path in self.storagepath.iterdir():
             if not (path / 'grevlingcontext.json').exists():
                 continue
-            yield path
+            yield runner.LocalWorkspace(path)
 
     @property
     def shape(self):
@@ -1020,24 +560,22 @@ class Case:
             namespace['_logdir'] = logdir = self.storagepath / render(self._logdir, namespace)
             if not logdir.exists():
                 continue
+            ws = runner.LocalWorkspace(logdir)
 
             collector = ResultCollector(self._types)
             for key, value in namespace.items():
                 collector.collect(key, value)
 
             namespace.update(self._constants)
-
-            for command in self._commands:
-                command.capture(collector, logdir=logdir)
-
-            collector.commit_to_file()
+            self.script.capture(collector, workspace=ws)
+            collector.commit_to_file(ws, merge=True)
 
     def collect(self):
         with self.lock():
             data = self.load_dataframe()
-            for path in self.iter_instancedirs():
+            for ws in self.iter_instancedirs():
                 collector = ResultCollector(self.context_mgr.types)
-                collector.collect_from_file(path)
+                collector.collect_from_file(ws)
                 data = collector.commit_to_dataframe(data)
             data = data.sort_index()
             self.save_dataframe(data)
@@ -1055,32 +593,26 @@ class Case:
             namespace['_logdir'] = str(logdir)
         else:
             namespace['_logdir'] = logdir = self.storagepath / render(self._logdir, namespace)
-        logdir.mkdir(parents=True, exist_ok=True)
+        log_ws = runner.LocalWorkspace(logdir, 'LOG')
+        my_ws = runner.LocalWorkspace(self.sourcepath, 'SRC')
 
         collector = ResultCollector(self.context_mgr.types)
         for key, value in namespace.items():
             collector.collect(key, value)
         collector.collect('_started', pd.Timestamp.now())
 
-        with TemporaryDirectory() as workpath:
-            workpath = Path(workpath)
-
-            util.log.debug(f"Using SRC='{self.sourcepath}', WRK='{workpath}', LOG='{logdir}'")
+        with runner.TempWorkspace('WRK') as temp_ws:
+            util.log.debug(f"Using SRC='{my_ws}', WRK='{temp_ws}', LOG='{log_ws}'")
 
             ignore_missing = self._ignore_missing
-            for filemap in self._pre_files:
-                filemap.copy(namespace, self.sourcepath, workpath, sourcename='SRC', targetname='WRK', ignore_missing=ignore_missing)
+            if not self.premap.copy(namespace, my_ws, temp_ws, ignore_missing=self._ignore_missing):
+                return False
 
-            success = True
-            for command in self._commands:
-                if not command.run(collector, namespace, workpath, logdir):
-                    success = False
-                    break
+            success = self.script.run(collector, namespace, temp_ws.root, log_ws)
 
             ignore_missing = self._ignore_missing or not success
-            for filemap in self._post_files:
-                filemap.copy(namespace, workpath, logdir, sourcename='WRK', targetname='LOG', ignore_missing=ignore_missing)
+            self.postmap.copy(namespace, temp_ws, log_ws, ignore_missing=ignore_missing)
 
         collector.collect('_finished', pd.Timestamp.now())
-        collector.commit_to_file()
+        collector.commit_to_file(log_ws)
         return success

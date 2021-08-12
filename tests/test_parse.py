@@ -31,74 +31,74 @@ def test_parse():
         'float': 14.0,
     }
 
-    assert case._pre_files[0].source == 'somefile'
-    assert case._pre_files[0].target == 'somefile'
-    assert case._pre_files[0].mode == 'simple'
-    assert case._pre_files[0].template
+    assert case.premap[0].source == 'somefile'
+    assert case.premap[0].target == 'somefile'
+    assert case.premap[0].mode == 'simple'
+    assert case.premap[0].template
 
-    assert case._pre_files[1].source == 'from'
-    assert case._pre_files[1].target == 'to'
-    assert case._pre_files[1].mode == 'simple'
-    assert case._pre_files[1].template
+    assert case.premap[1].source == 'from'
+    assert case.premap[1].target == 'to'
+    assert case.premap[1].mode == 'simple'
+    assert case.premap[1].template
 
-    assert case._pre_files[2].source == 'q'
-    assert case._pre_files[2].target == 'q'
-    assert case._pre_files[2].mode == 'simple'
-    assert case._pre_files[2].template
+    assert case.premap[2].source == 'q'
+    assert case.premap[2].target == 'q'
+    assert case.premap[2].mode == 'simple'
+    assert case.premap[2].template
 
-    assert case._pre_files[3].source == 'a'
-    assert case._pre_files[3].target == 'b'
-    assert case._pre_files[3].mode == 'simple'
-    assert not case._pre_files[3].template
+    assert case.premap[3].source == 'a'
+    assert case.premap[3].target == 'b'
+    assert case.premap[3].mode == 'simple'
+    assert not case.premap[3].template
 
-    assert case._pre_files[4].source == 'r'
-    assert case._pre_files[4].target == 's'
-    assert case._pre_files[4].mode == 'simple'
-    assert not case._pre_files[4].template
+    assert case.premap[4].source == 'r'
+    assert case.premap[4].target == 's'
+    assert case.premap[4].mode == 'simple'
+    assert not case.premap[4].template
 
-    assert case._post_files[0].source == 'c'
-    assert case._post_files[0].target == 'd'
-    assert case._post_files[0].mode == 'simple'
-    assert not case._post_files[0].template
+    assert case.postmap[0].source == 'c'
+    assert case.postmap[0].target == 'd'
+    assert case.postmap[0].mode == 'simple'
+    assert not case.postmap[0].template
 
-    assert case._post_files[1].source == 'm'
-    assert case._post_files[1].target == '.'
-    assert case._post_files[1].mode == 'glob'
-    assert not case._post_files[1].template
+    assert case.postmap[1].source == 'm'
+    assert case.postmap[1].target == '.'
+    assert case.postmap[1].mode == 'glob'
+    assert not case.postmap[1].template
 
-    assert case._commands[0]._command == 'string command here'
-    assert case._commands[0].name == 'string'
-    assert case._commands[0]._capture == []
+    assert case.script.commands[0]._command == 'string command here'
+    assert case.script.commands[0].name == 'string'
+    assert case.script.commands[0]._capture == []
 
-    assert case._commands[1]._command == ['list', 'command', 'here']
-    assert case._commands[1].name == 'list'
-    assert case._commands[1]._capture == []
+    assert case.script.commands[1]._command == ['list', 'command', 'here']
+    assert case.script.commands[1].name == 'list'
+    assert case.script.commands[1]._capture == []
 
-    assert case._commands[2]._command == '/usr/bin/nontrivial-name with args'
-    assert case._commands[2].name == 'nontrivial-name'
-    assert case._commands[2]._capture == []
+    assert case.script.commands[2]._command == '/usr/bin/nontrivial-name with args'
+    assert case.script.commands[2].name == 'nontrivial-name'
+    assert case.script.commands[2]._capture == []
 
-    assert case._commands[3]._command == ['/usr/bin/nontrivial-name', 'with', 'args', 'as', 'list']
-    assert case._commands[3].name == 'nontrivial-name'
-    assert case._commands[3]._capture == []
+    assert case.script.commands[3]._command == ['/usr/bin/nontrivial-name', 'with', 'args', 'as', 'list']
+    assert case.script.commands[3].name == 'nontrivial-name'
+    assert case.script.commands[3]._capture == []
 
-    assert case._commands[4]._command == 'run this thing'
-    assert case._commands[4].name == 'somecommand'
-    assert case._commands[4]._capture[0]._regex.pattern == 'oneregex (?P<one>.*)'
-    assert case._commands[4]._capture[0]._mode == 'last'
+    assert case.script.commands[4]._command == 'run this thing'
+    assert case.script.commands[4].name == 'somecommand'
+    assert case.script.commands[4]._capture[0]._regex.pattern == 'oneregex (?P<one>.*)'
+    assert case.script.commands[4]._capture[0]._mode == 'last'
 
-    assert case._commands[5]._command == '/some/nontrivial-stuff'
-    assert case._commands[5].name == 'nontrivial-stuff'
-    assert case._commands[5]._capture[0]._regex.pattern == 'multiregex (?P<multi>.*)'
-    assert case._commands[5]._capture[0]._mode == 'all'
-    assert case._commands[5]._capture[1]._regex.pattern == 'firstregex (?P<first>.*)'
-    assert case._commands[5]._capture[1]._mode == 'first'
-    assert case._commands[5]._capture[2]._regex.pattern == 'lastregex (?P<last>.*)'
-    assert case._commands[5]._capture[2]._mode == 'last'
-    assert case._commands[5]._capture[3]._regex.pattern.startswith(re.escape('someint'))
-    assert case._commands[5]._capture[3]._mode == 'last'
-    assert case._commands[5]._capture[4]._regex.pattern.startswith(re.escape('here is a prefix'))
-    assert case._commands[5]._capture[4]._mode == 'all'
+    assert case.script.commands[5]._command == '/some/nontrivial-stuff'
+    assert case.script.commands[5].name == 'nontrivial-stuff'
+    assert case.script.commands[5]._capture[0]._regex.pattern == 'multiregex (?P<multi>.*)'
+    assert case.script.commands[5]._capture[0]._mode == 'all'
+    assert case.script.commands[5]._capture[1]._regex.pattern == 'firstregex (?P<first>.*)'
+    assert case.script.commands[5]._capture[1]._mode == 'first'
+    assert case.script.commands[5]._capture[2]._regex.pattern == 'lastregex (?P<last>.*)'
+    assert case.script.commands[5]._capture[2]._mode == 'last'
+    assert case.script.commands[5]._capture[3]._regex.pattern.startswith(re.escape('someint'))
+    assert case.script.commands[5]._capture[3]._mode == 'last'
+    assert case.script.commands[5]._capture[4]._regex.pattern.startswith(re.escape('here is a prefix'))
+    assert case.script.commands[5]._capture[4]._mode == 'all'
 
     assert case.types == {
         '_index': int,
