@@ -202,7 +202,7 @@ CASE_SCHEMA = Map({
         Str(),
         Seq(Str()),
         Map({
-            'command': Str() | Seq(Str()),
+            Optional('command'): Str() | Seq(Str()),
             Optional('name'): Str(),
             Optional('capture'): Capture() | Seq(Capture()),
             Optional('capture-output'): Deprecated("capture-output is deprecated (now always on)", Bool()),
