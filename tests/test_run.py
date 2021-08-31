@@ -1,7 +1,9 @@
+import os
 from pathlib import Path
+import shutil
 
-import numpy as np
 import pandas as pd
+import pytest
 
 from grevling import Case
 
@@ -142,3 +144,10 @@ def test_stdout():
     assert read_file(path / 'out-1' / 'good.stderr') == 'stderr 1\n'
     assert read_file(path / 'out-1' / 'bad.stdout') == 'stdout 1\n'
     assert read_file(path / 'out-1' / 'bad.stderr') == 'stderr 1\n'
+
+
+@pytest.mark.skipif(os.name == 'nt' or shutil.which('docker') is None, reason="requires docker and *nix")
+def test_docker():
+    case = Case(DATADIR / 'run' / 'docker')
+    case.clear_cache()
+    assert case.run()

@@ -539,7 +539,7 @@ class Case:
 
         return True
 
-    def run(self, nprocs: Optional[int] = None):
+    def run(self, nprocs: Optional[int] = None) -> bool:
         instances = self.context_mgr.fullspace()
 
         if nprocs is None:
@@ -553,6 +553,8 @@ class Case:
         size = self.parameters.size_fullspace()
         logger = util.log.info if nsuccess == size else util.log.error
         logger(f"{nsuccess} of {size} succeeded")
+
+        return nsuccess == size
 
     def capture(self):
         for index, namespace in enumerate(self._context.fullspace()):
