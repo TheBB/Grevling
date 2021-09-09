@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from difflib import Differ
+from functools import partial
 import multiprocessing
 import operator
 import os
@@ -20,7 +21,7 @@ from .render import render
 from .schema import load_and_validate
 from .parameters import ParameterSpace
 from .context import ContextManager
-from .filemap import FileMap
+from .filemap import FileMap, SingleFileMap
 from .capture import ResultCollector
 from .script import ScriptTemplate
 from . import util, api
@@ -357,6 +358,26 @@ class Plot:
         return yaxis
 
 
+class Instance:
+
+    context: api.Context
+    case: 'Case'
+
+    def __init__(self, context, case, index=0):
+        context['_index'] = index
+        context['_logdir'] = render(case._logdir, context)
+        self.context = context
+        self.case = case
+
+    @property
+    def logdir(self):
+        return self.context['_logdir']
+
+    @property
+    def index(self):
+        return self.context['_index']
+
+
 class Case:
 
     yamlpath: Path
@@ -385,11 +406,13 @@ class Case:
         assert yamlpath.is_file()
         self.yamlpath = yamlpath
         self.sourcepath = yamlpath.parent
+        self.local_space = runner.LocalWorkspace(self.sourcepath)
 
         if storagepath is None:
             storagepath = self.sourcepath / '.grevlingdata'
         storagepath.mkdir(parents=True, exist_ok=True)
         self.storagepath = storagepath
+        self.storage_spaces = runner.LocalWorkspaceCollection(self.storagepath)
 
         self.dataframepath = storagepath / 'dataframe.parquet'
 
@@ -436,7 +459,7 @@ class Case:
 
     def iter_instancedirs(self) -> Iterable[api.Workspace]:
         for path in self.storagepath.iterdir():
-            if not (path / 'grevlingcontext.json').exists():
+            if not (path / '.grevling' / 'context.json').exists():
                 continue
             yield runner.LocalWorkspace(path)
 
@@ -539,45 +562,66 @@ class Case:
 
         return True
 
+    @util.with_context('Pre {instance.index}')
+    def prepare_instance(self, runner, instance):
+        util.log.info(', '.join(f'{k}={repr(instance.context[k])}' for k in self.parameters))
+
+        workspace = runner.open_workspace(instance.logdir)
+
+        collector = ResultCollector(self.context_mgr.types)
+        for key, value in instance.context.items():
+            collector.collect(key, value)
+        collector.commit_to_file(self.storage_spaces.open_workspace(instance.logdir).subspace('.grevling'))
+
+        util.log.debug(f"Using SRC='{self.local_space}', WRK='{workspace}'")
+        if not self.premap.copy(instance.context, self.local_space, workspace, ignore_missing=self._ignore_missing):
+            return False
+
+        instance.script = self.script.render(instance.context)
+        runner.notify_prepared(instance)
+        return True
+
     def run(self, nprocs: Optional[int] = None) -> bool:
         instances = self.context_mgr.fullspace()
+        instances = [Instance(ctx, self, index=i) for i, ctx in enumerate(instances)]
 
-        if nprocs is None:
-            nsuccess = 0
-            for index, namespace in enumerate(instances):
-                nsuccess += self.run_single(index, namespace)
-        else:
-            with multiprocessing.Pool(processes=nprocs, initializer=util.initialize_process) as pool:
-                nsuccess = sum(pool.starmap(self.run_single, enumerate(instances)))
+        with runner.LocalRunner() as r, runner.LocalWorkspaceCollection(self.storagepath) as target:
 
-        size = self.parameters.size_fullspace()
-        logger = util.log.info if nsuccess == size else util.log.error
-        logger(f"{nsuccess} of {size} succeeded")
+            if nprocs is None:
+                nsuccess = 0
+                for instance in instances:
+                    success = self.prepare_instance(r, instance)
+                    if not success:
+                        continue
+                nsuccess = r.run_all()
+                r.download_all(target, self.postmap)
 
-        return nsuccess == size
+            else:
+                with multiprocessing.Pool(processes=nprocs, initializer=util.initialize_process) as pool:
+                    execer = partial(self.run_single, space=space, target=target)
+                    nsuccess = sum(pool.starmap(execer, enumerate(instances)))
+
+            size = self.parameters.size_fullspace()
+            logger = util.log.info if nsuccess == size else util.log.error
+            logger(f"{nsuccess} of {size} succeeded")
+
+            return nsuccess == size
 
     def capture(self):
-        for index, namespace in enumerate(self._context.fullspace()):
-            namespace['_index'] = index
-            namespace['_logdir'] = logdir = self.storagepath / render(self._logdir, namespace)
-            if not logdir.exists():
-                continue
-            ws = runner.LocalWorkspace(logdir)
-
-            collector = ResultCollector(self._types)
-            for key, value in namespace.items():
-                collector.collect(key, value)
-
-            namespace.update(self._constants)
-            self.script.capture(collector, workspace=ws)
-            collector.commit_to_file(ws, merge=True)
+        for ws in self.iter_instancedirs():
+            log_ws = ws.subspace('.grevling')
+            collector = ResultCollector(self.context_mgr.types)
+            collector.collect_from_file(log_ws)
+            self.script.capture(collector, log_ws)
+            collector.commit_to_file(log_ws)
 
     def collect(self):
         with self.lock():
             data = self.load_dataframe()
             for ws in self.iter_instancedirs():
+                log_ws = ws.subspace('.grevling')
                 collector = ResultCollector(self.context_mgr.types)
-                collector.collect_from_file(ws)
+                collector.collect_from_file(log_ws)
                 data = collector.commit_to_dataframe(data)
             data = data.sort_index()
             self.save_dataframe(data)
@@ -587,34 +631,7 @@ class Case:
             plot.generate_all(self)
 
     @util.with_context('instance {index}')
-    def run_single(self, index, namespace, logdir=None):
+    def run_single(self, index, namespace, workspace, log_ws):
         util.log.info(', '.join(f'{k}={repr(namespace[k])}' for k in self.parameters))
-
-        namespace['_index'] = index
-        if logdir is not None:
-            namespace['_logdir'] = str(logdir)
-        else:
-            namespace['_logdir'] = logdir = self.storagepath / render(self._logdir, namespace)
-        log_ws = runner.LocalWorkspace(logdir, 'LOG')
-        my_ws = runner.LocalWorkspace(self.sourcepath, 'SRC')
-
-        collector = ResultCollector(self.context_mgr.types)
-        for key, value in namespace.items():
-            collector.collect(key, value)
-        collector.collect('_started', pd.Timestamp.now())
-
-        with runner.TempWorkspace('WRK') as temp_ws:
-            util.log.debug(f"Using SRC='{my_ws}', WRK='{temp_ws}', LOG='{log_ws}'")
-
-            ignore_missing = self._ignore_missing
-            if not self.premap.copy(namespace, my_ws, temp_ws, ignore_missing=self._ignore_missing):
-                return False
-
-            success = self.script.run(collector, namespace, temp_ws.root, log_ws)
-
-            ignore_missing = self._ignore_missing or not success
-            self.postmap.copy(namespace, temp_ws, log_ws, ignore_missing=ignore_missing)
-
-        collector.collect('_finished', pd.Timestamp.now())
-        collector.commit_to_file(log_ws)
+        success = self.script.run(namespace, workspace.root, log_ws)
         return success

@@ -206,6 +206,7 @@ CASE_SCHEMA = Map({
             Optional('name'): Str(),
             Optional('capture'): Capture() | Seq(Capture()),
             Optional('capture-output'): Deprecated("capture-output is deprecated (now always on)", Bool()),
+            Optional('capture-walltime'): Deprecated("capture-walltime is deprecated (now always on)", Bool()),
             Optional('capture-walltime'): Bool(),
             Optional('retry-on-fail'): Bool(),
             Optional('env'): MapPattern(Str(), Str()),

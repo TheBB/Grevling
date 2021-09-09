@@ -32,6 +32,7 @@ def test_plots():
     case = Case(DATADIR / 'run' / 'plot')
     case.clear_cache()
     case.run()
+    case.capture()
     case.collect()
     case.plot()
 

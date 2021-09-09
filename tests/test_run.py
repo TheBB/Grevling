@@ -28,6 +28,7 @@ def test_echo():
     case = Case(DATADIR / 'run' / 'echo')
     case.clear_cache()
     case.run()
+    case.capture()
     case.collect()
 
     data = case.load_dataframe()
@@ -48,6 +49,7 @@ def test_cat():
     case = Case(DATADIR / 'run' / 'cat')
     case.clear_cache()
     case.run()
+    case.capture()
     case.collect()
 
     data = case.load_dataframe()
@@ -85,6 +87,7 @@ def test_capture():
     case = Case(DATADIR / 'run' / 'capture')
     case.clear_cache()
     case.run()
+    case.capture()
     case.collect()
 
     data = case.load_dataframe()
@@ -115,6 +118,7 @@ def test_failing():
     case = Case(DATADIR / 'run' / 'failing')
     case.clear_cache()
     case.run()
+    case.capture()
     case.collect()
 
     data = case.load_dataframe()
@@ -136,14 +140,14 @@ def test_stdout():
     case.run()
 
     path = case.storagepath
-    assert read_file(path / 'out-0' / 'good.stdout') == 'stdout 0\n'
-    assert read_file(path / 'out-0' / 'good.stderr') == 'stderr 0\n'
-    assert read_file(path / 'out-0' / 'bad.stdout') == 'stdout 0\n'
-    assert read_file(path / 'out-0' / 'bad.stderr') == 'stderr 0\n'
-    assert read_file(path / 'out-1' / 'good.stdout') == 'stdout 1\n'
-    assert read_file(path / 'out-1' / 'good.stderr') == 'stderr 1\n'
-    assert read_file(path / 'out-1' / 'bad.stdout') == 'stdout 1\n'
-    assert read_file(path / 'out-1' / 'bad.stderr') == 'stderr 1\n'
+    assert read_file(path / 'out-0' / '.grevling' / 'good.stdout') == 'stdout 0\n'
+    assert read_file(path / 'out-0' / '.grevling' / 'good.stderr') == 'stderr 0\n'
+    assert read_file(path / 'out-0' / '.grevling' / 'bad.stdout') == 'stdout 0\n'
+    assert read_file(path / 'out-0' / '.grevling' / 'bad.stderr') == 'stderr 0\n'
+    assert read_file(path / 'out-1' / '.grevling' / 'good.stdout') == 'stdout 1\n'
+    assert read_file(path / 'out-1' / '.grevling' / 'good.stderr') == 'stderr 1\n'
+    assert read_file(path / 'out-1' / '.grevling' / 'bad.stdout') == 'stdout 1\n'
+    assert read_file(path / 'out-1' / '.grevling' / 'bad.stderr') == 'stderr 1\n'
 
 
 @pytest.mark.skipif(os.name == 'nt' or shutil.which('docker') is None, reason="requires docker and *nix")

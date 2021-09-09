@@ -78,8 +78,8 @@ def test_parse():
     assert case.script.commands[2].name == 'nontrivial-name'
     assert case.script.commands[2].captures == []
 
-    assert case.script.commands[3].command == ['/usr/bin/nontrivial-name', 'with', 'args', 'as', 'list']
-    assert case.script.commands[3].name == 'nontrivial-name'
+    assert case.script.commands[3].command == ['/usr/bin/nontrivial-name-2', 'with', 'args', 'as', 'list']
+    assert case.script.commands[3].name == 'nontrivial-name-2'
     assert case.script.commands[3].captures == []
 
     assert case.script.commands[4].command == 'run this thing'
@@ -118,6 +118,12 @@ def test_parse():
         'last': float,
         'someint': int,
         'somefloat': List[float],
+        'walltime/string': float,
+        'walltime/list': float,
+        'walltime/nontrivial-name': float,
+        'walltime/nontrivial-name-2': float,
+        'walltime/somecommand': float,
+        'walltime/nontrivial-stuff': float,
     }
 
     assert case._logdir == 'loop-de-loop'

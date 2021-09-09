@@ -68,7 +68,7 @@ class ResultCollector(dict):
         self._types = types
 
     def collect_from_file(self, ws: api.Workspace):
-        with ws.open_file('grevlingcontext.json', 'r') as f:
+        with ws.open_file('context.json', 'r') as f:
             data = json.load(f)
         for key, value in data.items():
             self.collect(key, value)
@@ -85,18 +85,15 @@ class ResultCollector(dict):
         else:
             self[name] = value
 
-    def commit_to_file(self, ws: api.Workspace, merge: bool = True):
-        data = self
-        if merge and ws.exists('grevlingcontext.json'):
-            try:
-                with ws.open_file('grevlingcontext.json', 'r') as f:
-                    existing_data = json.load(f)
-            except:
-                existing_data = {}
-            data = {**existing_data, **data}
+    def read_info(self, ws: api.Workspace):
+        with ws.open_file('grevling.txt', 'r') as f:
+            for line in f:
+                key, value = line.strip().split('=', 1)
+                self.collect(key, value)
 
-        with ws.open_file('grevlingcontext.json', 'w') as f:
-            json.dump(data, f, sort_keys=True, indent=4, cls=util.JSONEncoder)
+    def commit_to_file(self, ws: api.Workspace):
+        with ws.open_file('context.json', 'w') as f:
+            json.dump(self, f, sort_keys=True, indent=4, cls=util.JSONEncoder)
 
     def commit_to_dataframe(self, data):
         index = self['_index']

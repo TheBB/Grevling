@@ -1,5 +1,6 @@
 from contextlib import contextmanager
-from logging import log
+from dataclasses import field, InitVar, dataclass
+import datetime
 import os
 from pathlib import Path
 import shlex
@@ -26,37 +27,21 @@ def shell_list_render(arg: Union[str, List[str]], context: api.Context) -> List[
     return [render(c, context) for c in arg]
 
 
+@dataclass()
 class Command:
 
     name: str
     args: Union[str, List[str]]
-    env: Optional[Dict[str, str]]
-    captures: List[Capture]
-    shell: bool
+    env: Dict[str, str] = field(default_factory=dict)
 
-    container: Optional[str]
-    container_args: List[str]
+    container: Optional[str] = None
+    container_args: List[str] = field(default_factory=list)
 
-    retry_on_fail: bool
-    capture_walltime: bool
-    allow_failure: bool
+    shell: bool = False
+    retry_on_fail: bool = False
+    allow_failure: bool = False
 
-    def __init__(self, name: str, args: Union[str, List[str]], env: Optional[Dict[str, str]],
-                 captures: List[Capture] = [], shell: bool = False, retry_on_fail: bool = False,
-                 capture_walltime: bool = False, allow_failure: bool = False,
-                 container: Optional[str] = None, container_args: List[str] = []):
-        self.name = name
-        self.args = args
-        self.env = env
-        self.captures = captures
-        self.shell = shell
-        self.container = container
-        self.container_args = container_args
-        self.retry_on_fail = retry_on_fail
-        self.capture_walltime = capture_walltime
-        self.allow_failure = allow_failure
-
-    def execute(self, collector: ResultCollector, cwd: Path, log_ws: api.Workspace):
+    def execute(self, cwd: Path, log_ws: api.Workspace):
         kwargs = {
             'cwd': cwd,
             'shell': self.shell,
@@ -93,8 +78,7 @@ class Command:
 
         log_ws.write_file(f'{self.name}.stdout', result.stdout)
         log_ws.write_file(f'{self.name}.stderr', result.stderr)
-
-        self.capture(collector, stdout=result.stdout, duration=duration)
+        log_ws.write_file('grevling.txt', f'walltime/{self.name}={duration}\n', append=True)
 
         if result.returncode:
             level = util.log.warn if self.allow_failure else util.log.error
@@ -107,62 +91,41 @@ class Command:
 
         return True
 
-    def capture(self, collector: ResultCollector,
-                stdout: Optional[bytes] = None,
-                workspace: Optional[api.Workspace] = None,
-                duration: Optional[float] = None):
-        if stdout is None:
-            assert workspace is not None
-            with workspace.open_file(f'{self.name}.stdout', 'rb') as f:
-                stdout = f.read()
-        assert isinstance(stdout, bytes)
-        stdout = stdout.decode()
-        for capture in self.captures:
-            capture.find_in(collector, stdout)
-        if self.capture_walltime and duration is not None:
-            collector.collect(f'walltime/{self.name}', duration)
 
-
+@dataclass()
 class CommandTemplate:
 
-    name: str
-    command: Union[str, List[str]]
-    env: Optional[Dict[str, str]]
-    captures: List[Capture]
+    name: str = ''
 
-    container: Optional[str]
-    container_args: Union[str, List[str]]
+    command: Union[str, List[str]] = ''
+    env: Dict[str, str] = field(default_factory=dict)
+    captures: List[Capture] = field(init=False)
 
-    capture_walltime: bool
-    retry_on_fail: bool
-    allow_failure: bool
+    container: Optional[str] = None
+    container_args: Union[str, List[str]] = field(init=False)
+
+    retry_on_fail: bool = False
+    allow_failure: bool = False
+
+    # Init-only variables, used for initializing captures and container_args
+    container_args_spec: InitVar[Dict] = {}
+    capture: InitVar[Union[str, Dict, List]] = []
 
     @classmethod
     def load(cls, spec, containers={}):
         if isinstance(spec, (str, list)):
-            return cls(spec)
-        if 'capture-output' in spec:
-            del spec['capture-output']
-        return util.call_yaml(cls, spec, container_args=containers)
+            return cls(command=spec)
+        spec.pop('capture-output', None)
+        spec.pop('capture-walltime', None)
+        return util.call_yaml(cls, spec, container_args_spec=containers)
 
-    def __init__(self, command='', name=None, capture=None, capture_walltime=False,
-                 retry_on_fail=False, env=None, container=None, container_args={},
-                 allow_failure=False):
-        self.command = command
-        self.env = env
-
-        self.capture_walltime = capture_walltime
-        self.retry_on_fail = retry_on_fail
-        self.allow_failure = allow_failure
-
-        self.container = container
-        self.container_args = container_args.get(container, [])
-
-        if name is None:
-            exe = shlex.split(command)[0] if isinstance(command, str) else command[0]
+    def __post_init__(self, container_args_spec, capture):
+        if not self.name:
+            assert self.command
+            exe = shlex.split(self.command)[0] if isinstance(self.command, str) else self.command[0]
             self.name = Path(exe).name
-        else:
-            self.name = name
+
+        self.container_args = container_args_spec.get(self.container, [])
 
         self.captures = []
         if isinstance(capture, (str, dict)):
@@ -171,8 +134,7 @@ class CommandTemplate:
             self.captures.extend(Capture.load(c) for c in capture)
 
     def add_types(self, types: Dict[str, Any]):
-        if self.capture_walltime:
-            types[f'walltime/{self.name}'] = float
+        types[f'walltime/{self.name}'] = float
         for cap in self.captures:
             cap.add_types(types)
 
@@ -189,26 +151,38 @@ class CommandTemplate:
 
         command = shell_list_render(self.command, context)
 
-        cmd = Command(self.name, command, kwargs.get('env'), self.captures, kwargs['shell'],
-                      retry_on_fail=self.retry_on_fail, capture_walltime=self.capture_walltime,
-                      allow_failure=self.allow_failure,
-                      container=self.container, container_args=shell_list_render(self.container_args, context))
-        return cmd
+        return Command(
+            name=self.name, args=command, env=kwargs.get('env'), shell=kwargs['shell'],
+            retry_on_fail=self.retry_on_fail,
+            allow_failure=self.allow_failure,
+            container=self.container,
+            container_args=shell_list_render(self.container_args, context)
+        )
 
-    def capture(self, collector: ResultCollector,
-                stdout: Optional[bytes] = None,
-                workspace: Optional[api.Workspace] = None,
-                duration: Optional[float] = None):
-        if stdout is None:
-            assert workspace is not None
-            with workspace.open_file(f'{self.name}.stdout', 'rb') as f:
+    def capture(self, collector: ResultCollector, workspace: api.Workspace):
+        try:
+            with workspace.open_file(f'{self.name}.stdout', 'r') as f:
                 stdout = f.read()
-        assert isinstance(stdout, bytes)
-        stdout = stdout.decode()
+        except FileNotFoundError:
+            return
         for capture in self.captures:
             capture.find_in(collector, stdout)
-        if self.capture_walltime and duration is not None:
-            collector.collect(f'walltime/{self.name}', duration)
+
+
+@dataclass
+class Script:
+
+    commands: List[Command]
+
+    def run(self, cwd: Path, log_ws: api.Workspace) -> bool:
+        log_ws.write_file('grevling.txt', f'_started={datetime.datetime.now()}\n', append=True)
+        try:
+            for cmd in self.commands:
+                if not cmd.execute(cwd, log_ws):
+                    return False
+            return True
+        finally:
+            log_ws.write_file('grevling.txt', f'_finished={datetime.datetime.now()}\n', append=True)
 
 
 class ScriptTemplate:
@@ -228,13 +202,13 @@ class ScriptTemplate:
         for command in self.commands:
             command.capture(collector, workspace=workspace)
 
-    def run(self, collector: ResultCollector, context: api.Context, cwd: Path, log_ws: api.Workspace) -> bool:
-        for command in self.commands:
-            cmd = command.render(context)
-            if not cmd.execute(collector, cwd, log_ws):
-                return False
-        return True
+    def render(self, context: api.Context) -> Script:
+        return Script([cmd.render(context) for cmd in self.commands])
 
     def add_types(self, types):
         for command in self.commands:
             command.add_types(types)
+
+    def capture(self, collector: ResultCollector, workspace: api.Workspace):
+        for cmd in self.commands:
+            cmd.capture(collector, workspace)

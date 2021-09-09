@@ -11,6 +11,7 @@ constants:
   e: 2.7182
 script:
   - command: [sh, -c, 'for i in `seq 1 ${i}`; do echo result $i; done']
+    name: sh-v
     capture-walltime: on
     capture:
       - type: integer
@@ -18,6 +19,7 @@ script:
         prefix: result
         mode: all
   - command: [sh, -c, 'for i in `seq 1 10`; do echo result $i; done']
+    name: sh-f
     capture:
       - type: integer
         name: fresult
