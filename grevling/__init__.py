@@ -296,7 +296,12 @@ class Capture:
                 'integer': (r'[-+]?[0-9]+', int),
                 'float': (r'[-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?', float),
             }[spec['type']]
-            pattern = re.escape(spec['prefix']) + r'\s*[:=]?\s*(?P<' + spec['name'] + '>' + pattern + ')'
+            skip = r'(\S+\s+){' + str(spec.get('skip-words', 0)) + '}'
+            if spec.get('flexible-prefix', False):
+                prefix = r'\s+'.join(re.escape(p) for p in spec['prefix'].split())
+            else:
+                prefix = re.escape(spec['prefix'])
+            pattern = prefix + r'\s*[:=]?\s*' + skip + '(?P<' + spec['name'] + '>' + pattern + ')'
             mode = spec.get('mode', 'last')
             type_overrides = {spec['name']: tp}
             return cls(pattern, mode, type_overrides)
@@ -1015,17 +1020,17 @@ class Case:
         logger(f"{nsuccess} of {size} succeeded")
 
     def capture(self):
-        for index, namespace in enumerate(self._context.fullspace()):
+        for index, namespace in enumerate(self.context_mgr.fullspace()):
             namespace['_index'] = index
             namespace['_logdir'] = logdir = self.storagepath / render(self._logdir, namespace)
             if not logdir.exists():
                 continue
 
-            collector = ResultCollector(self._types)
+            collector = ResultCollector(self.context_mgr.types)
             for key, value in namespace.items():
                 collector.collect(key, value)
 
-            namespace.update(self._constants)
+            # namespace.update(self._constants)
 
             for command in self._commands:
                 command.capture(collector, logdir=logdir)

@@ -98,6 +98,8 @@ def NumberCapture():
         'type': Choice('integer', 'float'),
         'name': Str(),
         'prefix': Str(),
+        Optional('skip-words'): Int(),
+        Optional('flexible-prefix'): Bool(),
         Optional('mode'): Choice('first', 'last', 'all'),
     })
 
