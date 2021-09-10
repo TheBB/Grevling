@@ -19,7 +19,12 @@ class Capture:
                 'integer': (r'[-+]?[0-9]+', int),
                 'float': (r'[-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?', float),
             }[spec['type']]
-            pattern = re.escape(spec['prefix']) + r'\s*[:=]?\s*(?P<' + spec['name'] + '>' + pattern + ')'
+            skip = r'(\S+\s+){' + str(spec.get('skip-words', 0)) + '}'
+            if spec.get('flexible-prefix', False):
+                prefix = r'\s+'.join(re.escape(p) for p in spec['prefix'].split())
+            else:
+                prefix = re.escape(spec['prefix'])
+            pattern = prefix + r'\s*[:=]?\s*' + skip + '(?P<' + spec['name'] + '>' + pattern + ')'
             mode = spec.get('mode', 'last')
             type_overrides = {spec['name']: tp}
             return cls(pattern, mode, type_overrides)
