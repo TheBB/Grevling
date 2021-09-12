@@ -8,6 +8,8 @@ from typing import Dict, Any, ContextManager, Iterable, Union, Optional
 
 
 Context = Dict[str, Any]
+Types = Dict[str, Any]
+PathStr = Union[Path, str]
 
 
 class Workspace:
@@ -23,15 +25,15 @@ class Workspace:
         ...
 
     @abstractmethod
-    def open_file(self, path: Path, mode: str = 'w') -> ContextManager[IOBase]:
+    def open_file(self, path: PathStr, mode: str = 'w') -> ContextManager[IOBase]:
         ...
 
     @abstractmethod
-    def write_file(self, path: Path, source: Union[str, bytes, IOBase, Path]):
+    def write_file(self, path: PathStr, source: Union[str, bytes, IOBase, Path]):
         ...
 
     @abstractmethod
-    def read_file(self, path: Path) -> ContextManager[IOBase]:
+    def read_file(self, path: PathStr) -> ContextManager[IOBase]:
         ...
 
     @abstractmethod
@@ -39,10 +41,15 @@ class Workspace:
         ...
 
     @abstractmethod
-    def exists(self, path: Path) -> bool:
+    def exists(self, path: PathStr) -> bool:
         ...
 
+    @abstractmethod
     def subspace(self, name: str) -> 'Workspace':
+        ...
+
+    @abstractmethod
+    def top_name(self) -> str:
         ...
 
     def glob(self, pattern: str) -> Iterable[Path]:

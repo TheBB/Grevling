@@ -12,7 +12,7 @@ import multiprocessing_logging
 import numpy as np
 import pandas as pd
 import rich.logging
-from typing_inspect import get_origin
+from typing_inspect import get_origin, get_args
 
 
 class LoggerAdapter(logging.LoggerAdapter):
@@ -177,3 +177,12 @@ def call_yaml(func, mapping, *args, **kwargs):
     mapping = {key.replace('-', '_'): value for key, value in mapping.items()}
     binding = signature.bind(*args, **kwargs, **mapping)
     return func(*binding.args, **binding.kwargs)
+
+
+def coerce(tp, value):
+    if is_list_type(tp) and not isinstance(value, list):
+        eltype = get_args(tp)[0]
+        return eltype(value)
+    elif not isinstance(tp, str) and not is_list_type(tp):
+        return tp(value)
+    return value

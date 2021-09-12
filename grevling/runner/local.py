@@ -52,11 +52,11 @@ class LocalWorkspace(api.Workspace):
         shutil.rmtree(self.root)
 
     @contextmanager
-    def open_file(self, path: Path, mode: str = 'w') -> ContextManager[IOBase]:
+    def open_file(self, path, mode: str = 'w') -> ContextManager[IOBase]:
         with open(self.root / path, mode) as f:
             yield f
 
-    def write_file(self, path: Path, source: Union[str, bytes, IOBase, Path], append: bool = False):
+    def write_file(self, path, source: Union[str, bytes, IOBase, Path], append: bool = False):
         target = self.root / path
         target.parent.mkdir(parents=True, exist_ok=True)
 
@@ -76,7 +76,7 @@ class LocalWorkspace(api.Workspace):
             return
 
     @contextmanager
-    def read_file(self, path: Path) -> ContextManager[IOBase]:
+    def read_file(self, path) -> ContextManager[IOBase]:
         with open(self.root / path, 'rb') as f:
             yield f
 
@@ -85,13 +85,16 @@ class LocalWorkspace(api.Workspace):
             if path.is_file():
                 yield path.relative_to(self.root)
 
-    def exists(self, path: Path) -> bool:
+    def exists(self, path) -> bool:
         return (self.root / path).exists()
 
     def subspace(self, name: str) -> api.Workspace:
         path = self.root / name
         path.mkdir(exist_ok=True, parents=True)
         return LocalWorkspace(path, name=f'{self.name}/{name}')
+
+    def top_name(self) -> str:
+        return self.root.name
 
     def copy_all_to(self, workspace: api.Workspace):
         assert isinstance(workspace, LocalWorkspace)
@@ -118,10 +121,13 @@ class TempWorkspaceCollection(LocalWorkspaceCollection):
 class LocalRunner:
 
     workspaces: api.WorkspaceCollection
+    ignore_missing: bool
 
-    def __init__(self):
+    def __init__(self, ignore_missing: bool = False):
         self.prepared = []
         self.ran = []
+
+        self.ignore_missing = ignore_missing
 
     def __enter__(self):
         self.workspaces = TempWorkspaceCollection().__enter__()
@@ -156,7 +162,7 @@ class LocalRunner:
             with util.log.with_context(f'Post {instance.index}'):
                 source_ws = self.workspaces.open_workspace(instance.logdir)
                 target_ws = workspaces.open_workspace(instance.logdir)
-                ignore_missing = instance.case._ignore_missing or not instance.success
+                ignore_missing = self.ignore_missing or not instance.success
                 postmap.copy(instance.context, source_ws, target_ws, ignore_missing=ignore_missing)
 
                 target_log = target_ws.subspace('.grevling')

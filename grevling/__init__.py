@@ -26,6 +26,7 @@ from .capture import ResultCollector
 from .script import ScriptTemplate
 from . import util, api
 from .runner import local as runner
+from .instance import Instance
 
 
 __version__ = '1.2.1'
@@ -358,26 +359,6 @@ class Plot:
         return yaxis
 
 
-class Instance:
-
-    context: api.Context
-    case: 'Case'
-
-    def __init__(self, context, case, index=0):
-        context['_index'] = index
-        context['_logdir'] = render(case._logdir, context)
-        self.context = context
-        self.case = case
-
-    @property
-    def logdir(self):
-        return self.context['_logdir']
-
-    @property
-    def index(self):
-        return self.context['_index']
-
-
 class Case:
 
     yamlpath: Path
@@ -583,9 +564,14 @@ class Case:
 
     def run(self, nprocs: Optional[int] = None) -> bool:
         instances = self.context_mgr.fullspace()
-        instances = [Instance(ctx, self, index=i) for i, ctx in enumerate(instances)]
+        instances = [
+            Instance.from_context(
+                ctx, self._logdir, self.storage_spaces, self.context_mgr.types, index=i
+            )
+            for i, ctx in enumerate(instances)
+        ]
 
-        with runner.LocalRunner() as r, runner.LocalWorkspaceCollection(self.storagepath) as target:
+        with runner.LocalRunner(self._ignore_missing) as r, runner.LocalWorkspaceCollection(self.storagepath) as target:
 
             if nprocs is None:
                 nsuccess = 0
