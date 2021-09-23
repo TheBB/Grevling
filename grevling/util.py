@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import contextmanager
 from functools import wraps
 import inspect
@@ -186,3 +187,10 @@ def coerce(tp, value):
     elif not isinstance(tp, str) and not is_list_type(tp):
         return tp(value)
     return value
+
+
+def to_queue(it):
+    q = asyncio.Queue()
+    for i in it:
+        q.put_nowait(i)
+    return q

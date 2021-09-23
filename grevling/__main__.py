@@ -11,6 +11,7 @@ from simpleeval import SimpleEval
 from strictyaml import YAMLValidationError
 
 import grevling
+from grevling.workflow.local import LocalWorkflow
 from . import util
 
 
@@ -89,7 +90,9 @@ def run(case, nprocs, azure):
     if not case.check(interactive=False):
         sys.exit(1)
     case.clear_cache()
-    case.run(nprocs=nprocs)
+
+    with LocalWorkflow(case) as w:
+        w.pipeline().run(case.instances())
 
 
 @main.command('run-with')

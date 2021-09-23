@@ -543,11 +543,8 @@ class Case:
 
         return True
 
-    @util.with_context('Pre {instance.index}')
-    def prepare_instance(self, runner, instance):
+    def prepare_instance(self, instance, workspace):
         util.log.info(', '.join(f'{k}={repr(instance.context[k])}' for k in self.parameters))
-
-        workspace = runner.open_workspace(instance.logdir)
 
         collector = ResultCollector(self.context_mgr.types)
         for key, value in instance.context.items():
@@ -559,39 +556,37 @@ class Case:
             return False
 
         instance.script = self.script.render(instance.context)
-        runner.notify_prepared(instance)
         return True
 
-    def run(self, nprocs: Optional[int] = None) -> bool:
-        instances = self.context_mgr.fullspace()
-        instances = [
+    def instances(self) -> Iterable[Instance]:
+        return (
             Instance.from_context(
                 ctx, self._logdir, self.storage_spaces, self.context_mgr.types, index=i
             )
-            for i, ctx in enumerate(instances)
-        ]
+            for i, ctx in enumerate(self.context_mgr.fullspace())
+        )
 
-        with runner.LocalRunner(self._ignore_missing) as r, runner.LocalWorkspaceCollection(self.storagepath) as target:
+        # with runner.LocalRunner(self._ignore_missing) as r, runner.LocalWorkspaceCollection(self.storagepath) as target:
 
-            if nprocs is None:
-                nsuccess = 0
-                for instance in instances:
-                    success = self.prepare_instance(r, instance)
-                    if not success:
-                        continue
-                nsuccess = r.run_all()
-                r.download_all(target, self.postmap)
+        #     if nprocs is None:
+        #         nsuccess = 0
+        #         for instance in instances:
+        #             success = self.prepare_instance(r, instance)
+        #             if not success:
+        #                 continue
+        #         nsuccess = r.run_all()
+        #         r.download_all(target, self.postmap)
 
-            else:
-                with multiprocessing.Pool(processes=nprocs, initializer=util.initialize_process) as pool:
-                    execer = partial(self.run_single, space=space, target=target)
-                    nsuccess = sum(pool.starmap(execer, enumerate(instances)))
+        #     else:
+        #         with multiprocessing.Pool(processes=nprocs, initializer=util.initialize_process) as pool:
+        #             execer = partial(self.run_single, space=space, target=target)
+        #             nsuccess = sum(pool.starmap(execer, enumerate(instances)))
 
-            size = self.parameters.size_fullspace()
-            logger = util.log.info if nsuccess == size else util.log.error
-            logger(f"{nsuccess} of {size} succeeded")
+        #     size = self.parameters.size_fullspace()
+        #     logger = util.log.info if nsuccess == size else util.log.error
+        #     logger(f"{nsuccess} of {size} succeeded")
 
-            return nsuccess == size
+        #     return nsuccess == size
 
     def capture(self):
         for ws in self.iter_instancedirs():

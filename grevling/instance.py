@@ -10,9 +10,11 @@ from .render import render
 
 class Status(Enum):
 
-    Initialized = 'initialized'
+    Created = 'created'
+    Prepared = 'prepared'
     Started = 'started'
     Finished = 'finished'
+    Downloaded = 'downloaded'
 
 
 class Instance:
@@ -33,19 +35,21 @@ class Instance:
             context['_index'] = index
         logdir = render(logdir_pattern, context)
         logspace = logspaces.open_workspace(logdir)
-        return cls(logspace, types, context)
+        return cls(logspace, types, context, status=Status.Created)
 
-    def __init__(self, logspace: api.Workspace, types: api.Types, context: Optional[api.Context] = None):
+    def __init__(self, logspace: api.Workspace, types: api.Types, context: Optional[api.Context] = None,
+                 status = None):
         self.logspace = logspace
         self.bookspace = logspace.subspace('.grevling')
         self.logdir = logspace.top_name()
         self.types = types
         self._context = context
+        self.status = status
 
         if context is not None:
             context['_logdir'] = self.logdir
 
-        if self.update_status() == Status.Initialized and context is not None:
+        if context is not None and status == Status.Created:
             self.write_context()
 
     @property
@@ -72,11 +76,5 @@ class Instance:
         with self.bookspace.open_file('context.json', 'w') as f:
             json.dump(self.context, f, sort_keys=True, indent=4, cls=util.JSONEncoder)
 
-    def update_status(self):
-        if self.bookspace.exists('started'):
-            self.status = Status.Started
-        elif self.bookspace.exists('finished'):
-            self.status = Status.Finished
-        else:
-            self.status = Status.Initialized
-        return self.status
+    def open_workspace(self, workspaces):
+        return workspaces.open_workspace(self.logdir)

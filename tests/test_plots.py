@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 
 from grevling import Case
+from grevling.workflow.local import LocalWorkflow
 from grevling.plotting import MockBackend
 
 
@@ -31,7 +32,8 @@ def test_plots():
     MockBackend.plots = []
     case = Case(DATADIR / 'run' / 'plot')
     case.clear_cache()
-    case.run()
+    with LocalWorkflow(case) as w:
+        w.pipeline().run(case.instances())
     case.capture()
     case.collect()
     case.plot()

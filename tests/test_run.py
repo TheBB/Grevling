@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from grevling import Case
+from grevling.workflow.local import LocalWorkflow
 
 
 DATADIR = Path(__file__).parent / 'data'
@@ -27,7 +28,8 @@ def check_df(left, right):
 def test_echo():
     case = Case(DATADIR / 'run' / 'echo')
     case.clear_cache()
-    case.run()
+    with LocalWorkflow(case) as w:
+        w.pipeline().run(case.instances())
     case.capture()
     case.collect()
 
@@ -48,7 +50,8 @@ def test_echo():
 def test_cat():
     case = Case(DATADIR / 'run' / 'cat')
     case.clear_cache()
-    case.run()
+    with LocalWorkflow(case) as w:
+        w.pipeline().run(case.instances())
     case.capture()
     case.collect()
 
@@ -70,7 +73,8 @@ def test_cat():
 def test_files():
     case = Case(DATADIR / 'run' / 'files')
     case.clear_cache()
-    case.run()
+    with LocalWorkflow(case) as w:
+        w.pipeline().run(case.instances())
 
     for a in range(1,4):
         for b in 'abc':
@@ -86,7 +90,8 @@ def test_files():
 def test_capture():
     case = Case(DATADIR / 'run' / 'capture')
     case.clear_cache()
-    case.run()
+    with LocalWorkflow(case) as w:
+        w.pipeline().run(case.instances())
     case.capture()
     case.collect()
 
@@ -117,7 +122,8 @@ def test_capture():
 def test_failing():
     case = Case(DATADIR / 'run' / 'failing')
     case.clear_cache()
-    case.run()
+    with LocalWorkflow(case) as w:
+        w.pipeline().run(case.instances())
     case.capture()
     case.collect()
 
@@ -137,7 +143,8 @@ def test_failing():
 def test_stdout():
     case = Case(DATADIR / 'run' / 'stdout')
     case.clear_cache()
-    case.run()
+    with LocalWorkflow(case) as w:
+        w.pipeline().run(case.instances())
 
     path = case.storagepath
     assert read_file(path / 'out-0' / '.grevling' / 'good.stdout') == 'stdout 0\n'
@@ -154,4 +161,5 @@ def test_stdout():
 def test_docker():
     case = Case(DATADIR / 'run' / 'docker')
     case.clear_cache()
-    assert case.run()
+    with LocalWorkflow(case) as w:
+        w.pipeline().run(case.instances())
