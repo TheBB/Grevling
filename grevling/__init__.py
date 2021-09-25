@@ -13,6 +13,7 @@ from fasteners import InterProcessLock
 import pandas as pd
 from typing_inspect import get_origin, get_args
 
+from .api import Status
 from .capture import ResultCollector
 from .plotting import Plot
 from .render import render
@@ -20,8 +21,8 @@ from .schema import load_and_validate
 from .context import ContextManager
 from .filemap import FileMap
 from .script import ScriptTemplate
+from .workflow.local import LocalWorkspaceCollection, LocalWorkspace
 from . import util, api
-from .runner import local as runner
 
 
 __version__ = '1.2.1'
@@ -73,13 +74,13 @@ class Case:
         assert yamlpath.is_file()
         self.yamlpath = yamlpath
         self.sourcepath = yamlpath.parent
-        self.local_space = runner.LocalWorkspace(self.sourcepath, 'SRC')
+        self.local_space = LocalWorkspace(self.sourcepath, 'SRC')
 
         if storagepath is None:
             storagepath = self.sourcepath / '.grevlingdata'
         storagepath.mkdir(parents=True, exist_ok=True)
         self.storagepath = storagepath
-        self.storage_spaces = runner.LocalWorkspaceCollection(self.storagepath)
+        self.storage_spaces = LocalWorkspaceCollection(self.storagepath)
 
         self.dataframepath = storagepath / 'dataframe.parquet'
 
@@ -129,7 +130,7 @@ class Case:
             print(path)
             if not (path / '.grevling' / 'context.json').exists():
                 continue
-            yield runner.LocalWorkspace(path)
+            yield LocalWorkspace(path)
 
     @property
     def shape(self):
@@ -236,7 +237,7 @@ class Case:
         if logdir is None:
             logdir = render(self._logdir, ctx)
         ctx['_logdir'] = str(logdir)
-        workspace = runner.LocalWorkspace(Path(ctx['_logdir']))
+        workspace = LocalWorkspace(Path(ctx['_logdir']))
         return Instance.create(self, ctx, local=workspace)
 
     def instances(self, *statuses) -> Iterable['Instance']:
@@ -263,15 +264,6 @@ class Case:
     def plot(self):
         for plot in self._plots:
             plot.generate_all(self)
-
-
-class Status(Enum):
-
-    Created = 'created'
-    Prepared = 'prepared'
-    Started = 'started'
-    Finished = 'finished'
-    Downloaded = 'downloaded'
 
 
 class Instance:

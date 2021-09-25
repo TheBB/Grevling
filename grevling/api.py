@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from enum import Enum
 from fnmatch import fnmatch
 from io import IOBase
 from pathlib import Path
@@ -10,6 +11,15 @@ from typing import Dict, Any, ContextManager, Iterable, Union, Optional
 Context = Dict[str, Any]
 Types = Dict[str, Any]
 PathStr = Union[Path, str]
+
+
+class Status(Enum):
+
+    Created = 'created'
+    Prepared = 'prepared'
+    Started = 'started'
+    Finished = 'finished'
+    Downloaded = 'downloaded'
 
 
 class Workspace(ABC):

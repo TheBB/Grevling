@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 import asyncio
+from io import StringIO
 from itertools import chain
+import traceback
 
 from .. import util
 
@@ -29,7 +31,15 @@ class PipeSegment(Pipe):
     async def work(self, in_queue, out_queue=None):
         while True:
             arg = await in_queue.get()
-            ret = self.apply(arg)
+            try:
+                ret = self.apply(arg)
+            except Exception as e:
+                util.log.error(str(e))
+                with StringIO() as buf:
+                    traceback.print_exc(file=buf)
+                    util.log.debug(buf.getvalue())
+                in_queue.task_done()
+                continue
             if out_queue:
                 await out_queue.put(ret)
             in_queue.task_done()
