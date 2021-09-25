@@ -11,8 +11,15 @@ from simpleeval import SimpleEval
 from strictyaml import YAMLValidationError
 
 import grevling
-from grevling.workflow.local import LocalWorkflow
-from . import util
+from . import util, api
+
+import grevling.workflow.local
+
+
+def workflows(func):
+    func = click.option('--local', 'workflow', is_flag=True, flag_value='local', default=True)(func)
+    func = click.option('--azure', 'workflow', is_flag=True, flag_value='azure')(func)
+    return func
 
 
 class CustomClickException(click.ClickException):
@@ -83,11 +90,13 @@ def check(case):
 
 @main.command('run-all')
 @click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
-def run_all(case):
+@workflows
+def run_all(case, workflow):
     if not case.check(interactive=False):
         sys.exit(1)
     case.clear_cache()
-    case.run()
+    with api.Workflow.get_workflow(workflow)() as w:
+        w.pipeline().run(case.create_instances())
     case.collect()
     case.plot()
 
@@ -95,27 +104,28 @@ def run_all(case):
 @main.command('run')
 @click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
 @click.option('-j', 'nprocs', default=None, type=int)
-@click.option('--azure', flag_value=True, default=False)
-def run(case, nprocs, azure):
+@workflows
+def run(case, nprocs, workflow):
     if not case.check(interactive=False):
         sys.exit(1)
     case.clear_cache()
-    with LocalWorkflow(case) as w:
+    with api.Workflow.get_workflow(workflow)() as w:
         w.pipeline().run(case.create_instances())
 
 
 @main.command('run-with')
 @click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
 @click.option('--target', '-t', default='.', type=click.Path())
+@workflows
 @click.argument('context', nargs=-1, type=str)
-def run_with(case, target, context):
+def run_with(case, target, workflow, context):
     evaluator = SimpleEval()
     parsed_context = {}
     for s in context:
         k, v = s.split('=', 1)
         parsed_context[k] = evaluator.eval(v)
     instance = case.create_instance(parsed_context, logdir=target)
-    with LocalWorkflow(case) as w:
+    with api.Workflow.get_workflow(workflow)() as w:
         w.pipeline().run([instance])
 
 

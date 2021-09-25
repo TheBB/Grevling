@@ -26,10 +26,9 @@ class RunInstance(PipeSegment):
         return instance
 
 
-class LocalWorkflow:
+class LocalWorkflow(api.Workflow):
 
-    def __init__(self, case):
-        self.case = case
+    name = 'local'
 
     def __enter__(self):
         self.workspaces = TempWorkspaceCollection('WRK').__enter__()

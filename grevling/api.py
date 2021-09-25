@@ -4,8 +4,9 @@ from fnmatch import fnmatch
 from io import IOBase
 from pathlib import Path
 
-
 from typing import Dict, Any, ContextManager, Iterable, Union, Optional
+
+from . import util
 
 
 Context = Dict[str, Any]
@@ -82,3 +83,16 @@ class WorkspaceCollection(ContextManager['WorkspaceCollection'], ABC):
     def workspace_names(self) -> Iterable[str]:
         ...
 
+
+class Workflow(ContextManager['Workflow'], ABC):
+
+    @staticmethod
+    def get_workflow(name: str):
+        cls = util.find_subclass(Workflow, name, attr='name')
+        if not cls:
+            raise ImportError(f"Unknown workflow, or additional dependencies required: {name}")
+        return cls
+
+    @abstractmethod
+    def pipeline():
+        ...
