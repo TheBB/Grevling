@@ -237,7 +237,7 @@ class Case:
         if logdir is None:
             logdir = render(self._logdir, ctx)
         ctx['_logdir'] = str(logdir)
-        workspace = LocalWorkspace(Path(ctx['_logdir']))
+        workspace = LocalWorkspace(Path(ctx['_logdir']), name='LOG')
         return Instance.create(self, ctx, local=workspace)
 
     def instances(self, *statuses) -> Iterable['Instance']:
