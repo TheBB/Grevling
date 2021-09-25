@@ -12,7 +12,7 @@ Types = Dict[str, Any]
 PathStr = Union[Path, str]
 
 
-class Workspace:
+class Workspace(ABC):
 
     name: str
 
@@ -58,7 +58,7 @@ class Workspace:
                 yield path
 
 
-class WorkspaceCollection(ContextManager['WorkspaceCollection']):
+class WorkspaceCollection(ContextManager['WorkspaceCollection'], ABC):
 
     @abstractmethod
     def new_workspace(self, prefix: Optional[str] = None) -> Workspace:
@@ -71,3 +71,4 @@ class WorkspaceCollection(ContextManager['WorkspaceCollection']):
     @abstractmethod
     def workspace_names(self) -> Iterable[str]:
         ...
+

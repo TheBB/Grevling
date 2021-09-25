@@ -4,7 +4,7 @@ import numpy as np
 from simpleeval import SimpleEval, DEFAULT_FUNCTIONS, NameNotDefined
 
 from .parameters import ParameterSpace
-from . import util
+from . import util, api
 
 
 BUILTINS = {
@@ -35,7 +35,7 @@ class ContextManager:
     evaluables: Dict[str, str]
     constants: Dict[str, Any]
     templates: Dict[str, Any]
-    types: Dict[str, Any]
+    types: api.Types
 
     @classmethod
     def load(cls, spec: Dict) -> 'ContextManager':

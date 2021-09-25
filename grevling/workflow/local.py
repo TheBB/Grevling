@@ -1,7 +1,7 @@
 from . import Pipeline, PipeSegment, PrepareInstance, DownloadResults
 from ..runner.local import TempWorkspaceCollection
 from .. import util
-from ..instance import Status
+from .. import Status
 
 
 class RunInstance(PipeSegment):

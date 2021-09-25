@@ -100,12 +100,8 @@ def run(case, nprocs, azure):
     if not case.check(interactive=False):
         sys.exit(1)
     case.clear_cache()
-
     with LocalWorkflow(case) as w:
         w.pipeline().run(case.create_instances())
-    case.collect()
-    data = case.load_dataframe()
-    print(data)
 
 
 @main.command('run-with')
@@ -118,8 +114,9 @@ def run_with(case, target, context):
     for s in context:
         k, v = s.split('=', 1)
         parsed_context[k] = evaluator.eval(v)
-    parsed_context = case.context_mgr.evaluate_context(parsed_context)
-    case.run_single(index=0, namespace=parsed_context, logdir=Path(target))
+    instance = case.create_instance(parsed_context, logdir=target)
+    with LocalWorkflow(case) as w:
+        w.pipeline().run([instance])
 
 
 @main.command('capture')
