@@ -378,7 +378,10 @@ class Instance:
         collector = ResultCollector(self.types)
         collector.collect_from_dict(self.context)
 
-        self.remote_book.copy_all_to(self.local_book)
+        bookmap = FileMap.load(
+            files=[{'source': '*', 'mode': 'glob'}],
+        )
+        bookmap.copy(self.context, self.remote_book, self.local_book)
         collector.collect_from_info(self.local_book)
 
         ignore_missing = self._case._ignore_missing or not collector['_success']

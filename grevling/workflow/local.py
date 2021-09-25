@@ -135,10 +135,6 @@ class LocalWorkspace(api.Workspace):
     def top_name(self) -> str:
         return self.root.name
 
-    def copy_all_to(self, workspace: api.Workspace):
-        assert isinstance(workspace, LocalWorkspace)
-        shutil.copytree(self.root, workspace.root, dirs_exist_ok=True)
-
 
 class TempWorkspaceCollection(LocalWorkspaceCollection):
 
