@@ -35,6 +35,11 @@ class LocalWorkspaceCollection(api.WorkspaceCollection):
         subpath.mkdir(parents=True, exist_ok=True)
         return LocalWorkspace(subpath, name)
 
+    def workspace_names(self, name: str = '') -> Iterable[str]:
+        for path in self.root.iterdir():
+            if path.is_dir():
+                yield path.name
+
 
 class LocalWorkspace(api.Workspace):
 
@@ -88,8 +93,9 @@ class LocalWorkspace(api.Workspace):
     def exists(self, path) -> bool:
         return (self.root / path).exists()
 
-    def subspace(self, name: str) -> api.Workspace:
-        path = self.root / name
+    def subspace(self, path: str, name: str = '') -> api.Workspace:
+        name = name or str(path)
+        path = self.root / path
         path.mkdir(exist_ok=True, parents=True)
         return LocalWorkspace(path, name=f'{self.name}/{name}')
 

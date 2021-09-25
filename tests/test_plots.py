@@ -33,7 +33,7 @@ def test_plots():
     case = Case(DATADIR / 'run' / 'plot')
     case.clear_cache()
     with LocalWorkflow(case) as w:
-        w.pipeline().run(case.instances())
+        w.pipeline().run(case.create_instances())
     case.capture()
     case.collect()
     case.plot()

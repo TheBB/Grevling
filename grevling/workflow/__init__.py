@@ -63,34 +63,25 @@ class Pipeline(Pipe):
 
 class PrepareInstance(PipeSegment):
 
-    def __init__(self, case, workspaces):
-        self.case = case
+    def __init__(self, workspaces):
         self.workspaces = workspaces
 
     @util.with_context('I {instance.index}')
     @util.with_context('Pre')
     def apply(self, instance):
-        workspace = instance.open_workspace(self.workspaces)
-        self.case.prepare_instance(instance, workspace)
+        with instance.bind_remote(self.workspaces):
+            instance.prepare()
         return instance
 
 
 class DownloadResults(PipeSegment):
 
-    def __init__(self, case, workspaces):
-        self.case = case
+    def __init__(self, workspaces):
         self.workspaces = workspaces
 
     @util.with_context('I {instance.index}')
     @util.with_context('Down')
     def apply(self, instance):
-        source_ws = instance.open_workspace(self.workspaces)
-        source_log = source_ws.subspace('.grevling')
-
-        with source_log.read_file('grevling.txt') as f:
-            ignore_missing = self.case._ignore_missing or b'success=0' in f.read()
-
-        self.case.postmap.copy(instance.context, source_ws, instance.logspace, ignore_missing=ignore_missing)
-
-        source_log.copy_all_to(instance.bookspace)
+        with instance.bind_remote(self.workspaces):
+            instance.download()
         return instance

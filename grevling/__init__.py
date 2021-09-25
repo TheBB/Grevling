@@ -35,6 +35,8 @@ __version__ = '1.2.1'
 def _pandas_dtype(tp):
     if tp == int:
         return pd.Int64Dtype()
+    if tp == bool:
+        return pd.BooleanDtype()
     if util.is_list_type(tp):
         return object
     return tp
@@ -373,7 +375,6 @@ class Case:
     script: ScriptTemplate
     _plots: List[Plot]
 
-    _logdir: str
     _ignore_missing: bool
 
     def __init__(self, yamlpath='.', storagepath=None, yamldata=None):
@@ -387,7 +388,7 @@ class Case:
         assert yamlpath.is_file()
         self.yamlpath = yamlpath
         self.sourcepath = yamlpath.parent
-        self.local_space = runner.LocalWorkspace(self.sourcepath)
+        self.local_space = runner.LocalWorkspace(self.sourcepath, 'SRC')
 
         if storagepath is None:
             storagepath = self.sourcepath / '.grevlingdata'
@@ -412,7 +413,7 @@ class Case:
         self.script = ScriptTemplate.load(casedata.get('script', []), casedata.get('containers', {}))
 
         # Fill in types derived from commands
-        self.script.add_types(self.context_mgr.types)
+        self.script.add_types(self.types)
 
         # Read settings
         settings = casedata.get('settings', {})
@@ -440,6 +441,7 @@ class Case:
 
     def iter_instancedirs(self) -> Iterable[api.Workspace]:
         for path in self.storagepath.iterdir():
+            print(path)
             if not (path / '.grevling' / 'context.json').exists():
                 continue
             yield runner.LocalWorkspace(path)
@@ -458,7 +460,7 @@ class Case:
             return pd.read_parquet(self.dataframepath, engine='pyarrow')
         data = {
             k: pd.Series([], dtype=_pandas_dtype(v))
-            for k, v in self.context_mgr.types.items()
+            for k, v in self.types.items()
             if k != '_index'
         }
         return pd.DataFrame(index=pd.Int64Index([]), data=data)
@@ -467,12 +469,10 @@ class Case:
         df.to_parquet(self.dataframepath, engine='pyarrow', index=True)
 
     def has_data(self):
+        from instance import Status
         with self.lock():
-            df = self.load_dataframe()
-        if df['_finished'].any():
-            return True
-        if any(self.iter_instancedirs()):
-            return True
+            for instance in self.instances(Status.Downloaded):
+                return True
         return False
 
     def _check_decide_diff(self, diff: List[str], prev_file: Path, interactive: bool = True) -> bool:
@@ -518,11 +518,6 @@ class Case:
         return True
 
     def check(self, interactive=True) -> bool:
-        if self._logdir is None:
-            if self._post_files:
-                util.log.error("Error: logdir must be set for capture of stdout, stderr or files")
-                return False
-
         prev_file = self.storagepath / 'grevling.yaml'
         if prev_file.exists():
             with open(self.yamlpath, 'r') as f:
@@ -543,66 +538,31 @@ class Case:
 
         return True
 
-    def prepare_instance(self, instance, workspace):
-        util.log.info(', '.join(f'{k}={repr(instance.context[k])}' for k in self.parameters))
+    def create_instances(self) -> Iterable[Instance]:
+        for i, ctx in enumerate(self.context_mgr.fullspace()):
+            ctx['_index'] = i
+            ctx['_logdir'] = render(self._logdir, ctx)
+            yield Instance.create(self, ctx)
 
-        collector = ResultCollector(self.context_mgr.types)
-        for key, value in instance.context.items():
-            collector.collect(key, value)
-        collector.commit_to_file(self.storage_spaces.open_workspace(instance.logdir).subspace('.grevling'))
-
-        util.log.debug(f"Using SRC='{self.local_space}', WRK='{workspace}'")
-        if not self.premap.copy(instance.context, self.local_space, workspace, ignore_missing=self._ignore_missing):
-            return False
-
-        instance.script = self.script.render(instance.context)
-        return True
-
-    def instances(self) -> Iterable[Instance]:
-        return (
-            Instance.from_context(
-                ctx, self._logdir, self.storage_spaces, self.context_mgr.types, index=i
-            )
-            for i, ctx in enumerate(self.context_mgr.fullspace())
-        )
-
-        # with runner.LocalRunner(self._ignore_missing) as r, runner.LocalWorkspaceCollection(self.storagepath) as target:
-
-        #     if nprocs is None:
-        #         nsuccess = 0
-        #         for instance in instances:
-        #             success = self.prepare_instance(r, instance)
-        #             if not success:
-        #                 continue
-        #         nsuccess = r.run_all()
-        #         r.download_all(target, self.postmap)
-
-        #     else:
-        #         with multiprocessing.Pool(processes=nprocs, initializer=util.initialize_process) as pool:
-        #             execer = partial(self.run_single, space=space, target=target)
-        #             nsuccess = sum(pool.starmap(execer, enumerate(instances)))
-
-        #     size = self.parameters.size_fullspace()
-        #     logger = util.log.info if nsuccess == size else util.log.error
-        #     logger(f"{nsuccess} of {size} succeeded")
-
-        #     return nsuccess == size
+    def instances(self, *statuses) -> Iterable[Instance]:
+        for name in self.storage_spaces.workspace_names():
+            instance = Instance(self, logdir=name)
+            if statuses and instance.status not in statuses:
+                continue
+            yield instance
 
     def capture(self):
-        for ws in self.iter_instancedirs():
-            log_ws = ws.subspace('.grevling')
-            collector = ResultCollector(self.context_mgr.types)
-            collector.collect_from_file(log_ws)
-            self.script.capture(collector, log_ws)
-            collector.commit_to_file(log_ws)
+        from .instance import Status
+        with self.lock():
+            for instance in self.instances(Status.Downloaded):
+                instance.capture()
 
     def collect(self):
+        from .instance import Status
         with self.lock():
             data = self.load_dataframe()
-            for ws in self.iter_instancedirs():
-                log_ws = ws.subspace('.grevling')
-                collector = ResultCollector(self.context_mgr.types)
-                collector.collect_from_file(log_ws)
+            for instance in self.instances(Status.Downloaded):
+                collector = instance.cached_capture()
                 data = collector.commit_to_dataframe(data)
             data = data.sort_index()
             self.save_dataframe(data)

@@ -64,6 +64,16 @@ def main(ctx, verbosity, rich):
     util.initialize_logging(level=verbosity, show_time=False)
     multiprocessing.current_process().name = 'M'
 
+    # from azure.identity import DefaultAzureCredential
+    # from azure.mgmt.resource import SubscriptionClient
+    # import logging
+    # for name in logging.root.manager.loggerDict:
+    #     if name.startswith('azure'):
+    #         logging.getLogger(name).setLevel('ERROR')
+    # cr = DefaultAzureCredential()
+    # subs = SubscriptionClient(cr)
+    # print(list(subs.subscriptions.list()))
+
 
 @main.command()
 @click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
@@ -92,7 +102,10 @@ def run(case, nprocs, azure):
     case.clear_cache()
 
     with LocalWorkflow(case) as w:
-        w.pipeline().run(case.instances())
+        w.pipeline().run(case.create_instances())
+    case.collect()
+    data = case.load_dataframe()
+    print(data)
 
 
 @main.command('run-with')

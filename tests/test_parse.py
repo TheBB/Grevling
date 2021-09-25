@@ -105,6 +105,7 @@ def test_parse():
         '_logdir': str,
         '_started': 'datetime64[ns]',
         '_finished': 'datetime64[ns]',
+        '_success': bool,
         'alpha': int,
         'bravo': float,
         'charlie': float,

@@ -179,9 +179,9 @@ class Script:
         try:
             for cmd in self.commands:
                 if not cmd.execute(cwd, log_ws):
-                    log_ws.write_file('grevling.txt', 'success=0\n', append=True)
+                    log_ws.write_file('grevling.txt', '_success=0\n', append=True)
                     return False
-            log_ws.write_file('grevling.txt', 'success=1\n', append=True)
+            log_ws.write_file('grevling.txt', '_success=1\n', append=True)
             return True
         finally:
             log_ws.write_file('grevling.txt', f'_finished={datetime.datetime.now()}\n', append=True)

@@ -67,32 +67,35 @@ class ResultCollector(dict):
         super().__init__()
         self._types = types
 
-    def collect_from_file(self, ws: api.Workspace):
-        with ws.open_file('context.json', 'r') as f:
+    def collect_from_context(self, ws: api.Workspace):
+        self.collect_from_file(ws, 'context.json')
+
+    def collect_from_cache(self, ws: api.Workspace):
+        self.collect_from_file(ws, 'captured.json')
+
+    def collect_from_file(self, ws: api.Workspace, filename: str):
+        with ws.open_file(filename, 'r') as f:
             data = json.load(f)
         for key, value in data.items():
             self.collect(key, value)
 
-    def collect(self, name: str, value: Any):
-        if name not in self._types:
-            return
-        tp = self._types[name]
-        if util.is_list_type(tp) and not isinstance(value, list):
-            eltype = get_args(tp)[0]
-            self.setdefault(name, []).append(eltype(value))
-        elif not isinstance(tp, str) and not util.is_list_type(tp):
-            self[name] = tp(value)
-        else:
-            self[name] = value
-
-    def read_info(self, ws: api.Workspace):
+    def collect_from_info(self, ws: api.Workspace):
         with ws.open_file('grevling.txt', 'r') as f:
             for line in f:
                 key, value = line.strip().split('=', 1)
                 self.collect(key, value)
 
+    def collect_from_dict(self, d: dict):
+        for k, v in d.items():
+            self.collect(k, v)
+
+    def collect(self, name: str, value: Any):
+        if name not in self._types:
+            return
+        self[name] = util.coerce_into(self._types[name], value, self.get(name))
+
     def commit_to_file(self, ws: api.Workspace):
-        with ws.open_file('context.json', 'w') as f:
+        with ws.open_file('captured.json', 'w') as f:
             json.dump(self, f, sort_keys=True, indent=4, cls=util.JSONEncoder)
 
     def commit_to_dataframe(self, data):

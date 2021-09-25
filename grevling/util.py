@@ -183,9 +183,22 @@ def call_yaml(func, mapping, *args, **kwargs):
 def coerce(tp, value):
     if is_list_type(tp) and not isinstance(value, list):
         eltype = get_args(tp)[0]
-        return eltype(value)
+        return coerce(eltype, value)
     elif not isinstance(tp, str) and not is_list_type(tp):
-        return tp(value)
+        if tp is bool:
+            return bool(int(value))
+        else:
+            return tp(value)
+    return value
+
+
+def coerce_into(tp, value, prev=None):
+    value = coerce(tp, value)
+    if is_list_type(tp) and isinstance(prev, list):
+        prev.append(value)
+        return prev
+    elif is_list_type(tp) and not isinstance(value, list):
+        return [value]
     return value
 
 

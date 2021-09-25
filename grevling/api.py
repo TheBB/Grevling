@@ -65,5 +65,9 @@ class WorkspaceCollection(ContextManager['WorkspaceCollection']):
         ...
 
     @abstractmethod
-    def open_workspace(self, name: str) -> Workspace:
+    def open_workspace(self, path: str, name: str = '') -> Workspace:
+        ...
+
+    @abstractmethod
+    def workspace_names(self) -> Iterable[str]:
         ...

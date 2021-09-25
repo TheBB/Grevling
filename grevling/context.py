@@ -33,7 +33,8 @@ class ContextManager:
 
     parameters: ParameterSpace
     evaluables: Dict[str, str]
-    constants = Dict[str, Any]
+    constants: Dict[str, Any]
+    templates: Dict[str, Any]
     types: Dict[str, Any]
 
     @classmethod
@@ -50,6 +51,7 @@ class ContextManager:
             '_logdir': str,
             '_started': 'datetime64[ns]',
             '_finished': 'datetime64[ns]',
+            '_success': bool,
         }
         self.types.update(data.get('types', {}))
 
