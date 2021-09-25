@@ -11,12 +11,24 @@ import grevling
 from . import util, api
 
 import grevling.workflow.local
+try:
+    import grevling.workflow.azure
+except ImportError:
+    pass
 
 
 def workflows(func):
     func = click.option('--local', 'workflow', is_flag=True, flag_value='local', default=True)(func)
     func = click.option('--azure', 'workflow', is_flag=True, flag_value='azure')(func)
     return func
+
+
+def run_helper(workflow, instances, **kwargs) -> bool:
+    with api.Workflow.get_workflow(workflow, **kwargs) as w:
+        if not w.ready:
+            return False
+        w.pipeline().run(instances)
+    return True
 
 
 class CustomClickException(click.ClickException):
@@ -88,12 +100,11 @@ def check(case):
 @click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
 @click.option('-j', 'nprocs', default=1, type=int)
 @workflows
-def run_all(case, workflow, nprocs):
+def run_all(case, workflow, **kwargs):
     if not case.check(interactive=False):
         sys.exit(1)
     case.clear_cache()
-    with api.Workflow.get_workflow(workflow)(nprocs) as w:
-        w.pipeline().run(case.create_instances())
+    run_helper(workflow, case.create_instances(), **kwargs)
     case.collect()
     case.plot()
 
@@ -102,12 +113,11 @@ def run_all(case, workflow, nprocs):
 @click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
 @click.option('-j', 'nprocs', default=1, type=int)
 @workflows
-def run(case, nprocs, workflow):
+def run(case, workflow, **kwargs):
     if not case.check(interactive=False):
         sys.exit(1)
     case.clear_cache()
-    with api.Workflow.get_workflow(workflow)(nprocs) as w:
-        w.pipeline().run(case.create_instances())
+    run_helper(workflow, case.create_instances(), **kwargs)
 
 
 @main.command('run-with')
@@ -122,8 +132,7 @@ def run_with(case, target, workflow, context):
         k, v = s.split('=', 1)
         parsed_context[k] = evaluator.eval(v)
     instance = case.create_instance(parsed_context, logdir=target)
-    with api.Workflow.get_workflow(workflow)() as w:
-        w.pipeline().run([instance])
+    run_helper('local', [instance])
 
 
 @main.command('capture')

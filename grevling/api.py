@@ -86,12 +86,19 @@ class WorkspaceCollection(ContextManager['WorkspaceCollection'], ABC):
 
 class Workflow(ContextManager['Workflow'], ABC):
 
+    ready: bool
+
+    @classmethod
+    def init(cls):
+        pass
+
     @staticmethod
-    def get_workflow(name: str):
+    def get_workflow(name: str, **kwargs):
         cls = util.find_subclass(Workflow, name, attr='name')
         if not cls:
             raise ImportError(f"Unknown workflow, or additional dependencies required: {name}")
-        return cls
+        cls.init()
+        return cls(**kwargs)
 
     @abstractmethod
     def pipeline():

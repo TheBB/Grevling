@@ -30,6 +30,8 @@ class RunInstance(PipeSegment):
 class LocalWorkflow(api.Workflow):
 
     name = 'local'
+    ready = True
+
     nprocs: int
 
     def __init__(self, nprocs: int = 1):
