@@ -88,6 +88,9 @@ class Workflow(ContextManager['Workflow'], ABC):
 
     ready: bool
 
+    def __init__(self, case):
+        self.case = case
+
     @classmethod
     def init(cls):
         pass

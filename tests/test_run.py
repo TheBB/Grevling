@@ -31,7 +31,7 @@ def check_df(left, right):
 def test_echo():
     case = Case(DATADIR / 'run' / 'echo')
     case.clear_cache()
-    with LocalWorkflow() as w:
+    with LocalWorkflow(case) as w:
         w.pipeline().run(case.create_instances())
     case.collect()
 
@@ -53,7 +53,7 @@ def test_echo():
 def test_cat():
     case = Case(DATADIR / 'run' / 'cat')
     case.clear_cache()
-    with LocalWorkflow() as w:
+    with LocalWorkflow(case) as w:
         w.pipeline().run(case.create_instances())
     case.collect()
 
@@ -76,7 +76,7 @@ def test_cat():
 def test_files():
     case = Case(DATADIR / 'run' / 'files')
     case.clear_cache()
-    with LocalWorkflow() as w:
+    with LocalWorkflow(case) as w:
         w.pipeline().run(case.create_instances())
 
     for a in range(1,4):
@@ -93,7 +93,7 @@ def test_files():
 def test_capture():
     case = Case(DATADIR / 'run' / 'capture')
     case.clear_cache()
-    with LocalWorkflow() as w:
+    with LocalWorkflow(case) as w:
         w.pipeline().run(case.create_instances())
     case.collect()
 
@@ -125,7 +125,7 @@ def test_capture():
 def test_double_capture():
     case = Case(DATADIR / 'run' / 'capture')
     case.clear_cache()
-    with LocalWorkflow() as w:
+    with LocalWorkflow(case) as w:
         w.pipeline().run(case.create_instances())
     case.collect()
     case.capture()
@@ -158,7 +158,7 @@ def test_double_capture():
 def test_failing():
     case = Case(DATADIR / 'run' / 'failing')
     case.clear_cache()
-    with LocalWorkflow() as w:
+    with LocalWorkflow(case) as w:
         w.pipeline().run(case.create_instances())
     case.collect()
 
@@ -179,7 +179,7 @@ def test_failing():
 def test_stdout():
     case = Case(DATADIR / 'run' / 'stdout')
     case.clear_cache()
-    with LocalWorkflow() as w:
+    with LocalWorkflow(case) as w:
         w.pipeline().run(case.create_instances())
 
     path = case.storagepath
@@ -197,7 +197,7 @@ def test_stdout():
 def test_docker():
     case = Case(DATADIR / 'run' / 'docker')
     case.clear_cache()
-    with LocalWorkflow() as w:
+    with LocalWorkflow(case) as w:
         w.pipeline().run(case.create_instances())
 
 
