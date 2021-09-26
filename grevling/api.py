@@ -56,7 +56,7 @@ class Workspace(ABC):
         ...
 
     @abstractmethod
-    def subspace(self, name: str) -> 'Workspace':
+    def subspace(self, path: str, name: str = '') -> 'Workspace':
         ...
 
     @abstractmethod
@@ -71,9 +71,7 @@ class Workspace(ABC):
 
 class WorkspaceCollection(ContextManager['WorkspaceCollection'], ABC):
 
-    @abstractmethod
-    def new_workspace(self, prefix: Optional[str] = None) -> Workspace:
-        ...
+    name: str
 
     @abstractmethod
     def open_workspace(self, path: str, name: str = '') -> Workspace:

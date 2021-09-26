@@ -1,6 +1,9 @@
+from io import IOBase
 from operator import attrgetter
+from pathlib import Path
 import re
-import string
+
+from typing import Iterable, Optional, ContextManager, Union
 
 import inquirer
 
@@ -13,9 +16,10 @@ from azure.mgmt.batch import BatchManagementClient
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.resource import SubscriptionClient
 from azure.mgmt.storage import StorageManagementClient
-from azure.storage.blob import BlobServiceClient
+from azure.storage.blob import BlobServiceClient, ContainerClient, BlobPrefix
 
 from .. import api, util
+from . import PrepareInstance
 
 
 az_loggers = [
@@ -109,7 +113,7 @@ def get_attached_storage(cred, sub, batch):
         return None
 
     util.log.info(f"Using storage account '{acct_name}'")
-    return BlobServiceClient(account_url='https://{acct_name}.blob.core.windows.net', credential=key)
+    return BlobServiceClient(account_url=f'https://{acct_name}.blob.core.windows.net', credential=key)
 
 
 def get_batch_client(cred, sub, batch):
@@ -190,6 +194,68 @@ def get_pool_settings(cred, sub, acct, batch):
     }
 
 
+class AzureWorkspace(api.Workspace):
+
+    client: ContainerClient
+    root: Path
+
+    def __init__(self, client: ContainerClient, root: Path, name: str = ''):
+        self.client = client
+        self.root = root
+        self.name = name
+
+    def __str__(self):
+        return f'{self.client.container_name}/{self.root}'
+
+    def destroy(self):
+        assert False
+
+    def open_file(self, path: api.PathStr, mode: str = 'w') -> ContextManager[IOBase]:
+        assert False
+
+    def write_file(self, path: api.PathStr, source: Union[str, bytes, IOBase, Path]):
+        self.client.upload_blob(str(self.root / path), source, overwrite=True)
+
+    def read_file(self, path: api.PathStr) -> ContextManager[IOBase]:
+        assert False
+
+    def files(self) -> Iterable[Path]:
+        assert False
+
+    def exists(self, path: api.PathStr) -> bool:
+        assert False
+
+    def subspace(self, path: str, name: str = '') -> 'AzureWorkspace':
+        name = name or str(path)
+        return AzureWorkspace(self.client, self.root / path, name=f'{self.name}/{name}')
+
+    def top_name(self) -> str:
+        assert False
+
+
+class AzureWorkspaceCollection(api.WorkspaceCollection):
+
+    client: ContainerClient
+
+    def __init__(self, client: ContainerClient, name: str = ''):
+        self.client = client
+        self.name = name
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        pass
+
+    def workspace_names(self) -> Iterable[str]:
+        for blob in self.client.walk_blobs():
+            if isinstance(blob, BlobPrefix):
+                yield blob.name
+
+    def open_workspace(self, path: str, name: str = '') -> AzureWorkspace:
+        return AzureWorkspace(self.client, Path(path), name)
+
+
 class AzureWorkflow(api.Workflow):
 
     name = 'azure'
@@ -220,11 +286,13 @@ class AzureWorkflow(api.Workflow):
             return self
         util.log.info(f"Using batch account '{batch_account.name}'")
 
-        self.blob_client = get_attached_storage(credential, subscription.subscription_id, batch_account)
-        self.batch_client = get_batch_client(credential, subscription.subscription_id, batch_account)
+        blob_client = get_attached_storage(credential, subscription.subscription_id, batch_account)
+        if blob_client is None:
+            return self
+        # self.batch_client = get_batch_client(credential, subscription.subscription_id, batch_account)
+        # pool = get_pool_settings(credential, subscription.subscription_id, batch_account, self.batch_client)
 
-        pool = get_pool_settings(credential, subscription.subscription_id, batch_account, self.batch_client)
-        print(pool)
+        self.workspaces = AzureWorkspaceCollection(blob_client.get_container_client('grevling'))
 
         self.ready = True
         return self
@@ -233,4 +301,4 @@ class AzureWorkflow(api.Workflow):
         pass
 
     def pipeline(self):
-        return None
+        return PrepareInstance(self.workspaces)

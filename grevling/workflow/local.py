@@ -66,10 +66,6 @@ class LocalWorkspaceCollection(api.WorkspaceCollection):
     def __exit__(self, *args, **kwargs):
         pass
 
-    def new_workspace(self, prefix: Optional[str] = None, name: str = '') -> api.Workspace:
-        path = Path(tempfile.mkdtemp(prefix=prefix, dir=self.root))
-        return LocalWorkspace(path, name)
-
     def open_workspace(self, path: str, name: str = '') -> api.Workspace:
         subpath = self.root / path
         subpath.mkdir(parents=True, exist_ok=True)
