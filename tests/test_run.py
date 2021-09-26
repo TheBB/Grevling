@@ -28,10 +28,14 @@ def check_df(left, right):
     )
 
 
-def test_echo():
+@pytest.mark.parametrize('as_bash', [True, False])
+def test_echo(as_bash):
+    if as_bash and os.name == 'nt':
+        pytest.skip()
+
     case = Case(DATADIR / 'run' / 'echo')
     case.clear_cache()
-    with LocalWorkflow(case) as w:
+    with LocalWorkflow(as_bash=as_bash) as w:
         w.pipeline().run(case.create_instances())
     case.collect()
 
@@ -50,10 +54,14 @@ def test_echo():
     ))
 
 
-def test_cat():
+@pytest.mark.parametrize('as_bash', [True, False])
+def test_cat(as_bash):
+    if as_bash and os.name == 'nt':
+        pytest.skip()
+
     case = Case(DATADIR / 'run' / 'cat')
     case.clear_cache()
-    with LocalWorkflow(case) as w:
+    with LocalWorkflow(as_bash=as_bash) as w:
         w.pipeline().run(case.create_instances())
     case.collect()
 
@@ -73,10 +81,14 @@ def test_cat():
     ))
 
 
-def test_files():
+@pytest.mark.parametrize('as_bash', [True, False])
+def test_files(as_bash):
+    if as_bash and os.name == 'nt':
+        pytest.skip()
+
     case = Case(DATADIR / 'run' / 'files')
     case.clear_cache()
-    with LocalWorkflow(case) as w:
+    with LocalWorkflow(as_bash=as_bash) as w:
         w.pipeline().run(case.create_instances())
 
     for a in range(1,4):
@@ -90,10 +102,14 @@ def test_files():
             assert read_file(path / 'some' / 'deep' / 'directory' / 'empty3.dat') == ''
 
 
-def test_capture():
+@pytest.mark.parametrize('as_bash', [True, False])
+def test_capture(as_bash):
+    if as_bash and os.name == 'nt':
+        pytest.skip()
+
     case = Case(DATADIR / 'run' / 'capture')
     case.clear_cache()
-    with LocalWorkflow(case) as w:
+    with LocalWorkflow(as_bash=as_bash) as w:
         w.pipeline().run(case.create_instances())
     case.collect()
 
@@ -125,7 +141,7 @@ def test_capture():
 def test_double_capture():
     case = Case(DATADIR / 'run' / 'capture')
     case.clear_cache()
-    with LocalWorkflow(case) as w:
+    with LocalWorkflow() as w:
         w.pipeline().run(case.create_instances())
     case.collect()
     case.capture()
@@ -155,10 +171,14 @@ def test_double_capture():
     ))
 
 
-def test_failing():
+@pytest.mark.parametrize('as_bash', [True, False])
+def test_failing(as_bash):
+    if as_bash and os.name == 'nt':
+        pytest.skip()
+
     case = Case(DATADIR / 'run' / 'failing')
     case.clear_cache()
-    with LocalWorkflow(case) as w:
+    with LocalWorkflow(as_bash=as_bash) as w:
         w.pipeline().run(case.create_instances())
     case.collect()
 
@@ -176,10 +196,14 @@ def test_failing():
     ))
 
 
-def test_stdout():
+@pytest.mark.parametrize('as_bash', [True, False])
+def test_stdout(as_bash):
+    if as_bash and os.name == 'nt':
+        pytest.skip()
+
     case = Case(DATADIR / 'run' / 'stdout')
     case.clear_cache()
-    with LocalWorkflow(case) as w:
+    with LocalWorkflow(as_bash=as_bash) as w:
         w.pipeline().run(case.create_instances())
 
     path = case.storagepath
@@ -194,11 +218,15 @@ def test_stdout():
 
 
 @pytest.mark.skipif(os.name == 'nt' or shutil.which('docker') is None, reason="requires docker and *nix")
-def test_docker():
+@pytest.mark.parametrize('as_bash', [True, False])
+def test_docker(as_bash):
     case = Case(DATADIR / 'run' / 'docker')
     case.clear_cache()
-    with LocalWorkflow(case) as w:
+    with LocalWorkflow(as_bash=as_bash) as w:
         w.pipeline().run(case.create_instances())
+
+    path = case.storagepath
+    assert 'Hello from Docker!' in read_file(path / '0' / '.grevling' / 'empty.stdout')
 
 
 @pytest.mark.skipif(shutil.which('sleep') is None, reason="requires sleep")

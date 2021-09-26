@@ -24,6 +24,7 @@ def workflows(func):
 
 
 def run_helper(workflow, instances, **kwargs) -> bool:
+    print(kwargs)
     with api.Workflow.get_workflow(workflow, **kwargs) as w:
         if not w.ready:
             return False
@@ -104,7 +105,7 @@ def run_all(case, workflow, **kwargs):
     if not case.check(interactive=False):
         sys.exit(1)
     case.clear_cache()
-    if not run_helper(workflow, case.create_instances(), case=case, **kwargs):
+    if not run_helper(workflow, case.create_instances(), **kwargs):
         return
     case.collect()
     case.plot()
@@ -118,7 +119,7 @@ def run(case, workflow, **kwargs):
     if not case.check(interactive=False):
         sys.exit(1)
     case.clear_cache()
-    run_helper(workflow, case.create_instances(), case=case, **kwargs)
+    run_helper(workflow, case.create_instances(), **kwargs)
 
 
 @main.command('run-with')
@@ -133,7 +134,7 @@ def run_with(case, target, workflow, context):
         k, v = s.split('=', 1)
         parsed_context[k] = evaluator.eval(v)
     instance = case.create_instance(parsed_context, logdir=target)
-    run_helper(workflow, [instance], case=case)
+    run_helper(workflow, [instance])
 
 
 @main.command('capture')

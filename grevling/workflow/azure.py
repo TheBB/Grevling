@@ -19,7 +19,7 @@ from azure.mgmt.storage import StorageManagementClient
 from azure.storage.blob import BlobServiceClient, ContainerClient, BlobPrefix
 
 from .. import api, util
-from . import PrepareInstance
+from . import PrepareInstance, PipeSegment
 
 
 az_loggers = [
@@ -256,6 +256,18 @@ class AzureWorkspaceCollection(api.WorkspaceCollection):
         return AzureWorkspace(self.client, Path(path), name)
 
 
+class RunInstance(PipeSegment):
+
+    def __init__(self, workspaces):
+        self.workspaces = workspaces
+
+    @util.with_context('I {instance.index}')
+    @util.with_context('Run')
+    def apply(self, instance):
+        with instance.bind_remote(self.workspaces):
+            instance.upload_script()
+
+
 class AzureWorkflow(api.Workflow):
 
     name = 'azure'
@@ -268,6 +280,9 @@ class AzureWorkflow(api.Workflow):
         if logging.root.level > logging.DEBUG:
             for name in az_loggers:
                 logging.getLogger(name).setLevel(logging.ERROR)
+
+    def __init__(self, **_):
+        pass
 
     def __enter__(self):
         self.ready = False

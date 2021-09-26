@@ -99,6 +99,7 @@ class Workflow(ContextManager['Workflow'], ABC):
         if not cls:
             raise ImportError(f"Unknown workflow, or additional dependencies required: {name}")
         cls.init()
+        print(cls, kwargs)
         return cls(**kwargs)
 
     @abstractmethod

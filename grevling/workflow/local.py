@@ -13,16 +13,29 @@ from .. import util, api
 
 class RunInstance(PipeSegment):
 
-    def __init__(self, workspaces, ncopies: int = 1):
+    workspaces: api.WorkspaceCollection
+    as_bash: bool
+
+    def __init__(self, workspaces, ncopies: int = 1, as_bash: bool = False):
         super().__init__(ncopies)
         self.workspaces = workspaces
+        self.as_bash = as_bash
 
     @util.with_context('I {instance.index}')
     @util.with_context('Run')
     async def apply(self, instance):
-        instance.status = Status.Started
         workspace = instance.open_workspace(self.workspaces)
-        await instance.script.run(workspace.root, workspace.subspace('.grevling'))
+        if self.as_bash:
+            with instance.bind_remote(self.workspaces):
+                instance.upload_script(in_container=False)
+
+        instance.status = Status.Started
+
+        if self.as_bash:
+            await instance.script.run_script(workspace.root)
+        else:
+            await instance.script.run(workspace.root, workspace.subspace('.grevling'))
+
         instance.status = Status.Finished
         return instance
 
@@ -33,8 +46,10 @@ class LocalWorkflow(api.Workflow):
     ready = True
 
     nprocs: int
+    as_bash: bool
 
-    def __init__(self, nprocs: int = 1):
+    def __init__(self, nprocs: int = 1, as_bash: bool = False):
+        self.as_bash = as_bash
         self.nprocs = nprocs
 
     def __enter__(self):
@@ -47,7 +62,7 @@ class LocalWorkflow(api.Workflow):
     def pipeline(self):
         return Pipeline(
             PrepareInstance(self.workspaces),
-            RunInstance(self.workspaces, ncopies=self.nprocs),
+            RunInstance(self.workspaces, ncopies=self.nprocs, as_bash=self.as_bash),
             DownloadResults(self.workspaces),
         )
 

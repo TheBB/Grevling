@@ -63,6 +63,26 @@ class Command:
     retry_on_fail: bool = False
     allow_failure: bool = False
 
+    def containerify(self, cwd, command, as_bash: bool = False):
+        if as_bash:
+            cargs = [shlex.quote(carg) for carg in self.container_args]
+        else:
+            cargs = self.container_args
+        docker_command = [
+            'docker', 'run', *cargs,
+            f'-v{cwd}:/workdir', '--workdir', '/workdir',
+            self.container,
+        ]
+        if command:
+            docker_command.extend(['bash', '-c', ' '.join(shlex.quote(c) for c in command)])
+        return docker_command
+
+    def to_bash(self, in_container: bool = False) -> str:
+        command = self.args
+        if in_container or not self.container:
+            return ' '.join(shlex.quote(c) for c in command)
+        return ' '.join(self.containerify('$(pwd)', command, as_bash=True))
+
     async def execute(self, cwd: Path, log_ws: api.Workspace):
         kwargs = {
             'cwd': cwd,
@@ -72,15 +92,8 @@ class Command:
 
         command = self.args
         if self.container:
-            docker_command = [
-                'docker', 'run', *self.container_args,
-                f'-v{cwd}:/workdir', '--workdir', '/workdir',
-                self.container,
-            ]
-            if command:
-                docker_command.extend(['bash', '-c', ' '.join(shlex.quote(c) for c in command)])
+            command = self.containerify(cwd, command)
             kwargs['shell'] = False
-            command = docker_command
 
         util.log.debug(' '.join(shlex.quote(c) for c in command))
 
@@ -192,17 +205,60 @@ class Script:
 
     commands: List[Command]
 
-    async def run(self, cwd: Path, log_ws: api.Workspace) -> bool:
+    async def run_script(self, cwd: Path):
+        proc = await asyncio.create_subprocess_exec('bash', '.grevling/grevling.sh', cwd=cwd)
+        await proc.communicate()
+
+    async def run(self, cwd: Path, log_ws: api.Workspace):
         log_ws.write_file('grevling.txt', f'_started={datetime.datetime.now()}\n', append=True)
         try:
             for cmd in self.commands:
                 if not await cmd.execute(cwd, log_ws):
                     log_ws.write_file('grevling.txt', '_success=0\n', append=True)
-                    return False
+                    return
             log_ws.write_file('grevling.txt', '_success=1\n', append=True)
-            return True
         finally:
             log_ws.write_file('grevling.txt', f'_finished={datetime.datetime.now()}\n', append=True)
+
+    def to_bash(self, in_container: bool = False) -> str:
+        cmds = []
+        for command in self.commands:
+            name = command.name
+            cmds.extend([
+                f'exec_{name}() {{',
+                '    ' + command.to_bash(in_container=in_container),
+                '}',
+            ])
+            cmds.extend([
+                f'time_{name}() {{',
+                f'    duration=$( {{ time exec_{name} > .grevling/{name}.stdout 2> .grevling/{name}.stderr; }} 2>&1 )',
+                '    status=$?',
+                f'    echo walltime/{name}=$duration >> .grevling/grevling.txt',
+                '    return $status',
+                '}'
+            ])
+
+        cmds.append('exec_all() {')
+        for command in self.commands:
+            cmds.extend([
+                f'    time_{command.name}',
+                '    if [ $? -ne 0 ]; then return 0; fi',
+            ])
+        cmds.extend([
+            '    return 1',
+            '}'
+        ])
+
+        cmds.extend([
+            "export TIMEFORMAT='%3R'",
+            "rm -f .grevling/grevling.txt",
+            "echo _started=$(date '+%Y-%m-%d %H:%M:%S.%N') >> .grevling/grevling.txt",
+            "exec_all",
+            "echo _success=$? >> .grevling/grevling.txt",
+            "echo _finished=$(date '+%Y-%m-%d %H:%M:%S.%N') >> .grevling/grevling.txt",
+        ])
+
+        return '\n'.join(cmds) + '\n'
 
 
 class ScriptTemplate:

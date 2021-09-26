@@ -141,7 +141,10 @@ class Case:
         return pd.DataFrame(index=pd.Int64Index([]), data=data)
 
     def save_dataframe(self, df: pd.DataFrame):
-        df.to_parquet(self.dataframepath, engine='pyarrow', index=True)
+        df.to_parquet(
+            self.dataframepath, engine='pyarrow', index=True,
+            allow_truncated_timestamps=True, coerce_timestamps='us',
+        )
 
     def has_data(self):
         with self.lock():
@@ -388,6 +391,12 @@ class Instance:
         self._case.premap.copy(self.context, src, self.remote, ignore_missing=self._case._ignore_missing)
 
         self.status = Status.Prepared
+
+    def upload_script(self, in_container: bool = False):
+        assert self.remote_book
+        assert self.status == Status.Prepared
+        script = self.script.to_bash(in_container=in_container)
+        self.remote_book.write_file('grevling.sh', script)
 
     def download(self):
         assert self.remote
