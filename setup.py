@@ -11,6 +11,7 @@ setup(
     license='AGPL3',
     url='https://github.com/TheBB/Grevling',
     packages=find_packages(),
+    python_requires='>=3.7',
     install_requires=[
         'bidict',
         'click',
@@ -23,7 +24,7 @@ setup(
         'rich',
         'ruamel.yaml',
         'simpleeval',
-        'strictyaml',
+        'strictyaml>=1.4',
         'typing-inspect',
     ],
     extras_require={
