@@ -13,7 +13,8 @@ from .. import util, api
 
 class RunInstance(PipeSegment):
 
-    def __init__(self, workspaces):
+    def __init__(self, workspaces, ncopies: int = 1):
+        super().__init__(ncopies)
         self.workspaces = workspaces
 
     @util.with_context('I {instance.index}')
@@ -29,6 +30,10 @@ class RunInstance(PipeSegment):
 class LocalWorkflow(api.Workflow):
 
     name = 'local'
+    nprocs: int
+
+    def __init__(self, nprocs: int = 1):
+        self.nprocs = nprocs
 
     def __enter__(self):
         self.workspaces = TempWorkspaceCollection('WRK').__enter__()
@@ -40,7 +45,7 @@ class LocalWorkflow(api.Workflow):
     def pipeline(self):
         return Pipeline(
             PrepareInstance(self.workspaces),
-            RunInstance(self.workspaces),
+            RunInstance(self.workspaces, ncopies=self.nprocs),
             DownloadResults(self.workspaces),
         )
 

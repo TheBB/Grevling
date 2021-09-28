@@ -1,0 +1,7 @@
+parameters:
+  nothing:
+    type: uniform
+    interval: [0.0, 1.0]
+    num: 20
+script:
+  - sleep 0.5

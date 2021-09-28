@@ -90,12 +90,13 @@ def check(case):
 
 @main.command('run-all')
 @click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
+@click.option('-j', 'nprocs', default=1, type=int)
 @workflows
-def run_all(case, workflow):
+def run_all(case, workflow, nprocs):
     if not case.check(interactive=False):
         sys.exit(1)
     case.clear_cache()
-    with api.Workflow.get_workflow(workflow)() as w:
+    with api.Workflow.get_workflow(workflow)(nprocs) as w:
         w.pipeline().run(case.create_instances())
     case.collect()
     case.plot()
@@ -103,13 +104,13 @@ def run_all(case, workflow):
 
 @main.command('run')
 @click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
-@click.option('-j', 'nprocs', default=None, type=int)
+@click.option('-j', 'nprocs', default=1, type=int)
 @workflows
 def run(case, nprocs, workflow):
     if not case.check(interactive=False):
         sys.exit(1)
     case.clear_cache()
-    with api.Workflow.get_workflow(workflow)() as w:
+    with api.Workflow.get_workflow(workflow)(nprocs) as w:
         w.pipeline().run(case.create_instances())
 
 

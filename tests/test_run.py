@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import shutil
+from time import time
 
 import pandas as pd
 import pytest
@@ -198,3 +199,18 @@ def test_docker():
     case.clear_cache()
     with LocalWorkflow() as w:
         w.pipeline().run(case.create_instances())
+
+
+@pytest.mark.skipif(shutil.which('sleep') is None, reason="requires sleep")
+def test_sleep():
+    case = Case(DATADIR / 'run' / 'sleep')
+    case.clear_cache()
+
+    with LocalWorkflow(nprocs=20) as w:
+        start = time()
+        w.pipeline().run(case.create_instances())
+        duration = time() - start
+
+    # The case is configured to launch 20 processes, each sleeping 1/2 second
+    # with 20 concurrent processes, this should take < 1 sec under normal cirumstances.
+    assert duration < 2.0

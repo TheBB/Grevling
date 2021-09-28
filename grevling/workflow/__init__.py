@@ -10,7 +10,10 @@ from .. import util
 
 class Pipe(ABC):
 
+    ncopies: int = 1
+
     def run(self, inputs):
+        # TODO: As far as I can tell, this is only needed on Python 3.7
         if os.name == 'nt':
             asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
         asyncio.run(self._run(inputs))
@@ -25,6 +28,9 @@ class Pipe(ABC):
 
 
 class PipeSegment(Pipe):
+
+    def __init__(self, ncopies: int = 1):
+        self.ncopies = ncopies
 
     async def _run(self, inputs):
         queue = util.to_queue(inputs)
@@ -67,7 +73,8 @@ class Pipeline(Pipe):
         out_queues = chain(queues, [out_queue])
 
         for pipe, inq, outq in zip(self.pipes, in_queues, out_queues):
-            asyncio.create_task(pipe.work(inq, outq))
+            for _ in range(pipe.ncopies):
+                asyncio.create_task(pipe.work(inq, outq))
 
         await in_queue.join()
         for queue in queues:
