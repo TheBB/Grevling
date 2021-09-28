@@ -37,7 +37,7 @@ class PipeSegment(Pipe):
                 util.log.error(str(e))
                 with StringIO() as buf:
                     traceback.print_exc(file=buf)
-                    util.log.debug(buf.getvalue())
+                    util.log.error(buf.getvalue())
                 in_queue.task_done()
                 continue
             if out_queue:

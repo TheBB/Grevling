@@ -7,6 +7,7 @@ import pytest
 
 from grevling import Case
 from grevling.workflow.local import LocalWorkflow
+from grevling.util import initialize_logging
 
 
 DATADIR = Path(__file__).parent / 'data'
