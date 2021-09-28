@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import asyncio
 from io import StringIO
 from itertools import chain
+import os
 import traceback
 
 from .. import util
@@ -10,6 +11,8 @@ from .. import util
 class Pipe(ABC):
 
     def run(self, inputs):
+        if os.name == 'nt':
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
         asyncio.run(self._run(inputs))
 
     @abstractmethod
