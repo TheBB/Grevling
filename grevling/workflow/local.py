@@ -18,10 +18,10 @@ class RunInstance(PipeSegment):
 
     @util.with_context('I {instance.index}')
     @util.with_context('Run')
-    def apply(self, instance):
+    async def apply(self, instance):
         instance.status = Status.Started
         workspace = instance.open_workspace(self.workspaces)
-        instance.script.run(workspace.root, workspace.subspace('.grevling'))
+        await instance.script.run(workspace.root, workspace.subspace('.grevling'))
         instance.status = Status.Finished
         return instance
 

@@ -1,3 +1,5 @@
+import asyncio
+from collections import namedtuple
 from contextlib import contextmanager
 from dataclasses import field, InitVar, dataclass
 import datetime
@@ -27,6 +29,26 @@ def shell_list_render(arg: Union[str, List[str]], context: api.Context) -> List[
     return [render(c, context) for c in arg]
 
 
+Result = namedtuple('Result', ['stdout', 'stderr', 'returncode'])
+
+async def run(command: List[str], shell: bool, env: Dict[str, str], cwd: Path) -> Result:
+    kwargs = {
+        'env': env,
+        'cwd': cwd,
+        'stdout': asyncio.subprocess.PIPE,
+        'stderr': asyncio.subprocess.PIPE,
+    }
+
+    if shell:
+        command = ' '.join(shlex.quote(c) for c in command)
+        proc = await asyncio.create_subprocess_shell(command, **kwargs)
+    else:
+        proc = await asyncio.create_subprocess_exec(*command, **kwargs)
+
+    stdout, stderr = await proc.communicate()
+    return Result(stdout, stderr, proc.returncode)
+
+
 @dataclass()
 class Command:
 
@@ -41,12 +63,10 @@ class Command:
     retry_on_fail: bool = False
     allow_failure: bool = False
 
-    def execute(self, cwd: Path, log_ws: api.Workspace):
+    async def execute(self, cwd: Path, log_ws: api.Workspace):
         kwargs = {
             'cwd': cwd,
             'shell': self.shell,
-            'stdout': subprocess.PIPE,
-            'stderr': subprocess.PIPE,
             'env': self.env,
         }
 
@@ -64,12 +84,10 @@ class Command:
 
         util.log.debug(' '.join(shlex.quote(c) for c in command))
 
-        if kwargs['shell']:
-            command = ' '.join(shlex.quote(c) for c in command)
-
+        # TODO: How to get good timings when we run async?
         with time() as duration:
             while True:
-                result = subprocess.run(command, **kwargs)
+                result = await run(command, **kwargs)
                 if self.retry_on_fail and result.returncode:
                     util.log.info('Failed, retrying...')
                     continue
@@ -87,7 +105,7 @@ class Command:
             level(f"stderr stored")
             return self.allow_failure
         else:
-            util.log.info(f"success ({util.format_seconds(duration)})")
+            util.log.info(f"{self.name} success ({util.format_seconds(duration)})")
 
         return True
 
@@ -174,11 +192,11 @@ class Script:
 
     commands: List[Command]
 
-    def run(self, cwd: Path, log_ws: api.Workspace) -> bool:
+    async def run(self, cwd: Path, log_ws: api.Workspace) -> bool:
         log_ws.write_file('grevling.txt', f'_started={datetime.datetime.now()}\n', append=True)
         try:
             for cmd in self.commands:
-                if not cmd.execute(cwd, log_ws):
+                if not await cmd.execute(cwd, log_ws):
                     log_ws.write_file('grevling.txt', '_success=0\n', append=True)
                     return False
             log_ws.write_file('grevling.txt', '_success=1\n', append=True)

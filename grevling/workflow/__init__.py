@@ -32,7 +32,7 @@ class PipeSegment(Pipe):
         while True:
             arg = await in_queue.get()
             try:
-                ret = self.apply(arg)
+                ret = await self.apply(arg)
             except Exception as e:
                 util.log.error(str(e))
                 with StringIO() as buf:
@@ -45,7 +45,7 @@ class PipeSegment(Pipe):
             in_queue.task_done()
 
     @abstractmethod
-    def apply(self, arg):
+    async def apply(self, arg):
         ...
 
 
@@ -78,7 +78,7 @@ class PrepareInstance(PipeSegment):
 
     @util.with_context('I {instance.index}')
     @util.with_context('Pre')
-    def apply(self, instance):
+    async def apply(self, instance):
         with instance.bind_remote(self.workspaces):
             instance.prepare()
         return instance
@@ -91,7 +91,7 @@ class DownloadResults(PipeSegment):
 
     @util.with_context('I {instance.index}')
     @util.with_context('Down')
-    def apply(self, instance):
+    async def apply(self, instance):
         with instance.bind_remote(self.workspaces):
             instance.download()
         return instance
