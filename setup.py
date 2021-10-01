@@ -17,7 +17,6 @@ setup(
         'click',
         'fasteners',
         'mako',
-        'multiprocessing-logging',
         'numpy',
         'pandas',
         'pyarrow',

@@ -2,15 +2,12 @@ import asyncio
 from contextlib import contextmanager
 from functools import wraps
 import inspect
-from itertools import product
+from itertools import product, chain
 import json
 import logging
-import multiprocessing
-import warnings
 
 from typing import List
 
-import multiprocessing_logging
 import numpy as np
 import pandas as pd
 import rich.logging
@@ -19,52 +16,59 @@ from typing_inspect import get_origin, get_args
 
 class LoggerAdapter(logging.LoggerAdapter):
 
-    __context: List[str]
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.__context = []
+
+    def find_context(self):
+        frame = inspect.currentframe()
+        while frame:
+            bindings = frame.f_locals
+            if '__grevling_log_context__' in bindings:
+                return bindings['__grevling_log_context__']
+            frame = frame.f_back
+        return []
 
     def process(self, msg, kwargs):
-        context = []
-        procname = multiprocessing.current_process().name
-        if procname != 'M':
-            context.append(f'[bold magenta]{procname}[/]')
-        context.extend(self.__context)
-        context.append(msg)
-        msg = ' · '.join(context)
+        context = self.find_context()
+        msg = ' · '.join(chain(context, [msg]))
         kwargs.setdefault('extra', {}).update({
-            'procname': multiprocessing.current_process().name,
             'markup': True
         })
         return msg, kwargs
 
-    def push_context(self, ctx: str):
-        self.__context.append(ctx)
-
-    def pop_context(self):
-        self.__context.pop()
-
     @contextmanager
     def with_context(self, ctx: str):
-        self.push_context(ctx)
+        context = self.find_context()
+        frame = inspect.currentframe()
+        frame = frame.f_back.f_back
+        bindings = frame.f_locals
+
+        bindings['__grevling_log_context__'] = [*context, ctx]
         try:
             yield
         finally:
-            self.pop_context()
+            bindings['__grevling_log_context__'] = context
 
 
 def with_context(fmt: str):
     def decorator(func: callable):
         signature = inspect.signature(func)
-        @wraps(func)
-        def inner(*args, **kwargs):
+
+        def calculate_context(*args, **kwargs):
             binding = signature.bind(*args, **kwargs)
             binding.apply_defaults()
-            context = fmt.format(**binding.arguments)
-            with log.with_context(context):
-                return func(*args, **kwargs)
-        return inner
+            return fmt.format(**binding.arguments)
+
+        if asyncio.iscoroutinefunction(func):
+            async def inner(*args, **kwargs):
+                with log.with_context(calculate_context(*args, **kwargs)):
+                    return await func(*args, **kwargs)
+        else:
+            def inner(*args, **kwargs):
+                with log.with_context(calculate_context(*args, **kwargs)):
+                    return func(*args, **kwargs)
+
+        return wraps(func)(inner)
     return decorator
 
 
@@ -82,12 +86,10 @@ def initialize_logging(level='INFO', show_time=False):
 
     global log
     log = LoggerAdapter(logging.getLogger(), {})
-    multiprocessing_logging.install_mp_handler()
 
 
 def initialize_process():
-    proc = multiprocessing.current_process()
-    proc.name = 'W' + ':'.join(map(str, proc._identity))
+    pass
 
 
 class JSONEncoder(json.JSONEncoder):

@@ -1,11 +1,8 @@
-from functools import wraps
 import json
-import multiprocessing
 from pathlib import Path
 import sys
 
 import click
-import numpy as np
 from ruamel.yaml.parser import ParserError as YAMLParserError
 from simpleeval import SimpleEval
 from strictyaml import YAMLValidationError
@@ -69,7 +66,6 @@ def print_version(ctx, param, value):
 @click.pass_context
 def main(ctx, verbosity, rich):
     util.initialize_logging(level=verbosity, show_time=False)
-    multiprocessing.current_process().name = 'M'
 
     # from azure.identity import DefaultAzureCredential
     # from azure.mgmt.resource import SubscriptionClient
