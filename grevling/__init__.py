@@ -21,7 +21,7 @@ from .schema import load_and_validate
 from .context import ContextManager
 from .filemap import FileMap
 from .script import ScriptTemplate
-from .workflow.local import LocalWorkspaceCollection, LocalWorkspace
+from .workflow.local import LocalWorkspaceCollection, LocalWorkspace, LocalWorkflow
 from . import util, api
 
 
@@ -124,17 +124,6 @@ class Case:
     def clear_dataframe(self):
         with self.lock():
             self.dataframepath.unlink(missing_ok=True)
-
-    def iter_instancedirs(self) -> Iterable[api.Workspace]:
-        for path in self.storagepath.iterdir():
-            print(path)
-            if not (path / '.grevling' / 'context.json').exists():
-                continue
-            yield LocalWorkspace(path)
-
-    @property
-    def shape(self):
-        return tuple(map(len, self._parameters.values()))
 
     @contextmanager
     def lock(self):
@@ -242,6 +231,8 @@ class Case:
 
     def instances(self, *statuses) -> Iterable['Instance']:
         for name in self.storage_spaces.workspace_names():
+            if not self.storage_spaces.open_workspace(name).exists('.grevling/status.txt'):
+                continue
             instance = Instance(self, logdir=name)
             if statuses and instance.status not in statuses:
                 continue
@@ -264,6 +255,34 @@ class Case:
     def plot(self):
         for plot in self._plots:
             plot.generate_all(self)
+
+
+    # Deprecated methods
+
+    @util.deprecated("use LocalWorkflow.pipeline().run(case.create_instances()) instead", name='Case.run')
+    def run(self, nprocs=1):
+        nprocs = nprocs or 1
+        with LocalWorkflow(nprocs=nprocs) as workflow:
+            workflow.pipeline().run(self.create_instances())
+
+    def run_single(self, namespace: api.Context, logdir: Path, index: int = 0):
+        instance = self.create_instance(namespace, logdir=logdir, index=index)
+        with LocalWorkflow() as workflow:
+            workflow.pipeline().run([instance])
+
+    @util.deprecated("use Case.instances() instead", name='Case.iter_instancedirs')
+    def iter_instancedirs(self) -> Iterable[api.Workspace]:
+        for path in self.storagepath.iterdir():
+            print(path)
+            if not (path / '.grevling' / 'context.json').exists():
+                continue
+            yield LocalWorkspace(path)
+
+    @property
+    @util.deprecated("will be removed", name='Case.shape')
+    def shape(self):
+        return tuple(map(len, self._parameters.values()))
+
 
 
 class Instance:

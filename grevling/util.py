@@ -2,10 +2,11 @@ import asyncio
 from contextlib import contextmanager
 from functools import wraps
 import inspect
-from itertools import product, chain
+from itertools import product
 import json
 import logging
 import multiprocessing
+import warnings
 
 from typing import List
 
@@ -207,3 +208,17 @@ def to_queue(it):
     for i in it:
         q.put_nowait(i)
     return q
+
+
+def deprecated(info, name=None):
+
+    def decorator(func):
+        iname = name or func.__name__
+
+        @wraps(func)
+        def inner(*args, **kwargs):
+            log.warn(f'{iname} is deprecated: {info}')
+            return func(*args, **kwargs)
+
+        return inner
+    return decorator
