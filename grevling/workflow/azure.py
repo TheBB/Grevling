@@ -4,22 +4,29 @@ from pathlib import Path
 import re
 
 from typing import Iterable, Optional, ContextManager, Union
+from azure.storage import blob
 
 import inquirer
 
 from azure.batch import BatchServiceClient
 from azure.batch.batch_auth import SharedKeyCredentials
-from azure.batch.models import VirtualMachineConfiguration
+from azure.batch.models import (
+    VirtualMachineConfiguration, PoolAddParameter, ImageReference, JobAddParameter,
+    PoolInformation, TaskAddParameter, ResourceFile
+)
 from azure.core.exceptions import ClientAuthenticationError
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.batch import BatchManagementClient
+from azure.mgmt.batch.models import BatchAccount
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.resource import SubscriptionClient
+from azure.mgmt.resource.subscriptions.models import Subscription
 from azure.mgmt.storage import StorageManagementClient
-from azure.storage.blob import BlobServiceClient, ContainerClient, BlobPrefix
+from azure.storage.blob import BlobServiceClient, ContainerClient, BlobPrefix, generate_container_sas
 
 from .. import api, util
-from . import PrepareInstance, PipeSegment
+from . import Pipeline, PrepareInstance, PipeSegment
+from grevling import workflow
 
 
 az_loggers = [
@@ -100,9 +107,9 @@ def get_attached_storage(cred, sub, batch):
         acct_name = re.match(r'.*/storageAccounts/(?P<acct>[^/]*)', storage_id).groupdict()['acct']
     except:
         util.log.error(f"Batch account {batch.name} does not appear to have an associated storage account, or its ID was not understood")
-        return None
+        return None, None
 
-    client = StorageManagementClient(cred, sub)
+    client = StorageManagementClient(cred, sub.subscription_id)
 
     try:
         keys = client.storage_accounts.list_keys(res_grp, acct_name)
@@ -110,10 +117,11 @@ def get_attached_storage(cred, sub, batch):
         key = keys.keys[0].value
     except:
         util.log.error(f"Could not retrieve access keys to associated storage account")
-        return None
+        return None, None
 
     util.log.info(f"Using storage account '{acct_name}'")
-    return BlobServiceClient(account_url=f'https://{acct_name}.blob.core.windows.net', credential=key)
+    client = BlobServiceClient(account_url=f'https://{acct_name}.blob.core.windows.net', credential=key)
+    return client.get_container_client('grevling')
 
 
 def get_batch_client(cred, sub, batch):
@@ -123,7 +131,7 @@ def get_batch_client(cred, sub, batch):
         util.log.error(f"Batch account {batch.name} does not appear to have an associated resource group, or its ID was not understood")
         return None
 
-    client = BatchManagementClient(cred, sub)
+    client = BatchManagementClient(cred, sub.subscription_id)
     key = client.batch_account.get_keys(res_grp, batch.name).primary
     scred = SharedKeyCredentials(batch.name, key)
     return BatchServiceClient(scred, batch_url=f'https://{batch.name}.{batch.location}.batch.azure.com')
@@ -131,7 +139,7 @@ def get_batch_client(cred, sub, batch):
 
 def get_pool_settings(cred, sub, acct, batch):
     util.log.info("Creating a new batch pool")
-    client = ComputeManagementClient(cred, sub)
+    client = ComputeManagementClient(cred, sub.subscription_id)
     images = list(batch.account.list_supported_images())
 
     publishers = sorted(set(i.image_reference.publisher for i in images))
@@ -220,7 +228,8 @@ class AzureWorkspace(api.Workspace):
         assert False
 
     def files(self) -> Iterable[Path]:
-        assert False
+        for f in self.client.list_blobs(name_starts_with=str(self.root)):
+            yield Path(f['name']).relative_to(self.root)
 
     def exists(self, path: api.PathStr) -> bool:
         assert False
@@ -258,21 +267,41 @@ class AzureWorkspaceCollection(api.WorkspaceCollection):
 
 class RunInstance(PipeSegment):
 
-    def __init__(self, workspaces):
+    def __init__(self, workflow: 'AzureWorkflow', workspaces):
+        self.workflow = workflow
         self.workspaces = workspaces
 
     @util.with_context('I {instance.index}')
     @util.with_context('Run')
-    def apply(self, instance):
+    async def apply(self, instance):
         with instance.bind_remote(self.workspaces):
             instance.upload_script()
+        self.workflow.batch_client.task.add('grevling', TaskAddParameter(
+            id=instance.logdir,
+            command_line=f"/bin/bash -c 'cd {instance.logdir} && bash .grevling/grevling.sh'",
+            resource_files=[ResourceFile(
+                auto_storage_container_name='grevling',
+                blob_prefix=instance.logdir,
+            )],
+        ))
 
 
 class AzureWorkflow(api.Workflow):
 
     name = 'azure'
 
-    credentials: DefaultAzureCredential
+    credential: DefaultAzureCredential
+    subscription: Subscription
+
+    batch_account: BatchAccount
+
+    batch_client: BatchServiceClient
+    container_client: ContainerClient
+
+    workspaces: AzureWorkspaceCollection
+
+    pool_started: bool
+    job_started: bool
 
     @classmethod
     def init(cls):
@@ -284,36 +313,84 @@ class AzureWorkflow(api.Workflow):
     def __init__(self, **_):
         pass
 
-    def __enter__(self):
-        self.ready = False
-
+    def init_storage(self) -> bool:
         credential = get_credential()
         if not credential:
-            return self
+            return False
+        self.credential = credential
 
         subscription = get_subscription(credential)
         if not subscription:
-            return self
+            return False
         util.log.info(f"Using Azure subscription '{subscription.display_name}'")
+        self.subscription = subscription
 
-        batch_account = get_batch_account(credential, subscription)
+        batch_account = get_batch_account(self.credential, self.subscription)
         if not batch_account:
-            return self
+            return False
         util.log.info(f"Using batch account '{batch_account.name}'")
+        self.batch_account = batch_account
 
-        blob_client = get_attached_storage(credential, subscription.subscription_id, batch_account)
-        if blob_client is None:
+        container_client = get_attached_storage(self.credential, self.subscription, batch_account)
+        if container_client is None:
+            return False
+        self.container_client = container_client
+
+        self.workspaces = AzureWorkspaceCollection(self.container_client)
+        return True
+
+    def init_pool(self) -> bool:
+        batch_client = get_batch_client(self.credential, self.subscription, self.batch_account)
+        if not batch_client:
+            return False
+        self.batch_client = batch_client
+
+        pool_cfg = get_pool_settings(self.credential, self.subscription, self.batch_account, batch_client)
+        if not pool_cfg:
+            return False
+
+        pool = PoolAddParameter(
+            id='grevling',
+            virtual_machine_configuration=VirtualMachineConfiguration(
+                image_reference=ImageReference(
+                    publisher=pool_cfg['publisher'],
+                    offer=pool_cfg['offer'],
+                    sku=pool_cfg['sku'],
+                    version=pool_cfg['version'],
+                ),
+                node_agent_sku_id=pool_cfg['sku_id'],
+            ),
+            vm_size=pool_cfg['size'],
+            target_dedicated_nodes=pool_cfg['nnodes'],
+        )
+        batch_client.pool.add(pool)
+        self.pool_started = True
+
+        job = JobAddParameter(id='grevling', pool_info=PoolInformation(pool_id='grevling'))
+        batch_client.job.add(job)
+        self.job_started = True
+
+    def __enter__(self):
+        self.pool_started = False
+        self.job_started = False
+        self.ready = False
+
+        if not self.init_storage():
             return self
-        # self.batch_client = get_batch_client(credential, subscription.subscription_id, batch_account)
-        # pool = get_pool_settings(credential, subscription.subscription_id, batch_account, self.batch_client)
-
-        self.workspaces = AzureWorkspaceCollection(blob_client.get_container_client('grevling'))
 
         self.ready = True
         return self
 
     def __exit__(self, *args, **kwargs):
+        # if self.job_started:
+            # self.batch_client.job.delete('grevling')
+        # if self.pool_started:
+            # self.batch_client.pool.delete('grevling')
         pass
 
     def pipeline(self):
-        return PrepareInstance(self.workspaces)
+        self.init_pool()
+        return Pipeline(
+            PrepareInstance(self.workspaces),
+            RunInstance(self, self.workspaces),
+        )

@@ -24,7 +24,6 @@ def workflows(func):
 
 
 def run_helper(workflow, instances, **kwargs) -> bool:
-    print(kwargs)
     with api.Workflow.get_workflow(workflow, **kwargs) as w:
         if not w.ready:
             return False
@@ -79,16 +78,6 @@ def print_version(ctx, param, value):
 @click.pass_context
 def main(ctx, verbosity, rich):
     util.initialize_logging(level=verbosity, show_time=False)
-
-    # from azure.identity import DefaultAzureCredential
-    # from azure.mgmt.resource import SubscriptionClient
-    # import logging
-    # for name in logging.root.manager.loggerDict:
-    #     if name.startswith('azure'):
-    #         logging.getLogger(name).setLevel('ERROR')
-    # cr = DefaultAzureCredential()
-    # subs = SubscriptionClient(cr)
-    # print(list(subs.subscriptions.list()))
 
 
 @main.command()
