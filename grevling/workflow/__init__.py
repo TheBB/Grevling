@@ -12,6 +12,9 @@ class Pipe(ABC):
 
     ncopies: int = 1
 
+    def __init__(self, ncopies: int = 1):
+        self.ncopies = ncopies
+
     def run(self, inputs):
         # TODO: As far as I can tell, this is only needed on Python 3.7
         if os.name == 'nt':
@@ -19,7 +22,7 @@ class Pipe(ABC):
         asyncio.run(self._run(inputs))
 
     @abstractmethod
-    def _run(self, inputs):
+    async def _run(self, inputs):
         ...
 
     @abstractmethod
@@ -28,9 +31,6 @@ class Pipe(ABC):
 
 
 class PipeSegment(Pipe):
-
-    def __init__(self, ncopies: int = 1):
-        self.ncopies = ncopies
 
     async def _run(self, inputs):
         queue = util.to_queue(inputs)
@@ -58,6 +58,44 @@ class PipeSegment(Pipe):
         ...
 
 
+class PipeFilter(Pipe):
+
+    delay: float = 5.0
+
+    # TODO: Shouldn't be needed
+    async def _run(self, inputs):
+        queue = util.to_queue(inputs)
+        asyncio.create_task(self.work(queue))
+        await queue.join()
+
+    # TODO: Lots of shared code with PipeSegment
+    async def work(self, in_queue, out_queue=None):
+        assert out_queue
+        while True:
+            await asyncio.sleep(self.delay)
+            arg = await in_queue.get()
+            try:
+                ret = await self.apply(arg)
+            except Exception as e:
+                util.log.error(str(e))
+                with StringIO() as buf:
+                    traceback.print_exc(file=buf)
+                    util.log.error(buf.getvalue())
+                in_queue.task_done()
+                continue
+            if ret is None:
+                pass
+            elif ret:
+                await out_queue.put(arg)
+            else:
+                await in_queue.put(arg)
+            in_queue.task_done()
+
+    @abstractmethod
+    async def apply(self, arg):
+        ...
+
+
 class Pipeline(Pipe):
 
     def __init__(self, *pipes):
@@ -68,7 +106,8 @@ class Pipeline(Pipe):
 
     async def work(self, in_queue, out_queue=None):
         ntasks = len(self.pipes)
-        queues = [asyncio.Queue(maxsize=1) for _ in range(ntasks-1)]
+        # TODO: Smarter choices for maxsize
+        queues = [asyncio.Queue(maxsize=0) for _ in range(ntasks-1)]
         in_queues = chain([in_queue], queues)
         out_queues = chain(queues, [out_queue])
 

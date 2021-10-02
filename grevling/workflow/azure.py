@@ -1,10 +1,10 @@
-from io import IOBase
+from contextlib import contextmanager
+from io import IOBase, BytesIO
 from operator import attrgetter
 from pathlib import Path
 import re
 
-from typing import Iterable, Optional, ContextManager, Union
-from azure.storage import blob
+from typing import Iterable, ContextManager, Union
 
 import inquirer
 
@@ -12,7 +12,7 @@ from azure.batch import BatchServiceClient
 from azure.batch.batch_auth import SharedKeyCredentials
 from azure.batch.models import (
     VirtualMachineConfiguration, PoolAddParameter, ImageReference, JobAddParameter,
-    PoolInformation, TaskAddParameter, ResourceFile
+    PoolInformation, TaskAddParameter, ResourceFile, TaskState, BatchErrorException
 )
 from azure.core.exceptions import ClientAuthenticationError
 from azure.identity import DefaultAzureCredential
@@ -22,11 +22,10 @@ from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.resource import SubscriptionClient
 from azure.mgmt.resource.subscriptions.models import Subscription
 from azure.mgmt.storage import StorageManagementClient
-from azure.storage.blob import BlobServiceClient, ContainerClient, BlobPrefix, generate_container_sas
+from azure.storage.blob import BlobServiceClient, ContainerClient, BlobPrefix
 
 from .. import api, util
-from . import Pipeline, PrepareInstance, PipeSegment
-from grevling import workflow
+from . import PrepareInstance, DownloadResults, Pipeline, PipeSegment, PipeFilter
 
 
 az_loggers = [
@@ -37,7 +36,12 @@ az_loggers = [
     'azure.identity._credentials.managed_identity',
     'azure.identity._internal.decorators',
     'azure.identity._internal.get_token_mixin',
+    'azure.identity._internal.linux_vscode_adapter',
     'azure.identity._credentials.default',
+    'msrest.async_paging',
+    'msrest.service_client',
+    'msrest.universal_http',
+    'urllib3.connectionpool',
 ]
 
 
@@ -202,7 +206,7 @@ def get_pool_settings(cred, sub, acct, batch):
     }
 
 
-class AzureWorkspace(api.Workspace):
+class AzureStorageWorkspace(api.Workspace):
 
     client: ContainerClient
     root: Path
@@ -234,15 +238,15 @@ class AzureWorkspace(api.Workspace):
     def exists(self, path: api.PathStr) -> bool:
         assert False
 
-    def subspace(self, path: str, name: str = '') -> 'AzureWorkspace':
+    def subspace(self, path: str, name: str = '') -> 'AzureStorageWorkspace':
         name = name or str(path)
-        return AzureWorkspace(self.client, self.root / path, name=f'{self.name}/{name}')
+        return AzureStorageWorkspace(self.client, self.root / path, name=f'{self.name}/{name}')
 
     def top_name(self) -> str:
         assert False
 
 
-class AzureWorkspaceCollection(api.WorkspaceCollection):
+class AzureStorageWorkspaceCollection(api.WorkspaceCollection):
 
     client: ContainerClient
 
@@ -261,8 +265,90 @@ class AzureWorkspaceCollection(api.WorkspaceCollection):
             if isinstance(blob, BlobPrefix):
                 yield blob.name
 
-    def open_workspace(self, path: str, name: str = '') -> AzureWorkspace:
-        return AzureWorkspace(self.client, Path(path), name)
+    def open_workspace(self, path: str, name: str = '') -> AzureStorageWorkspace:
+        return AzureStorageWorkspace(self.client, Path(path), name)
+
+
+class AzureBatchWorkspace(api.Workspace):
+
+    client: BatchServiceClient
+    task_id: str
+    root: Path
+
+    def __init__(self, client: ContainerClient, task_id: str, root: Path, name: str = ''):
+        self.client = client
+        self.task_id = task_id
+        self.root = root
+        self.name = name
+
+    def __str__(self):
+        return f'/{self.root}'
+
+    def destroy(self):
+        assert False
+
+    def open_file(self, path: api.PathStr, mode: str = 'w') -> ContextManager[IOBase]:
+        assert False
+
+    def write_file(self, path: api.PathStr, source: Union[str, bytes, IOBase, Path]):
+        assert False
+
+    # TODO: Must be possible not to download the whole file at once here
+    @contextmanager
+    def read_file(self, path: api.PathStr) -> ContextManager[IOBase]:
+        path = self.root / path
+        stream = self.client.file.get_from_task('grevling', self.task_id, str(path))
+        output = BytesIO()
+        for data in stream:
+            output.write(data)
+        yield BytesIO(output.getvalue())
+
+    def files(self) -> Iterable[Path]:
+        for file in self.client.file.list_from_task('grevling', self.task_id, recursive=True):
+            if file.is_directory:
+                continue
+            pfile = Path(file.name)
+            if self.root not in pfile.parents:
+                continue
+            yield pfile.relative_to(self.root)
+
+    def exists(self, path: api.PathStr) -> bool:
+        path = str(self.root / path)
+        try:
+            self.client.file.get_properties_from_task('grevling', self.task_id, path)
+        except BatchErrorException:
+            return False
+        return True
+
+    def subspace(self, path: str, name: str = '') -> 'AzureStorageWorkspace':
+        name = name or str(path)
+        return AzureBatchWorkspace(self.client, self.task_id, self.root / path, name=f'{self.name}/name')
+
+    def top_name(self) -> str:
+        assert False
+
+
+class AzureBatchWorkspaceCollection(api.WorkspaceCollection):
+
+    client: BatchServiceClient
+
+    def __init__(self, client: ContainerClient, name: str = ''):
+        self.client = client
+        self.name = name
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        pass
+
+    def workspace_names(self) -> Iterable[str]:
+        for task in self.client.task.list(job_id='grevling'):
+            yield task.id
+
+    def open_workspace(self, path: str, name: str = '') -> AzureBatchWorkspace:
+        root = Path('wd') / path
+        return AzureBatchWorkspace(self.client, task_id=path, root=root, name=name)
 
 
 class RunInstance(PipeSegment):
@@ -276,6 +362,7 @@ class RunInstance(PipeSegment):
     async def apply(self, instance):
         with instance.bind_remote(self.workspaces):
             instance.upload_script()
+        util.log.info(f'Started {instance.logdir}')
         self.workflow.batch_client.task.add('grevling', TaskAddParameter(
             id=instance.logdir,
             command_line=f"/bin/bash -c 'cd {instance.logdir} && bash .grevling/grevling.sh'",
@@ -284,6 +371,21 @@ class RunInstance(PipeSegment):
                 blob_prefix=instance.logdir,
             )],
         ))
+        return instance
+
+
+class PollInstances(PipeFilter):
+
+    def __init__(self, workflow: 'AzureWorkflow'):
+        self.workflow = workflow
+
+    async def apply(self, instance):
+        task = self.workflow.batch_client.task.get('grevling', instance.logdir)
+        if task is None:
+            return None
+        if task.state == TaskState.completed:
+            instance.status = api.Status.Finished
+        return task.state == TaskState.completed
 
 
 class AzureWorkflow(api.Workflow):
@@ -298,7 +400,8 @@ class AzureWorkflow(api.Workflow):
     batch_client: BatchServiceClient
     container_client: ContainerClient
 
-    workspaces: AzureWorkspaceCollection
+    out_workspaces: AzureStorageWorkspaceCollection
+    in_workspaces: AzureBatchWorkspaceCollection
 
     pool_started: bool
     job_started: bool
@@ -306,9 +409,8 @@ class AzureWorkflow(api.Workflow):
     @classmethod
     def init(cls):
         import logging
-        if logging.root.level > logging.DEBUG:
-            for name in az_loggers:
-                logging.getLogger(name).setLevel(logging.ERROR)
+        for name in az_loggers:
+            logging.getLogger(name).setLevel(logging.ERROR)
 
     def __init__(self, **_):
         pass
@@ -335,17 +437,18 @@ class AzureWorkflow(api.Workflow):
         if container_client is None:
             return False
         self.container_client = container_client
+        self.out_workspaces = AzureStorageWorkspaceCollection(container_client)
 
-        self.workspaces = AzureWorkspaceCollection(self.container_client)
-        return True
-
-    def init_pool(self) -> bool:
         batch_client = get_batch_client(self.credential, self.subscription, self.batch_account)
         if not batch_client:
             return False
         self.batch_client = batch_client
+        self.in_workspaces = AzureBatchWorkspaceCollection(batch_client)
 
-        pool_cfg = get_pool_settings(self.credential, self.subscription, self.batch_account, batch_client)
+        return True
+
+    def init_pool(self) -> bool:
+        pool_cfg = get_pool_settings(self.credential, self.subscription, self.batch_account, self.batch_client)
         if not pool_cfg:
             return False
 
@@ -363,11 +466,11 @@ class AzureWorkflow(api.Workflow):
             vm_size=pool_cfg['size'],
             target_dedicated_nodes=pool_cfg['nnodes'],
         )
-        batch_client.pool.add(pool)
+        self.batch_client.pool.add(pool)
         self.pool_started = True
 
         job = JobAddParameter(id='grevling', pool_info=PoolInformation(pool_id='grevling'))
-        batch_client.job.add(job)
+        self.batch_client.job.add(job)
         self.job_started = True
 
     def __enter__(self):
@@ -391,6 +494,8 @@ class AzureWorkflow(api.Workflow):
     def pipeline(self):
         self.init_pool()
         return Pipeline(
-            PrepareInstance(self.workspaces),
-            RunInstance(self, self.workspaces),
+            PrepareInstance(self.out_workspaces),
+            RunInstance(self, self.out_workspaces),
+            PollInstances(self),
+            DownloadResults(self.in_workspaces),
         )
