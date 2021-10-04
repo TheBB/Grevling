@@ -30,30 +30,6 @@ from . import util, api
 __version__ = '1.2.1'
 
 
-def _pandas_dtype(tp):
-    if tp == int:
-        return pd.Int64Dtype()
-    if tp == bool:
-        return pd.BooleanDtype()
-    if util.is_list_type(tp):
-        return object
-    return tp
-
-
-def _typename(tp) -> str:
-    try:
-        return {
-            int: 'integer',
-            str: 'string',
-            float: 'float',
-            'datetime64[ns]': 'datetime',
-        }[tp]
-    except KeyError:
-        base = {list: 'list'}[get_origin(tp)]
-        subs = ', '.join(_typename(k) for k in get_args(tp))
-        return f'{base}[{subs}]'
-
-
 class Case:
 
     lock: Optional[InterProcessLock]
@@ -170,7 +146,7 @@ class Case:
         if self.dataframepath.is_file():
             return pd.read_parquet(self.dataframepath, engine='pyarrow')
         data = {
-            k: pd.Series([], dtype=_pandas_dtype(v))
+            k: pd.Series([], dtype=v.pandas)
             for k, v in self.types.items()
             if k != '_index'
         }

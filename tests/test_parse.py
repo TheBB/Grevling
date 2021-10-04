@@ -1,11 +1,10 @@
 from pathlib import Path
 import re
 
-from typing import List
-
 import numpy as np
 
 from grevling import Case
+import grevling.typing as tp
 
 
 DATADIR = Path(__file__).parent / 'data'
@@ -132,30 +131,30 @@ def test_parse():
     assert case.script.commands[5].captures[4]._mode == 'all'
 
     assert case.types == {
-        '_index': int,
-        '_logdir': str,
-        '_started': 'datetime64[ns]',
-        '_finished': 'datetime64[ns]',
-        '_success': bool,
-        'alpha': int,
-        'bravo': float,
-        'charlie': float,
-        'delta': float,
-        'echo': float,
-        'foxtrot': str,
-        'dblalpha': int,
-        'one': int,
-        'first': str,
-        'multi': List[str],
-        'last': float,
-        'someint': int,
-        'somefloat': List[float],
-        'walltime/string': float,
-        'walltime/list': float,
-        'walltime/nontrivial-name': float,
-        'walltime/nontrivial-name-2': float,
-        'walltime/somecommand': float,
-        'walltime/nontrivial-stuff': float,
+        '_index': tp.Integer(),
+        '_logdir': tp.String(),
+        '_started': tp.DateTime(),
+        '_finished': tp.DateTime(),
+        '_success': tp.Boolean(),
+        'alpha': tp.Integer(),
+        'bravo': tp.Float(),
+        'charlie': tp.Float(),
+        'delta': tp.Float(),
+        'echo': tp.Float(),
+        'foxtrot': tp.String(),
+        'dblalpha': tp.Integer(),
+        'one': tp.Integer(),
+        'first': tp.String(),
+        'multi': tp.List(tp.String()),
+        'last': tp.Float(),
+        'someint': tp.Integer(),
+        'somefloat': tp.List(tp.Float()),
+        'walltime/string': tp.Float(),
+        'walltime/list': tp.Float(),
+        'walltime/nontrivial-name': tp.Float(),
+        'walltime/nontrivial-name-2': tp.Float(),
+        'walltime/somecommand': tp.Float(),
+        'walltime/nontrivial-stuff': tp.Float(),
     }
 
     assert case._logdir == 'loop-de-loop'

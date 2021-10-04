@@ -4,9 +4,10 @@ from typing import Dict, Any, Sequence, Iterable, Type
 
 import numpy as np
 from simpleeval import SimpleEval, DEFAULT_FUNCTIONS, NameNotDefined
+from strictyaml.scalar import Int
 
 from .parameters import ParameterSpace
-from . import util, api
+from . import util, api, typing
 
 
 BUILTINS = {
@@ -24,11 +25,11 @@ BUILTINS = {
 
 def _guess_eltype(collection: Sequence) -> Type:
     if all(isinstance(v, str) for v in collection):
-        return str
+        return typing.String()
     if all(isinstance(v, int) for v in collection):
-        return int
+        return typing.Integer()
     assert all(isinstance(v, (int, float)) for v in collection)
-    return float
+    return typing.Float()
 
 
 class ContextProvider:
@@ -37,7 +38,7 @@ class ContextProvider:
     evaluables: Dict[str, str]
     constants: Dict[str, Any]
     templates: Dict[str, Any]
-    types: api.Types
+    types: typing.TypeManager
 
     @classmethod
     def load(cls, spec: Dict) -> ContextProvider:
@@ -48,14 +49,16 @@ class ContextProvider:
         self.evaluables = dict(data.get('evaluate', {}))
         self.constants = dict(data.get('constants', {}))
 
-        self.types = {
-            '_index': int,
-            '_logdir': str,
-            '_started': 'datetime64[ns]',
-            '_finished': 'datetime64[ns]',
-            '_success': bool,
-        }
-        self.types.update(data.get('types', {}))
+        self.types = typing.TypeManager(
+            _index=typing.Integer(),
+            _logdir=typing.String(),
+            _started=typing.DateTime(),
+            _finished=typing.DateTime(),
+            _success=typing.Boolean(),
+        )
+
+        for k, v in data.get('types', {}).items():
+            self.types[k] = typing.Type.find(v)
 
         # Guess types of parameters
         for name, param in self.parameters.items():

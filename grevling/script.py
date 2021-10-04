@@ -13,7 +13,7 @@ from time import time as osclock
 
 from typing import Dict, Any, List, Optional, Union
 
-from . import api, util
+from . import api, util, typing
 from .capture import Capture, ResultCollector
 from .render import render
 
@@ -169,7 +169,7 @@ class CommandTemplate:
             self.captures.extend(Capture.load(c) for c in capture)
 
     def add_types(self, types: api.Types):
-        types[f'walltime/{self.name}'] = float
+        types[f'walltime/{self.name}'] = typing.Float()
         for cap in self.captures:
             cap.add_types(types)
 

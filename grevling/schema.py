@@ -154,6 +154,11 @@ def PlotMode():
     )
 
 
+def Type():
+    """Validator that parses a type description."""
+    return Choice('int', 'integer', 'str', 'string', 'float', 'floating', 'double')
+
+
 class First(Validator):
     """Validator that validates against a sequence of sub-validators,
     picking the first that matches.
@@ -181,28 +186,6 @@ class First(Validator):
                 chunk,
             )
 
-
-class Type(ScalarValidator):
-    """Validator that parses a type description."""
-
-    scalar_regex = re.compile('^(int|integer|str|string|float|floating|double)$')
-
-    scalar_map = {
-        'int': int,
-        'integer': int,
-        'str': str,
-        'string': str,
-        'float': float,
-        'floating': float,
-        'double': float,
-    }
-
-    def validate_scalar(self, chunk):
-        if self.scalar_regex.match(chunk.contents):
-            return self.scalar_map[chunk.contents]
-        chunk.expecting_but_found(
-            "when expecting a valid type description", "found invalid input"
-        )
 
 
 CASE_SCHEMA = Map(
