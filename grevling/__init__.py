@@ -56,6 +56,8 @@ def _typename(tp) -> str:
 
 class Case:
 
+    lock: Optional[InterProcessLock]
+
     yamlpath: Path
     sourcepath: Path
     storagepath: Path
@@ -128,6 +130,24 @@ class Case:
             for spec in casedata.get('plots', [])
         ]
 
+        self.lock = None
+
+    def acquire_lock(self):
+        assert not self.lock
+        self.lock = InterProcessLock(self.storagepath / 'lockfile').__enter__()
+
+    def release_lock(self, *args, **kwargs):
+        assert self.lock
+        self.lock.__exit__(*args, **kwargs)
+        self.lock = None
+
+    def __enter__(self) -> Case:
+        self.acquire_lock()
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        self.release_lock(*args, **kwargs)
+
     @property
     def parameters(self) -> ParameterSpace:
         return self.context_mgr.parameters
@@ -137,17 +157,14 @@ class Case:
         return self.context_mgr.types
 
     def clear_cache(self):
+        # This will delete the lockfile, so release it first
+        self.release_lock(None, None, None)
         shutil.rmtree(self.storagepath)
         self.storagepath.mkdir(parents=True, exist_ok=True)
+        self.acquire_lock()
 
     def clear_dataframe(self):
-        with self.lock():
-            self.dataframepath.unlink(missing_ok=True)
-
-    @contextmanager
-    def lock(self):
-        with InterProcessLock(self.storagepath / 'lockfile'):
-            yield
+        self.dataframepath.unlink(missing_ok=True)
 
     def load_dataframe(self) -> pd.DataFram:
         if self.dataframepath.is_file():
@@ -163,9 +180,8 @@ class Case:
         df.to_parquet(self.dataframepath, engine='pyarrow', index=True)
 
     def has_data(self) -> bool:
-        with self.lock():
-            for _ in self.instances(Status.Downloaded):
-                return True
+        for _ in self.instances(Status.Downloaded):
+            return True
         return False
 
     def _check_decide_diff(
@@ -282,18 +298,16 @@ class Case:
             yield instance
 
     def capture(self):
-        with self.lock():
-            for instance in self.instances(Status.Downloaded):
-                instance.capture()
+        for instance in self.instances(Status.Downloaded):
+            instance.capture()
 
     def collect(self):
-        with self.lock():
-            data = self.load_dataframe()
-            for instance in self.instances(Status.Downloaded):
-                collector = instance.cached_capture()
-                data = collector.commit_to_dataframe(data)
-            data = data.sort_index()
-            self.save_dataframe(data)
+        data = self.load_dataframe()
+        for instance in self.instances(Status.Downloaded):
+            collector = instance.cached_capture()
+            data = collector.commit_to_dataframe(data)
+        data = data.sort_index()
+        self.save_dataframe(data)
 
     def plot(self):
         for plot in self._plots:
