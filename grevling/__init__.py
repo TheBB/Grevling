@@ -121,9 +121,8 @@ class Case:
         return self.context_mgr.types
 
     def clear_cache(self):
-        with self.lock():
-            shutil.rmtree(self.storagepath)
-            self.storagepath.mkdir(parents=True, exist_ok=True)
+        shutil.rmtree(self.storagepath)
+        self.storagepath.mkdir(parents=True, exist_ok=True)
 
     def clear_dataframe(self):
         with self.lock():
