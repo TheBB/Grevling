@@ -30,13 +30,13 @@ def compare_object(actual, expected, sort_xy=False):
 
 def test_plots():
     MockBackend.plots = []
-    case = Case(DATADIR / 'run' / 'plot')
-    case.clear_cache()
-    with LocalWorkflow() as w:
-        w.pipeline().run(case.create_instances())
-    case.capture()
-    case.collect()
-    case.plot()
+    with Case(DATADIR / 'run' / 'plot') as case:
+        case.clear_cache()
+        with LocalWorkflow() as w:
+            w.pipeline().run(case.create_instances())
+        case.capture()
+        case.collect()
+        case.plot()
 
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {

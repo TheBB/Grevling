@@ -48,9 +48,14 @@ class CaseType(click.Path):
         if not casefile.is_file():
             raise click.FileError(str(casefile), hint='is not a file')
         try:
-            return Case(path)
+            case = Case(path)
         except (YAMLValidationError, YAMLParserError) as error:
             raise CustomClickException(str(error))
+
+        case = case.__enter__()
+        if ctx:
+            ctx.call_on_close(case.__exit__)
+        return case
 
 
 def print_version(ctx, param, value):
