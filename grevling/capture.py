@@ -7,7 +7,8 @@ from typing import Any, List, Optional
 
 import pandas as pd
 
-from . import util, api
+from . import util, api, typing
+from .typing import TypeManager
 
 
 class Capture:
@@ -22,8 +23,8 @@ class Capture:
             return cls(spec)
         if spec.get('type') in ('integer', 'float'):
             pattern, tp = {
-                'integer': (r'[-+]?[0-9]+', int),
-                'float': (r'[-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?', float),
+                'integer': (r'[-+]?[0-9]+', typing.Integer()),
+                'float': (r'[-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?', typing.Float()),
             }[spec['type']]
             skip = r'(\S+\s+){' + str(spec.get('skip-words', 0)) + '}'
             if spec.get('flexible-prefix', False):
@@ -49,7 +50,7 @@ class Capture:
         self,
         pattern: str,
         mode: str = 'last',
-        type_overrides: Optional[api.Types] = None,
+        type_overrides: Optional[TypeManager] = None,
     ):
         self._regex = re.compile(pattern)
         self._mode = mode
@@ -57,9 +58,9 @@ class Capture:
 
     def add_types(self, types: api.Types):
         for group in self._regex.groupindex.keys():
-            single = self._type_overrides.get(group, str)
+            single = self._type_overrides.get(group, typing.String())
             if self._mode == 'all':
-                types.setdefault(group, List[single])
+                types.setdefault(group, typing.List(single))
             else:
                 types.setdefault(group, single)
 
@@ -87,9 +88,9 @@ class Capture:
 
 class ResultCollector(dict):
 
-    _types: api.Types
+    _types: TypeManager
 
-    def __init__(self, types: api.Types):
+    def __init__(self, types: TypeManager):
         super().__init__()
         self._types = types
 
@@ -118,11 +119,15 @@ class ResultCollector(dict):
     def collect(self, name: str, value: Any):
         if name not in self._types:
             return
-        self[name] = util.coerce_into(self._types[name], value, self.get(name))
+        self[name] = self._types.coerce_into(name, value, self.get(name))
 
     def commit_to_file(self, ws: api.Workspace):
+        json_data = {
+            key: self._types.to_json(key, value)
+            for key, value in self.items()
+        }
         with ws.open_file('captured.json', 'w') as f:
-            json.dump(self, f, sort_keys=True, indent=4, cls=util.JSONEncoder)
+            json.dump(json_data, f, sort_keys=True, indent=4, cls=util.JSONEncoder)
 
     def commit_to_dataframe(self, data: pd.DataFrame):
         index = self['_index']

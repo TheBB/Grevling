@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import partial
 import io
 import json
 from pathlib import Path
@@ -54,7 +55,7 @@ class CaseType(click.Path):
 
         case = case.__enter__()
         if ctx:
-            ctx.call_on_close(case.__exit__)
+            ctx.call_on_close(partial(case.__exit__, None, None, None))
         return case
 
 

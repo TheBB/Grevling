@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from .parameters import ParameterSpace
-from . import util
+from . import util, typing
 from .util import ignore
 from .render import render
 
@@ -470,10 +470,10 @@ class Plot:
                 spec[k] = [spec[k]]
 
         # Either all the axes are list type or none of them are
-        list_type = util.is_list_type(types[spec['yaxis'][0]])
-        assert all(util.is_list_type(types[k]) == list_type for k in spec['yaxis'][1:])
+        list_type = types[spec['yaxis'][0]].is_list
+        assert all(types[k].is_list == list_type for k in spec['yaxis'][1:])
         if spec['xaxis']:
-            assert util.is_list_type(types[spec['xaxis']]) == list_type
+            assert types[spec['xaxis']].is_list == list_type
 
         # If the x-axis has list type, the effective number of variates is one higher
         eff_variates = nvariate + list_type

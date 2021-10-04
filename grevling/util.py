@@ -145,9 +145,9 @@ def subclasses(cls, root=False):
         yield from subclasses(sub, root=False)
 
 
-def find_subclass(cls, name, root=False, attr='__tag__'):
+def find_subclass(cls, name, root=False, attr='__tag__', predicate=(lambda a, b: a == b)):
     for sub in subclasses(cls, root=root):
-        if hasattr(sub, attr) and getattr(sub, attr) == name:
+        if hasattr(sub, attr) and predicate(name, getattr(sub, attr)):
             return sub
     return None
 
@@ -184,28 +184,6 @@ def call_yaml(func, mapping, *args, **kwargs):
     mapping = {key.replace('-', '_'): value for key, value in mapping.items()}
     binding = signature.bind(*args, **kwargs, **mapping)
     return func(*binding.args, **binding.kwargs)
-
-
-def coerce(tp, value):
-    if is_list_type(tp) and not isinstance(value, list):
-        eltype = get_args(tp)[0]
-        return coerce(eltype, value)
-    elif not isinstance(tp, str) and not is_list_type(tp):
-        if tp is bool:
-            return bool(int(value))
-        else:
-            return tp(value)
-    return value
-
-
-def coerce_into(tp, value, prev=None):
-    value = coerce(tp, value)
-    if is_list_type(tp) and isinstance(prev, list):
-        prev.append(value)
-        return prev
-    elif is_list_type(tp) and not isinstance(value, list):
-        return [value]
-    return value
 
 
 def to_queue(it):
