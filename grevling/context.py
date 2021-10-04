@@ -31,7 +31,7 @@ def _guess_eltype(collection: Sequence) -> Type:
     return float
 
 
-class ContextManager:
+class ContextProvider:
 
     parameters: ParameterSpace
     evaluables: Dict[str, str]
@@ -40,7 +40,7 @@ class ContextManager:
     types: api.Types
 
     @classmethod
-    def load(cls, spec: Dict) -> ContextManager:
+    def load(cls, spec: Dict) -> ContextProvider:
         return cls(spec)
 
     def __init__(self, data: Dict):
