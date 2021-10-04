@@ -93,7 +93,10 @@ def run_all(case, workflow, nprocs):
         sys.exit(1)
     case.clear_cache()
     with api.Workflow.get_workflow(workflow)(nprocs) as w:
-        w.pipeline().run(case.create_instances())
+        success = w.pipeline().run(case.create_instances())
+    if not success:
+        util.log.error("An error happened, aborting")
+        sys.exit(1)
     case.collect()
     case.plot()
 
@@ -107,7 +110,8 @@ def run(case, nprocs, workflow):
         sys.exit(1)
     case.clear_cache()
     with api.Workflow.get_workflow(workflow)(nprocs) as w:
-        w.pipeline().run(case.create_instances())
+        if not w.pipeline().run(case.create_instances()):
+            sys.exit(1)
 
 
 @main.command('run-with')
@@ -123,7 +127,8 @@ def run_with(case, target, workflow, context):
         parsed_context[k] = evaluator.eval(v)
     instance = case.create_instance(parsed_context, logdir=target)
     with api.Workflow.get_workflow(workflow)() as w:
-        w.pipeline().run([instance])
+        if not w.pipeline().run([instance]):
+            sys.exit(1)
 
 
 @main.command('capture')

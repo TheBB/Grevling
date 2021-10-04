@@ -13,6 +13,8 @@ from .. import util, api
 
 class RunInstance(PipeSegment):
 
+    name = 'Run'
+
     def __init__(self, workspaces, ncopies: int = 1):
         super().__init__(ncopies)
         self.workspaces = workspaces
