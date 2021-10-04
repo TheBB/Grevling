@@ -1,6 +1,10 @@
 import shlex
 
+from typing import Optional
+
 from mako.template import Template
+
+from . import api
 
 
 def quote_shell(text):
@@ -18,7 +22,7 @@ QUOTERS = {
 }
 
 
-def render(text, context, mode=None):
+def render(text: str, context: api.Context, mode: Optional[str] = None) -> str:
     filters = ['str']
     imports = [
         'from numpy import sin, cos',

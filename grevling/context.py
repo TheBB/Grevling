@@ -1,4 +1,6 @@
-from typing import Dict, Any, Sequence, Iterable
+from __future__ import annotations
+
+from typing import Dict, Any, Sequence, Iterable, Type
 
 import numpy as np
 from simpleeval import SimpleEval, DEFAULT_FUNCTIONS, NameNotDefined
@@ -20,7 +22,7 @@ BUILTINS = {
 }
 
 
-def _guess_eltype(collection: Sequence):
+def _guess_eltype(collection: Sequence) -> Type:
     if all(isinstance(v, str) for v in collection):
         return str
     if all(isinstance(v, int) for v in collection):
@@ -38,7 +40,7 @@ class ContextManager:
     types: api.Types
 
     @classmethod
-    def load(cls, spec: Dict) -> 'ContextManager':
+    def load(cls, spec: Dict) -> ContextManager:
         return cls(spec)
 
     def __init__(self, data: Dict):
@@ -70,10 +72,11 @@ class ContextManager:
                     values = [ctx[name] for ctx in contexts]
                     self.types[name] = _guess_eltype(values)
 
-    def evaluate_context(self, *args, **kwargs):
+    def evaluate_context(self, *args, **kwargs) -> api.Context:
         return self.evaluate(*args, **kwargs)
 
-    def evaluate(self, context, verbose=True, allowed_missing=False, add_constants=True):
+    def evaluate(self, context, verbose: bool = True, allowed_missing: bool = False,
+                 add_constants: bool = True) -> api.Context:
         evaluator = SimpleEval(functions=BUILTINS)
         evaluator.names.update(context)
         evaluator.names.update({

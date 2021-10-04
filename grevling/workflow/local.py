@@ -1,27 +1,32 @@
+from __future__ import annotations
+
 from contextlib import contextmanager
 from io import IOBase
 from pathlib import Path
 import shutil
 import tempfile
 
-from typing import Union, Iterable, Optional, ContextManager
+from typing import Union, Iterable, Optional, ContextManager, TYPE_CHECKING
 
 from . import Pipeline, PipeSegment, PrepareInstance, DownloadResults
 from ..api import Status
 from .. import util, api
+
+if TYPE_CHECKING:
+    from .. import Instance
 
 
 class RunInstance(PipeSegment):
 
     name = 'Run'
 
-    def __init__(self, workspaces, ncopies: int = 1):
+    def __init__(self, workspaces: api.WorkspaceCollection, ncopies: int = 1):
         super().__init__(ncopies)
         self.workspaces = workspaces
 
     @util.with_context('I {instance.index}')
     @util.with_context('Run')
-    async def apply(self, instance):
+    async def apply(self, instance: Instance) -> Instance:
         instance.status = Status.Started
         workspace = instance.open_workspace(self.workspaces)
         await instance.script.run(workspace.root, workspace.subspace('.grevling'))
@@ -44,7 +49,7 @@ class LocalWorkflow(api.Workflow):
     def __exit__(self, *args, **kwargs):
         self.workspaces.__exit__(*args, **kwargs)
 
-    def pipeline(self):
+    def pipeline(self) -> Pipeline:
         return Pipeline(
             PrepareInstance(self.workspaces),
             RunInstance(self.workspaces, ncopies=self.nprocs),
@@ -60,17 +65,17 @@ class LocalWorkspaceCollection(api.WorkspaceCollection):
         self.root = Path(root)
         self.name = name
 
-    def __enter__(self):
+    def __enter__(self) -> LocalWorkspaceCollection:
         return self
 
     def __exit__(self, *args, **kwargs):
         pass
 
-    def new_workspace(self, prefix: Optional[str] = None, name: str = '') -> api.Workspace:
+    def new_workspace(self, prefix: Optional[str] = None, name: str = '') -> LocalWorkspace:
         path = Path(tempfile.mkdtemp(prefix=prefix, dir=self.root))
         return LocalWorkspace(path, name)
 
-    def open_workspace(self, path: str, name: str = '') -> api.Workspace:
+    def open_workspace(self, path: str, name: str = '') -> LocalWorkspace:
         subpath = self.root / path
         subpath.mkdir(parents=True, exist_ok=True)
         return LocalWorkspace(subpath, name)
@@ -150,7 +155,7 @@ class TempWorkspaceCollection(LocalWorkspaceCollection):
     def __init__(self, name: str = ''):
         super().__init__(root='', name=name)
 
-    def __enter__(self):
+    def __enter__(self) -> LocalWorkspaceCollection:
         self.tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self.tempdir.__enter__())
         return self

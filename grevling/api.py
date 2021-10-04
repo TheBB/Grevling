@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from enum import Enum
 from fnmatch import fnmatch
 from io import IOBase
 from pathlib import Path
 
-from typing import Dict, Any, ContextManager, Iterable, Union, Optional
+from typing import Dict, Any, ContextManager, Iterable, Union, Optional, TYPE_CHECKING
 
 from . import util
+
+if TYPE_CHECKING:
+    from .workflow import Pipe
 
 
 Context = Dict[str, Any]
@@ -28,7 +33,7 @@ class Workspace(ABC):
     name: str
 
     @abstractmethod
-    def __str__(self):
+    def __str__(self) -> str:
         ...
 
     @abstractmethod
@@ -56,7 +61,7 @@ class Workspace(ABC):
         ...
 
     @abstractmethod
-    def subspace(self, name: str) -> 'Workspace':
+    def subspace(self, name: str) -> Workspace:
         ...
 
     @abstractmethod
@@ -69,7 +74,15 @@ class Workspace(ABC):
                 yield path
 
 
-class WorkspaceCollection(ContextManager['WorkspaceCollection'], ABC):
+class WorkspaceCollection(ABC):
+
+    @abstractmethod
+    def __enter__(self) -> WorkspaceCollection:
+        ...
+
+    @abstractmethod
+    def __exit__(self, *args, **kwargs):
+        ...
 
     @abstractmethod
     def new_workspace(self, prefix: Optional[str] = None) -> Workspace:
@@ -84,7 +97,15 @@ class WorkspaceCollection(ContextManager['WorkspaceCollection'], ABC):
         ...
 
 
-class Workflow(ContextManager['Workflow'], ABC):
+class Workflow(ABC):
+
+    @abstractmethod
+    def __enter__(self) -> Workflow:
+        ...
+
+    @abstractmethod
+    def __exit__(self, *args, **kwargs):
+        ...
 
     @staticmethod
     def get_workflow(name: str):
@@ -94,5 +115,5 @@ class Workflow(ContextManager['Workflow'], ABC):
         return cls
 
     @abstractmethod
-    def pipeline():
+    def pipeline() -> Pipe:
         ...

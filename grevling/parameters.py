@@ -1,4 +1,6 @@
-from typing import Sequence, Iterable, Dict, Any
+from __future__ import annotations
+
+from typing import Sequence, Iterable, Dict, Any, List, Tuple
 
 import numpy as np
 
@@ -7,22 +9,25 @@ from . import api, util
 
 class Parameter(Sequence):
 
+    name: str
+    values: List
+
     @classmethod
-    def load(cls, name: str, spec: Any):
+    def load(cls, name: str, spec: Any) -> Parameter:
         if isinstance(spec, list):
             return cls(name, spec)
         assert isinstance(spec, dict)
         subcls = util.find_subclass(cls, spec.pop('type'), root=False, attr='__tag__')
         return util.call_yaml(subcls, spec, name)
 
-    def __init__(self, name, values):
+    def __init__(self, name: str, values: List):
         self.name = name
         self.values = values
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.values)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index) -> Any:
         return self.values[index]
 
 
@@ -30,7 +35,7 @@ class UniformParameter(Parameter):
 
     __tag__ = 'uniform'
 
-    def __init__(self, name, interval, num):
+    def __init__(self, name: str, interval: Tuple[float, float], num: int):
         super().__init__(name, np.linspace(*interval, num=num))
 
 
@@ -38,7 +43,7 @@ class GradedParameter(Parameter):
 
     __tag__ = 'graded'
 
-    def __init__(self, name, interval, num, grading):
+    def __init__(self, name: str, interval: Tuple[float, float], num: int, grading: float):
         lo, hi = interval
         step = (hi - lo) * (1 - grading) / (1 - grading ** (num - 1))
         values = [lo]
@@ -51,7 +56,7 @@ class GradedParameter(Parameter):
 class ParameterSpace(dict):
 
     @classmethod
-    def load(cls, data: Dict) -> 'ParameterSpace':
+    def load(cls, data: Dict) -> ParameterSpace:
         return cls({
             name: Parameter.load(name, spec)
             for name, spec in data.items()

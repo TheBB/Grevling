@@ -1,10 +1,12 @@
+from __future__ import annotations
+
+from abc import abstractclassmethod, ABC, abstractmethod
 from pathlib import Path
 import csv
-import logging
 import math
 import operator
 
-from typing import List, Dict, Optional, Iterable, Any
+from typing import List, Dict, Optional, Iterable, Any, Tuple
 
 from bidict import bidict
 import numpy as np
@@ -18,6 +20,8 @@ from .render import render
 
 class Backends:
 
+    _backends: List[PlotBackend]
+
     def __init__(self, *names: str):
         self._backends = [PlotBackend.get_backend(name)() for name in names]
 
@@ -28,7 +32,7 @@ class Backends:
         return inner
 
 
-class PlotBackend:
+class PlotBackend(ABC):
 
     name: str
 
@@ -40,6 +44,14 @@ class PlotBackend:
         if not cls.available():
             raise ImportError(f"Additional dependencies required for {name} backend")
         return cls
+
+    @abstractclassmethod
+    def available(cls) -> bool:
+        ...
+
+    @abstractmethod
+    def generate(self, filename: Path):
+        ...
 
     set_title = ignore
     set_xlabel = ignore
@@ -57,7 +69,7 @@ class MockBackend(PlotBackend):
     plots = []
 
     @classmethod
-    def available(cls):
+    def available(cls) -> bool:
         return True
 
     def __init__(self):
@@ -65,7 +77,8 @@ class MockBackend(PlotBackend):
         self.objects = []
         self.meta = {}
 
-    def add_line(self, legend: str, xpoints: List[float], ypoints: List[float], style: Dict[str, str], mode='line'):
+    def add_line(self, legend: str, xpoints: List[float], ypoints: List[float],
+                 style: Dict[str, str], mode='line'):
         self.objects.append({
             'legend': legend,
             'x': xpoints,
@@ -110,7 +123,7 @@ class MatplotilbBackend(PlotBackend):
     name = 'matplotlib'
 
     @classmethod
-    def available(cls):
+    def available(cls) -> bool:
         try:
             import matplotlib
             return True
@@ -171,7 +184,7 @@ class PlotlyBackend(PlotBackend):
     name = 'plotly'
 
     @classmethod
-    def available(cls):
+    def available(cls) -> bool:
         try:
             import plotly
             return True
@@ -225,8 +238,11 @@ class CSVBackend(PlotBackend):
 
     name = 'csv'
 
+    columns: List[Tuple[List[float], List[float]]]
+    legend: List[str]
+
     @classmethod
-    def available(cls):
+    def available(cls) -> bool:
         return True
 
     def __init__(self):
@@ -234,7 +250,7 @@ class CSVBackend(PlotBackend):
         self.legend = []
 
     def add_line(self, legend: str, xpoints: List[float], ypoints: List[float], style: Dict[str, str]):
-        self.columns.extend([xpoints, ypoints])
+        self.columns.extend((xpoints, ypoints))
         self.legend.extend([f'{legend} (x-axis)', legend])
 
     add_scatter = add_line

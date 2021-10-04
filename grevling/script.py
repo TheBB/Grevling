@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 from collections import namedtuple
 from contextlib import contextmanager
@@ -63,7 +65,7 @@ class Command:
     retry_on_fail: bool = False
     allow_failure: bool = False
 
-    async def execute(self, cwd: Path, log_ws: api.Workspace):
+    async def execute(self, cwd: Path, log_ws: api.Workspace) -> bool:
         kwargs = {
             'cwd': cwd,
             'shell': self.shell,
@@ -130,7 +132,7 @@ class CommandTemplate:
     capture: InitVar[Union[str, Dict, List]] = []
 
     @classmethod
-    def load(cls, spec, containers={}):
+    def load(cls, spec, containers={}) -> CommandTemplate:
         if isinstance(spec, (str, list)):
             return cls(command=spec)
         spec.pop('capture-output', None)
@@ -151,7 +153,7 @@ class CommandTemplate:
         elif isinstance(capture, list):
             self.captures.extend(Capture.load(c) for c in capture)
 
-    def add_types(self, types: Dict[str, Any]):
+    def add_types(self, types: api.Types):
         types[f'walltime/{self.name}'] = float
         for cap in self.captures:
             cap.add_types(types)
@@ -210,7 +212,7 @@ class ScriptTemplate:
     commands: List[CommandTemplate]
 
     @classmethod
-    def load(cls, commands: List, containers: Dict) -> 'ScriptTemplate':
+    def load(cls, commands: List, containers: Dict) -> ScriptTemplate:
         script = cls()
         script.commands.extend(CommandTemplate.load(spec, containers) for spec in commands)
         return script
@@ -225,7 +227,7 @@ class ScriptTemplate:
     def render(self, context: api.Context) -> Script:
         return Script([cmd.render(context) for cmd in self.commands])
 
-    def add_types(self, types):
+    def add_types(self, types: api.Types):
         for command in self.commands:
             command.add_types(types)
 

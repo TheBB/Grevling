@@ -1,17 +1,23 @@
+from __future__ import annotations
+
 import json
 import re
 
-from typing import Dict, Any, List
+from typing import Any, List, Optional
 
-from typing_inspect import get_args
+import pandas as pd
 
 from . import util, api
 
 
 class Capture:
 
+    _regex: re.Pattern
+    _mode: str
+    _type_overrides: api.Types
+
     @classmethod
-    def load(cls, spec):
+    def load(cls, spec) -> Capture:
         if isinstance(spec, str):
             return cls(spec)
         if spec.get('type') in ('integer', 'float'):
@@ -30,12 +36,12 @@ class Capture:
             return cls(pattern, mode, type_overrides)
         return util.call_yaml(cls, spec)
 
-    def __init__(self, pattern, mode='last', type_overrides=None):
+    def __init__(self, pattern: str, mode: str = 'last', type_overrides: Optional[api.Types] = None):
         self._regex = re.compile(pattern)
         self._mode = mode
         self._type_overrides = type_overrides or {}
 
-    def add_types(self, types: Dict[str, Any]):
+    def add_types(self, types: api.Types):
         for group in self._regex.groupindex.keys():
             single = self._type_overrides.get(group, str)
             if self._mode == 'all':
@@ -43,21 +49,22 @@ class Capture:
             else:
                 types.setdefault(group, single)
 
-    def find_in(self, collector, string):
+    def find_in(self, collector: ResultCollector, string: str):
         matches = self._regex.finditer(string)
         if self._mode == 'first':
             try:
                 matches = [next(matches)]
             except StopIteration:
-                pass
+                return
 
         elif self._mode == 'last':
+            try:
+                match = next(matches)
+            except StopIteration:
+                return
             for match in matches:
                 pass
-            try:
-                matches = [match]
-            except UnboundLocalError:
-                pass
+            matches = [match]
 
         for match in matches:
             for name, value in match.groupdict().items():
@@ -66,9 +73,9 @@ class Capture:
 
 class ResultCollector(dict):
 
-    _types: Dict[str, Any]
+    _types: api.Types
 
-    def __init__(self, types):
+    def __init__(self, types: api.Types):
         super().__init__()
         self._types = types
 
@@ -103,7 +110,7 @@ class ResultCollector(dict):
         with ws.open_file('captured.json', 'w') as f:
             json.dump(self, f, sort_keys=True, indent=4, cls=util.JSONEncoder)
 
-    def commit_to_dataframe(self, data):
+    def commit_to_dataframe(self, data: pd.DataFrame):
         index = self['_index']
         data.loc[index, :] = [None] * data.shape[1]
         for key, value in self.items():

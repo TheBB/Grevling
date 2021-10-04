@@ -1,6 +1,11 @@
+from __future__ import annotations
+
+import io
 import json
 from pathlib import Path
 import sys
+
+from typing import List
 
 import click
 from ruamel.yaml.parser import ParserError as YAMLParserError
@@ -8,7 +13,7 @@ from simpleeval import SimpleEval
 from strictyaml import YAMLValidationError
 
 import grevling
-from . import util, api
+from . import Case, util, api
 
 import grevling.workflow.local
 
@@ -25,10 +30,10 @@ class CustomClickException(click.ClickException):
         util.log.critical(str(self))
 
 
-class Case(click.Path):
+class CaseType(click.Path):
 
     def convert(self, value, param, ctx):
-        if isinstance(value, grevling.Case):
+        if isinstance(value, Case):
             return value
         path = Path(super().convert(value, param, ctx))
         if path.is_dir():
@@ -43,7 +48,7 @@ class Case(click.Path):
         if not casefile.is_file():
             raise click.FileError(str(casefile), hint='is not a file')
         try:
-            return grevling.Case(path)
+            return Case(path)
         except (YAMLValidationError, YAMLParserError) as error:
             raise CustomClickException(str(error))
 
@@ -62,33 +67,21 @@ def print_version(ctx, param, value):
 @click.option('--warning', 'verbosity', flag_value='WARNING')
 @click.option('--error', 'verbosity', flag_value='ERROR')
 @click.option('--critical', 'verbosity', flag_value='CRITICAL')
-@click.option('--rich/--no-rich', default=True)
-@click.pass_context
-def main(ctx, verbosity, rich):
+def main(verbosity: str):
     util.initialize_logging(level=verbosity, show_time=False)
-
-    # from azure.identity import DefaultAzureCredential
-    # from azure.mgmt.resource import SubscriptionClient
-    # import logging
-    # for name in logging.root.manager.loggerDict:
-    #     if name.startswith('azure'):
-    #         logging.getLogger(name).setLevel('ERROR')
-    # cr = DefaultAzureCredential()
-    # subs = SubscriptionClient(cr)
-    # print(list(subs.subscriptions.list()))
 
 
 @main.command()
-@click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
-def check(case):
+@click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
+def check(case: Case):
     case.check(interactive=True)
 
 
 @main.command('run-all')
-@click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
+@click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
 @click.option('-j', 'nprocs', default=1, type=int)
 @workflows
-def run_all(case, workflow, nprocs):
+def run_all(case: Case, workflow: str, nprocs: int):
     if not case.check(interactive=False):
         sys.exit(1)
     case.clear_cache()
@@ -102,10 +95,10 @@ def run_all(case, workflow, nprocs):
 
 
 @main.command('run')
-@click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
+@click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
 @click.option('-j', 'nprocs', default=1, type=int)
 @workflows
-def run(case, nprocs, workflow):
+def run(case: Case, workflow: str, nprocs: int):
     if not case.check(interactive=False):
         sys.exit(1)
     case.clear_cache()
@@ -115,11 +108,11 @@ def run(case, nprocs, workflow):
 
 
 @main.command('run-with')
-@click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
+@click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
 @click.option('--target', '-t', default='.', type=click.Path())
 @workflows
 @click.argument('context', nargs=-1, type=str)
-def run_with(case, target, workflow, context):
+def run_with(case: Case, target: str, workflow: str, context: List[str]):
     evaluator = SimpleEval()
     parsed_context = {}
     for s in context:
@@ -132,16 +125,16 @@ def run_with(case, target, workflow, context):
 
 
 @main.command('capture')
-@click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
-def capture(case):
+@click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
+def capture(case: Case):
     if not case.check(interactive=False):
         sys.exit(1)
     case.capture()
 
 
 @main.command('collect')
-@click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
-def collect(case):
+@click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
+def collect(case: Case):
     if not case.check(interactive=False):
         sys.exit(1)
     case.clear_dataframe()
@@ -149,8 +142,8 @@ def collect(case):
 
 
 @main.command('plot')
-@click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
-def plot(case):
+@click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
+def plot(case: Case):
     if not case.check(interactive=False):
         sys.exit(1)
     case.plot()
@@ -158,9 +151,9 @@ def plot(case):
 
 @main.command()
 @click.option('--fmt', '-f', default='json', type=click.Choice(['json']))
-@click.option('--case', '-c', default='.', type=Case(file_okay=True, dir_okay=True))
+@click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
 @click.argument('output', type=click.File('w'))
-def dump(case, fmt, output):
+def dump(case: Case, fmt: str, output: io.IOBase):
     with case.lock():
         data = case.load_dataframe()
     if fmt == 'json':

@@ -1,13 +1,14 @@
+from __future__ import annotations
+
 from contextlib import contextmanager
 from difflib import Differ
-from enum import Enum
 import json
 import os
 from pathlib import Path
 import pydoc
 import shutil
 
-from typing import List, Iterable, Optional
+from typing import List, Iterable, Optional, Any
 
 from fasteners import InterProcessLock
 import pandas as pd
@@ -19,8 +20,9 @@ from .plotting import Plot
 from .render import render
 from .schema import load_and_validate
 from .context import ContextManager
+from .parameters import ParameterSpace
 from .filemap import FileMap
-from .script import ScriptTemplate
+from .script import Script, ScriptTemplate
 from .workflow.local import LocalWorkspaceCollection, LocalWorkspace, LocalWorkflow
 from . import util, api
 
@@ -63,7 +65,8 @@ class Case:
 
     _ignore_missing: bool
 
-    def __init__(self, yamlpath='.', storagepath=None, yamldata=None):
+    def __init__(self, yamlpath: api.PathStr = '.',
+                 storagepath: Optional[Path] = None, yamldata: Optional[str] = None):
         if isinstance(yamlpath, str):
             yamlpath = Path(yamlpath)
         if yamlpath.is_dir():
@@ -110,16 +113,17 @@ class Case:
         self._plots = [Plot.load(spec, self.parameters, self.types) for spec in casedata.get('plots', [])]
 
     @property
-    def parameters(self):
+    def parameters(self) -> ParameterSpace:
         return self.context_mgr.parameters
 
     @property
-    def types(self):
+    def types(self) -> api.Types:
         return self.context_mgr.types
 
     def clear_cache(self):
-        shutil.rmtree(self.storagepath)
-        self.storagepath.mkdir(parents=True, exist_ok=True)
+        with self.lock():
+            shutil.rmtree(self.storagepath)
+            self.storagepath.mkdir(parents=True, exist_ok=True)
 
     def clear_dataframe(self):
         with self.lock():
@@ -130,7 +134,7 @@ class Case:
         with InterProcessLock(self.storagepath / 'lockfile'):
             yield
 
-    def load_dataframe(self):
+    def load_dataframe(self) -> pd.DataFram:
         if self.dataframepath.is_file():
             return pd.read_parquet(self.dataframepath, engine='pyarrow')
         data = {
@@ -143,7 +147,7 @@ class Case:
     def save_dataframe(self, df: pd.DataFrame):
         df.to_parquet(self.dataframepath, engine='pyarrow', index=True)
 
-    def has_data(self):
+    def has_data(self) -> bool:
         with self.lock():
             for _ in self.instances(Status.Downloaded):
                 return True
@@ -212,13 +216,13 @@ class Case:
 
         return True
 
-    def create_instances(self) -> Iterable['Instance']:
+    def create_instances(self) -> Iterable[Instance]:
         for i, ctx in enumerate(self.context_mgr.fullspace()):
             ctx['_index'] = i
             ctx['_logdir'] = render(self._logdir, ctx)
             yield Instance.create(self, ctx)
 
-    def create_instance(self, ctx: api.Context, logdir: Optional[Path] = None, index: Optional[int] = None) -> 'Instance':
+    def create_instance(self, ctx: api.Context, logdir: Optional[Path] = None, index: Optional[int] = None) -> Instance:
         ctx = self.context_mgr.evaluate_context(ctx)
         if index is None:
             index = 0
@@ -229,7 +233,7 @@ class Case:
         workspace = LocalWorkspace(Path(ctx['_logdir']), name='LOG')
         return Instance.create(self, ctx, local=workspace)
 
-    def instances(self, *statuses) -> Iterable['Instance']:
+    def instances(self, *statuses: api.Status) -> Iterable[Instance]:
         for name in self.storage_spaces.workspace_names():
             if not self.storage_spaces.open_workspace(name).exists('.grevling/status.txt'):
                 continue
@@ -300,13 +304,13 @@ class Instance:
     _status: Optional[Status]
 
     @classmethod
-    def create(cls, case, context: api.Context, local = None) -> 'Instance':
+    def create(cls, case: Case, context: api.Context, local = None) -> Instance:
         obj = cls(case, context=context, local=local)
         obj.status = Status.Created
         obj.write_context()
         return obj
 
-    def __init__(self, case, context: api.Context = None, logdir = None, local = None):
+    def __init__(self, case: Case, context: api.Context = None, logdir: Optional[str] = None, local: Optional[api.Workspace] = None):
         self._case = case
         self._context = context
 
@@ -325,7 +329,7 @@ class Instance:
         self._status = None
 
     @property
-    def status(self):
+    def status(self) -> api.Status:
         if not self._status:
             with self.local_book.open_file('status.txt', 'r') as f:
                 status = f.read()
@@ -333,26 +337,26 @@ class Instance:
         return self._status
 
     @status.setter
-    def status(self, value):
+    def status(self, value: api.Status):
         with self.local_book.open_file('status.txt', 'w') as f:
             f.write(value.value)
         self._status = value
 
     @property
-    def context(self):
+    def context(self) -> api.Context:
         if self._context is None:
             with self.local_book.open_file('context.json', 'r') as f:
                 self._context = json.load(f)
         return self._context
 
     @property
-    def types(self):
+    def types(self) -> api.Types:
         return self._case.types
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         return self.context[key]
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: Any) -> Any:
         self.context[key] = util.coerce(self.types[key], value)
 
     @contextmanager
@@ -365,18 +369,18 @@ class Instance:
             self.remote = self.remote_book = None
 
     @property
-    def index(self):
+    def index(self) -> int:
         return self.context['_index']
 
     @property
-    def script(self):
+    def script(self) -> Script:
         return self._case.script.render(self.context)
 
     def write_context(self):
         with self.local_book.open_file('context.json', 'w') as f:
             json.dump(self.context, f, sort_keys=True, indent=4, cls=util.JSONEncoder)
 
-    def open_workspace(self, workspaces, name=''):
+    def open_workspace(self, workspaces, name='') -> api.Workspace:
         return workspaces.open_workspace(self.logdir, name)
 
     def prepare(self):
@@ -420,7 +424,7 @@ class Instance:
         self._case.script.capture(collector, self.local_book)
         collector.commit_to_file(self.local_book)
 
-    def cached_capture(self):
+    def cached_capture(self) -> ResultCollector:
         collector = ResultCollector(self.types)
         collector.collect_from_cache(self.local_book)
         return collector
