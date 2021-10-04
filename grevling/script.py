@@ -33,7 +33,10 @@ def shell_list_render(arg: Union[str, List[str]], context: api.Context) -> List[
 
 Result = namedtuple('Result', ['stdout', 'stderr', 'returncode'])
 
-async def run(command: List[str], shell: bool, env: Dict[str, str], cwd: Path) -> Result:
+
+async def run(
+    command: List[str], shell: bool, env: Dict[str, str], cwd: Path
+) -> Result:
     kwargs = {
         'env': env,
         'cwd': cwd,
@@ -75,12 +78,18 @@ class Command:
         command = self.args
         if self.container:
             docker_command = [
-                'docker', 'run', *self.container_args,
-                f'-v{cwd}:/workdir', '--workdir', '/workdir',
+                'docker',
+                'run',
+                *self.container_args,
+                f'-v{cwd}:/workdir',
+                '--workdir',
+                '/workdir',
                 self.container,
             ]
             if command:
-                docker_command.extend(['bash', '-c', ' '.join(shlex.quote(c) for c in command)])
+                docker_command.extend(
+                    ['bash', '-c', ' '.join(shlex.quote(c) for c in command)]
+                )
             kwargs['shell'] = False
             command = docker_command
 
@@ -98,7 +107,9 @@ class Command:
 
         log_ws.write_file(f'{self.name}.stdout', result.stdout)
         log_ws.write_file(f'{self.name}.stderr', result.stderr)
-        log_ws.write_file('grevling.txt', f'walltime/{self.name}={duration}\n', append=True)
+        log_ws.write_file(
+            'grevling.txt', f'walltime/{self.name}={duration}\n', append=True
+        )
 
         if result.returncode:
             level = util.log.warn if self.allow_failure else util.log.error
@@ -142,7 +153,11 @@ class CommandTemplate:
     def __post_init__(self, container_args_spec, capture):
         if not self.name:
             assert self.command
-            exe = shlex.split(self.command)[0] if isinstance(self.command, str) else self.command[0]
+            exe = (
+                shlex.split(self.command)[0]
+                if isinstance(self.command, str)
+                else self.command[0]
+            )
             self.name = Path(exe).name
 
         self.container_args = container_args_spec.get(self.container, [])
@@ -172,11 +187,14 @@ class CommandTemplate:
         command = shell_list_render(self.command, context)
 
         return Command(
-            name=self.name, args=command, env=kwargs.get('env'), shell=kwargs['shell'],
+            name=self.name,
+            args=command,
+            env=kwargs.get('env'),
+            shell=kwargs['shell'],
             retry_on_fail=self.retry_on_fail,
             allow_failure=self.allow_failure,
             container=self.container,
-            container_args=shell_list_render(self.container_args, context)
+            container_args=shell_list_render(self.container_args, context),
         )
 
     def capture(self, collector: ResultCollector, workspace: api.Workspace):
@@ -195,7 +213,9 @@ class Script:
     commands: List[Command]
 
     async def run(self, cwd: Path, log_ws: api.Workspace) -> bool:
-        log_ws.write_file('grevling.txt', f'_started={datetime.datetime.now()}\n', append=True)
+        log_ws.write_file(
+            'grevling.txt', f'_started={datetime.datetime.now()}\n', append=True
+        )
         try:
             for cmd in self.commands:
                 if not await cmd.execute(cwd, log_ws):
@@ -204,7 +224,9 @@ class Script:
             log_ws.write_file('grevling.txt', '_success=1\n', append=True)
             return True
         finally:
-            log_ws.write_file('grevling.txt', f'_finished={datetime.datetime.now()}\n', append=True)
+            log_ws.write_file(
+                'grevling.txt', f'_finished={datetime.datetime.now()}\n', append=True
+            )
 
 
 class ScriptTemplate:
@@ -214,7 +236,9 @@ class ScriptTemplate:
     @classmethod
     def load(cls, commands: List, containers: Dict) -> ScriptTemplate:
         script = cls()
-        script.commands.extend(CommandTemplate.load(spec, containers) for spec in commands)
+        script.commands.extend(
+            CommandTemplate.load(spec, containers) for spec in commands
+        )
         return script
 
     def __init__(self):

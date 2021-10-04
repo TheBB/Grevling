@@ -71,7 +71,9 @@ class LocalWorkspaceCollection(api.WorkspaceCollection):
     def __exit__(self, *args, **kwargs):
         pass
 
-    def new_workspace(self, prefix: Optional[str] = None, name: str = '') -> LocalWorkspace:
+    def new_workspace(
+        self, prefix: Optional[str] = None, name: str = ''
+    ) -> LocalWorkspace:
         path = Path(tempfile.mkdtemp(prefix=prefix, dir=self.root))
         return LocalWorkspace(path, name)
 
@@ -106,7 +108,9 @@ class LocalWorkspace(api.Workspace):
         with open(self.root / path, mode) as f:
             yield f
 
-    def write_file(self, path, source: Union[str, bytes, IOBase, Path], append: bool = False):
+    def write_file(
+        self, path, source: Union[str, bytes, IOBase, Path], append: bool = False
+    ):
         target = self.root / path
         target.parent.mkdir(parents=True, exist_ok=True)
 

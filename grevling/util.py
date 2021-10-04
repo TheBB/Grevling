@@ -15,7 +15,6 @@ from typing_inspect import get_origin, get_args
 
 
 class LoggerAdapter(logging.LoggerAdapter):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -31,9 +30,7 @@ class LoggerAdapter(logging.LoggerAdapter):
     def process(self, msg, kwargs):
         context = self.find_context()
         msg = ' · '.join(chain(context, [msg]))
-        kwargs.setdefault('extra', {}).update({
-            'markup': True
-        })
+        kwargs.setdefault('extra', {}).update({'markup': True})
         return msg, kwargs
 
     @contextmanager
@@ -60,20 +57,25 @@ def with_context(fmt: str):
             return fmt.format(**binding.arguments)
 
         if asyncio.iscoroutinefunction(func):
+
             async def inner(*args, **kwargs):
                 with log.with_context(calculate_context(*args, **kwargs)):
                     return await func(*args, **kwargs)
+
         else:
+
             def inner(*args, **kwargs):
                 with log.with_context(calculate_context(*args, **kwargs)):
                     return func(*args, **kwargs)
 
         return wraps(func)(inner)
+
     return decorator
 
 
 logging.basicConfig(level='INFO')
 log: LoggerAdapter = LoggerAdapter(logging.getLogger(), {})
+
 
 def initialize_logging(level='INFO', show_time=False):
     logging.basicConfig(
@@ -93,7 +95,6 @@ def initialize_process():
 
 
 class JSONEncoder(json.JSONEncoder):
-
     def default(self, obj):
         if isinstance(obj, np.integer):
             return int(obj)
@@ -153,11 +154,13 @@ def find_subclass(cls, name, root=False, attr='__tag__'):
 
 def completer(options):
     matches = []
+
     def complete(text, state):
         if state == 0:
             matches.clear()
             matches.extend(c for c in options if c.startswith(text.lower()))
         return matches[state] if state < len(matches) else None
+
     return complete
 
 
@@ -213,7 +216,6 @@ def to_queue(it):
 
 
 def deprecated(info, name=None):
-
     def decorator(func):
         iname = name or func.__name__
 
@@ -223,4 +225,5 @@ def deprecated(info, name=None):
             return func(*args, **kwargs)
 
         return inner
+
     return decorator

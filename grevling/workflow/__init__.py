@@ -30,7 +30,9 @@ class Pipe(ABC):
         ...
 
     @abstractmethod
-    async def work(self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None):
+    async def work(
+        self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None
+    ):
         ...
 
 
@@ -50,7 +52,9 @@ class PipeSegment(Pipe):
         await queue.join()
         return self.npiped == ninputs
 
-    async def work(self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None):
+    async def work(
+        self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None
+    ):
         while True:
             arg = await in_queue.get()
             try:
@@ -85,9 +89,11 @@ class Pipeline(Pipe):
         await self.work(queue)
         return self.pipes[-1].npiped == ninputs
 
-    async def work(self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None):
+    async def work(
+        self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None
+    ):
         ntasks = len(self.pipes)
-        queues = [asyncio.Queue(maxsize=1) for _ in range(ntasks-1)]
+        queues = [asyncio.Queue(maxsize=1) for _ in range(ntasks - 1)]
         in_queues = chain([in_queue], queues)
         out_queues = chain(queues, [out_queue])
 

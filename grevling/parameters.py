@@ -43,7 +43,9 @@ class GradedParameter(Parameter):
 
     __tag__ = 'graded'
 
-    def __init__(self, name: str, interval: Tuple[float, float], num: int, grading: float):
+    def __init__(
+        self, name: str, interval: Tuple[float, float], num: int, grading: float
+    ):
         lo, hi = interval
         step = (hi - lo) * (1 - grading) / (1 - grading ** (num - 1))
         values = [lo]
@@ -54,13 +56,9 @@ class GradedParameter(Parameter):
 
 
 class ParameterSpace(dict):
-
     @classmethod
     def load(cls, data: Dict) -> ParameterSpace:
-        return cls({
-            name: Parameter.load(name, spec)
-            for name, spec in data.items()
-        })
+        return cls({name: Parameter.load(name, spec) for name, spec in data.items()})
 
     def subspace(self, *names: str) -> Iterable[Dict]:
         params = [self[name] for name in names]

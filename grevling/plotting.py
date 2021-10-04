@@ -29,6 +29,7 @@ class Backends:
         def inner(*args, **kwargs):
             for backend in self._backends:
                 getattr(backend, attr)(*args, **kwargs)
+
         return inner
 
 
@@ -77,15 +78,23 @@ class MockBackend(PlotBackend):
         self.objects = []
         self.meta = {}
 
-    def add_line(self, legend: str, xpoints: List[float], ypoints: List[float],
-                 style: Dict[str, str], mode='line'):
-        self.objects.append({
-            'legend': legend,
-            'x': xpoints,
-            'y': ypoints,
-            'mode': mode,
-            **style,
-        })
+    def add_line(
+        self,
+        legend: str,
+        xpoints: List[float],
+        ypoints: List[float],
+        style: Dict[str, str],
+        mode='line',
+    ):
+        self.objects.append(
+            {
+                'legend': legend,
+                'x': xpoints,
+                'y': ypoints,
+                'mode': mode,
+                **style,
+            }
+        )
 
     def add_scatter(self, *args, **kwargs):
         return self.add_line(*args, **kwargs, mode='scatter')
@@ -126,25 +135,43 @@ class MatplotilbBackend(PlotBackend):
     def available(cls) -> bool:
         try:
             import matplotlib
+
             return True
         except ImportError:
             return False
 
     def __init__(self):
         from matplotlib.figure import Figure
+
         self.figure = Figure(tight_layout=True)
         self.axes = self.figure.add_subplot(1, 1, 1)
         self.legend = []
 
-    def add_line(self, legend: str, xpoints: List[float], ypoints: List[float], style: Dict[str, str]):
-        self.axes.plot(xpoints, ypoints,
+    def add_line(
+        self,
+        legend: str,
+        xpoints: List[float],
+        ypoints: List[float],
+        style: Dict[str, str],
+    ):
+        self.axes.plot(
+            xpoints,
+            ypoints,
             color=style['color'],
-            linestyle={'dash': 'dashed', 'dot': 'dotted'}.get(style['line'], style['line']),
+            linestyle={'dash': 'dashed', 'dot': 'dotted'}.get(
+                style['line'], style['line']
+            ),
             marker={'circle': 'o', 'triangle': '^', 'square': 's'}.get(style['marker']),
         )
         self.legend.append(legend)
 
-    def add_scatter(self, legend: str, xpoints: List[float], ypoints: List[float], style: Dict[str, str]):
+    def add_scatter(
+        self,
+        legend: str,
+        xpoints: List[float],
+        ypoints: List[float],
+        style: Dict[str, str],
+    ):
         self.axes.scatter(xpoints, ypoints)
         self.legend.append(legend)
 
@@ -187,15 +214,24 @@ class PlotlyBackend(PlotBackend):
     def available(cls) -> bool:
         try:
             import plotly
+
             return True
         except:
             return False
 
     def __init__(self):
         import plotly.graph_objects as go
+
         self.figure = go.Figure()
 
-    def add_line(self, legend: str, xpoints: List[float], ypoints: List[float], style: Dict[str, str], mode='lines'):
+    def add_line(
+        self,
+        legend: str,
+        xpoints: List[float],
+        ypoints: List[float],
+        style: Dict[str, str],
+        mode='lines',
+    ):
         self.figure.add_scatter(x=xpoints, y=ypoints, mode=mode, name=legend)
 
     def add_scatter(self, *args, **kwargs):
@@ -218,13 +254,19 @@ class PlotlyBackend(PlotBackend):
 
     def set_xlim(self, value: List[float]):
         if self.figure.layout.xaxis.type == 'log':
-            self.figure.layout.xaxis.range = [math.log10(value[0]), math.log10(value[1])]
+            self.figure.layout.xaxis.range = [
+                math.log10(value[0]),
+                math.log10(value[1]),
+            ]
         else:
             self.figure.layout.xaxis.range = value
 
     def set_ylim(self, value: List[float]):
         if self.figure.layout.yaxis.type == 'log':
-            self.figure.layout.yaxis.range = [math.log10(value[0]), math.log10(value[1])]
+            self.figure.layout.yaxis.range = [
+                math.log10(value[0]),
+                math.log10(value[1]),
+            ]
         else:
             self.figure.layout.yaxis.range = value
 
@@ -249,7 +291,13 @@ class CSVBackend(PlotBackend):
         self.columns = []
         self.legend = []
 
-    def add_line(self, legend: str, xpoints: List[float], ypoints: List[float], style: Dict[str, str]):
+    def add_line(
+        self,
+        legend: str,
+        xpoints: List[float],
+        ypoints: List[float],
+        style: Dict[str, str],
+    ):
         self.columns.extend((xpoints, ypoints))
         self.legend.extend([f'{legend} (x-axis)', legend])
 
@@ -312,7 +360,9 @@ class PlotStyleManager:
 
     def assign(self, category: str, style: Optional[str] = None):
         if style is None:
-            candidates = list(s for s in self._defaults if s not in self._category_to_style.inverse)
+            candidates = list(
+                s for s in self._defaults if s not in self._category_to_style.inverse
+            )
             if self._mode == 'scatter':
                 try:
                     candidates.remove('line')
@@ -332,18 +382,22 @@ class PlotStyleManager:
             return self._custom_styles[style]
         getter = lambda d, k: d.get(k, d.get(None, []))
         s = getter(self._defaults, style)
-        s = getter(s, 'category' if style in self._category_to_style.inverse else 'single')
+        s = getter(
+            s, 'category' if style in self._category_to_style.inverse else 'single'
+        )
         s = getter(s, self._mode)
         return s
 
-    def styles(self, space: ParameterSpace, *categories: str) -> Iterable[Dict[str, str]]:
+    def styles(
+        self, space: ParameterSpace, *categories: str
+    ) -> Iterable[Dict[str, str]]:
         names, values = [], []
         for c in categories:
             style = self._category_to_style[c]
             available_values = self.get_values(style)
             assert len(available_values) >= len(space[c])
             names.append(style)
-            values.append(available_values[:len(space[c])])
+            values.append(available_values[: len(space[c])])
         yield from util.dict_product(names, values)
 
     def supplement(self, basestyle: Dict[str, str]):
@@ -359,9 +413,7 @@ class PlotStyleManager:
             yield basestyle
 
 
-
 class PlotMode:
-
     @classmethod
     def load(cls, spec):
         if isinstance(spec, str):
@@ -403,7 +455,9 @@ class Plot:
             spec['parameters'].setdefault(param, 'ignore')
 
         # If there is exactly one variate, and the x-axis is not given, assume that is the x-axis
-        variates = [param for param, kind in spec['parameters'].items() if kind == 'variate']
+        variates = [
+            param for param, kind in spec['parameters'].items() if kind == 'variate'
+        ]
         nvariate = len(variates)
         if nvariate == 1 and 'xaxis' not in spec:
             spec['xaxis'] = next(iter(variates))
@@ -437,10 +491,28 @@ class Plot:
 
         return util.call_yaml(cls, spec)
 
-    def __init__(self, parameters, filename, format, yaxis, xaxis, type,
-                 legend=None, xlabel=None, ylabel=None, title=None, grid=True,
-                 xmode='linear', ymode='linear', xlim=[], ylim=[],style={}):
-        self._parameters = {name: PlotMode.load(value) for name, value in parameters.items()}
+    def __init__(
+        self,
+        parameters,
+        filename,
+        format,
+        yaxis,
+        xaxis,
+        type,
+        legend=None,
+        xlabel=None,
+        ylabel=None,
+        title=None,
+        grid=True,
+        xmode='linear',
+        ymode='linear',
+        xlim=[],
+        ylim=[],
+        style={},
+    ):
+        self._parameters = {
+            name: PlotMode.load(value) for name, value in parameters.items()
+        }
         self._filename = filename
         self._format = format
         self._yaxis = yaxis
@@ -473,15 +545,20 @@ class Plot:
         return [
             param
             for param, mode in self._parameters.items()
-            if mode.kind in kinds and (
-                req_arg is None or
-                req_arg is True and mode.arg is not None or
-                req_arg is False and mode.arg is None
+            if mode.kind in kinds
+            and (
+                req_arg is None
+                or req_arg is True
+                and mode.arg is not None
+                or req_arg is False
+                and mode.arg is None
             )
         ]
 
     def _parameters_not_of_kind(self, *kinds: str):
-        return [param for param, mode in self._parameters.items() if mode.kind not in kinds]
+        return [
+            param for param, mode in self._parameters.items() if mode.kind not in kinds
+        ]
 
     def generate_all(self, case):
         # Collect all the fixed parameters and iterate over all those combinations
@@ -495,23 +572,31 @@ class Plot:
 
         for index in case.parameters.subspace(*fixed):
             index = {**index, **constants}
-            context = case.context_mgr.evaluate_context(index.copy(), allowed_missing=unfixed)
+            context = case.context_mgr.evaluate_context(
+                index.copy(), allowed_missing=unfixed
+            )
             self.generate_single(case, context, index)
 
     def generate_single(self, case, context: dict, index):
         # Collect all the categorized parameters and iterate over all those combinations
         categories = self._parameters_of_kind('category')
-        noncats = set(case.parameters.keys()) - set(self._parameters_of_kind('fixed', 'category'))
+        noncats = set(case.parameters.keys()) - set(
+            self._parameters_of_kind('fixed', 'category')
+        )
         backends = Backends(*self._format)
         plotter = operator.attrgetter(f'add_{self._type}')
 
         sub_indices = case.parameters.subspace(*categories)
         styles = self._styles.styles(case.parameters, *categories)
         for sub_index, basestyle in zip(sub_indices, styles):
-            sub_context = case.context_mgr.evaluate_context({**context, **sub_index}, allowed_missing=noncats)
+            sub_context = case.context_mgr.evaluate_context(
+                {**context, **sub_index}, allowed_missing=noncats
+            )
             sub_index = {**index, **sub_index}
 
-            cat_name, xaxis, yaxes = self.generate_category(case, sub_context, sub_index)
+            cat_name, xaxis, yaxes = self.generate_category(
+                case, sub_context, sub_index
+            )
 
             final_styles = self._styles.supplement(basestyle)
             for ax_name, data, style in zip(self._yaxis, yaxes, final_styles):
@@ -562,7 +647,9 @@ class Plot:
             xdata = np.arange(1, length + 1)
 
         if any(self._parameters_of_kind('category')):
-            name = ', '.join(f'{k}={repr(context[k])}' for k in self._parameters_of_kind('category'))
+            name = ', '.join(
+                f'{k}={repr(context[k])}' for k in self._parameters_of_kind('category')
+            )
         else:
             name = None
 
@@ -572,6 +659,8 @@ class Plot:
         if self._legend is not None:
             return render(self._legend, {**context, 'yaxis': yaxis})
         if any(self._parameters_of_kind('category')):
-            name = ', '.join(f'{k}={repr(context[k])}' for k in self._parameters_of_kind('category'))
+            name = ', '.join(
+                f'{k}={repr(context[k])}' for k in self._parameters_of_kind('category')
+            )
             return f'{name} ({yaxis})'
         return yaxis

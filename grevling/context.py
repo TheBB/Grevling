@@ -75,13 +75,18 @@ class ContextManager:
     def evaluate_context(self, *args, **kwargs) -> api.Context:
         return self.evaluate(*args, **kwargs)
 
-    def evaluate(self, context, verbose: bool = True, allowed_missing: bool = False,
-                 add_constants: bool = True) -> api.Context:
+    def evaluate(
+        self,
+        context,
+        verbose: bool = True,
+        allowed_missing: bool = False,
+        add_constants: bool = True,
+    ) -> api.Context:
         evaluator = SimpleEval(functions=BUILTINS)
         evaluator.names.update(context)
-        evaluator.names.update({
-            k: v for k, v in self.constants.items() if k not in context
-        })
+        evaluator.names.update(
+            {k: v for k, v in self.constants.items() if k not in context}
+        )
 
         if allowed_missing is False:
             allowed_missing = set()

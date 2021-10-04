@@ -42,7 +42,12 @@ def _pandas_dtype(tp):
 
 def _typename(tp) -> str:
     try:
-        return {int: 'integer', str: 'string', float: 'float', 'datetime64[ns]': 'datetime'}[tp]
+        return {
+            int: 'integer',
+            str: 'string',
+            float: 'float',
+            'datetime64[ns]': 'datetime',
+        }[tp]
     except KeyError:
         base = {list: 'list'}[get_origin(tp)]
         subs = ', '.join(_typename(k) for k in get_args(tp))
@@ -65,8 +70,12 @@ class Case:
 
     _ignore_missing: bool
 
-    def __init__(self, yamlpath: api.PathStr = '.',
-                 storagepath: Optional[Path] = None, yamldata: Optional[str] = None):
+    def __init__(
+        self,
+        yamlpath: api.PathStr = '.',
+        storagepath: Optional[Path] = None,
+        yamldata: Optional[str] = None,
+    ):
         if isinstance(yamlpath, str):
             yamlpath = Path(yamlpath)
         if yamlpath.is_dir():
@@ -95,11 +104,15 @@ class Case:
         self.context_mgr = ContextManager.load(casedata)
 
         # Read file mappings
-        self.premap = FileMap.load(casedata.get('prefiles', []), casedata.get('templates', []))
+        self.premap = FileMap.load(
+            casedata.get('prefiles', []), casedata.get('templates', [])
+        )
         self.postmap = FileMap.load(casedata.get('postfiles', []))
 
         # Read commands
-        self.script = ScriptTemplate.load(casedata.get('script', []), casedata.get('containers', {}))
+        self.script = ScriptTemplate.load(
+            casedata.get('script', []), casedata.get('containers', {})
+        )
 
         # Fill in types derived from commands
         self.script.add_types(self.types)
@@ -110,7 +123,10 @@ class Case:
         self._ignore_missing = settings.get('ignore-missing-files', False)
 
         # Construct plot objects
-        self._plots = [Plot.load(spec, self.parameters, self.types) for spec in casedata.get('plots', [])]
+        self._plots = [
+            Plot.load(spec, self.parameters, self.types)
+            for spec in casedata.get('plots', [])
+        ]
 
     @property
     def parameters(self) -> ParameterSpace:
@@ -152,24 +168,35 @@ class Case:
                 return True
         return False
 
-    def _check_decide_diff(self, diff: List[str], prev_file: Path, interactive: bool = True) -> bool:
+    def _check_decide_diff(
+        self, diff: List[str], prev_file: Path, interactive: bool = True
+    ) -> bool:
         decision = None
         decisions = ['exit', 'diff', 'new-delete', 'new-keep', 'old']
         if interactive:
             if os.name == 'nt':
                 from pyreadline import Readline
+
                 readline = Readline()
             else:
                 import readline
             readline.set_completer(util.completer(decisions))
             readline.parse_and_bind('tab: complete')
-            util.log.warning("Warning: Grevlingfile has changed and data have already been stored")
+            util.log.warning(
+                "Warning: Grevlingfile has changed and data have already been stored"
+            )
             util.log.warning("Pick an option:")
             util.log.warning("  exit - quit grevling and fix the problem manually")
             util.log.warning("  diff - view a diff between old and new")
-            util.log.warning("  new-delete - accept new version and delete existing data (significant changes made)")
-            util.log.warning("  new-keep - accept new version and keep existing data (no significant changes made)")
-            util.log.warning("  old - accept old version and exit (re-run grevling to load the changed grevlingfile)")
+            util.log.warning(
+                "  new-delete - accept new version and delete existing data (significant changes made)"
+            )
+            util.log.warning(
+                "  new-keep - accept new version and keep existing data (no significant changes made)"
+            )
+            util.log.warning(
+                "  old - accept old version and exit (re-run grevling to load the changed grevlingfile)"
+            )
             while decision is None:
                 decision = input('>>> ').strip().lower()
                 if decision not in decisions:
@@ -189,8 +216,12 @@ class Case:
                     shutil.copyfile(prev_file, self.yamlpath)
                     return False
         else:
-            util.log.error("Error: Grevlingfile has changed and data have already been stored")
-            util.log.error("Try running 'grevling check' for more information, or delete .grevlingdata if you're sure")
+            util.log.error(
+                "Error: Grevlingfile has changed and data have already been stored"
+            )
+            util.log.error(
+                "Try running 'grevling check' for more information, or delete .grevlingdata if you're sure"
+            )
             return False
         return True
 
@@ -203,7 +234,9 @@ class Case:
                 old_lines = f.readlines()
             diff = list(Differ().compare(old_lines, new_lines))
             if not all(line.startswith('  ') for line in diff) and self.has_data():
-                if not self._check_decide_diff(diff, prev_file, interactive=interactive):
+                if not self._check_decide_diff(
+                    diff, prev_file, interactive=interactive
+                ):
                     return False
 
         shutil.copyfile(self.yamlpath, prev_file)
@@ -221,7 +254,12 @@ class Case:
             ctx['_logdir'] = render(self._logdir, ctx)
             yield Instance.create(self, ctx)
 
-    def create_instance(self, ctx: api.Context, logdir: Optional[Path] = None, index: Optional[int] = None) -> Instance:
+    def create_instance(
+        self,
+        ctx: api.Context,
+        logdir: Optional[Path] = None,
+        index: Optional[int] = None,
+    ) -> Instance:
         ctx = self.context_mgr.evaluate_context(ctx)
         if index is None:
             index = 0
@@ -234,7 +272,9 @@ class Case:
 
     def instances(self, *statuses: api.Status) -> Iterable[Instance]:
         for name in self.storage_spaces.workspace_names():
-            if not self.storage_spaces.open_workspace(name).exists('.grevling/status.txt'):
+            if not self.storage_spaces.open_workspace(name).exists(
+                '.grevling/status.txt'
+            ):
                 continue
             instance = Instance(self, logdir=name)
             if statuses and instance.status not in statuses:
@@ -259,10 +299,12 @@ class Case:
         for plot in self._plots:
             plot.generate_all(self)
 
-
     # Deprecated methods
 
-    @util.deprecated("use LocalWorkflow.pipeline().run(case.create_instances()) instead", name='Case.run')
+    @util.deprecated(
+        "use LocalWorkflow.pipeline().run(case.create_instances()) instead",
+        name='Case.run',
+    )
     def run(self, nprocs=1):
         nprocs = nprocs or 1
         with LocalWorkflow(nprocs=nprocs) as workflow:
@@ -287,7 +329,6 @@ class Case:
         return tuple(map(len, self._parameters.values()))
 
 
-
 class Instance:
 
     local: api.Workspace
@@ -303,13 +344,19 @@ class Instance:
     _status: Optional[Status]
 
     @classmethod
-    def create(cls, case: Case, context: api.Context, local = None) -> Instance:
+    def create(cls, case: Case, context: api.Context, local=None) -> Instance:
         obj = cls(case, context=context, local=local)
         obj.status = Status.Created
         obj.write_context()
         return obj
 
-    def __init__(self, case: Case, context: api.Context = None, logdir: Optional[str] = None, local: Optional[api.Workspace] = None):
+    def __init__(
+        self,
+        case: Case,
+        context: api.Context = None,
+        logdir: Optional[str] = None,
+        local: Optional[api.Workspace] = None,
+    ):
         self._case = case
         self._context = context
 
@@ -388,7 +435,9 @@ class Instance:
 
         src = self._case.local_space
         util.log.debug(f"Using SRC='{src}', WRK='{self.remote}'")
-        self._case.premap.copy(self.context, src, self.remote, ignore_missing=self._case._ignore_missing)
+        self._case.premap.copy(
+            self.context, src, self.remote, ignore_missing=self._case._ignore_missing
+        )
 
         self.status = Status.Prepared
 
@@ -407,7 +456,9 @@ class Instance:
         collector.collect_from_info(self.local_book)
 
         ignore_missing = self._case._ignore_missing or not collector['_success']
-        self._case.postmap.copy(self.context, self.remote, self.local, ignore_missing=ignore_missing)
+        self._case.postmap.copy(
+            self.context, self.remote, self.local, ignore_missing=ignore_missing
+        )
 
         self._case.script.capture(collector, self.local_book)
         collector.commit_to_file(self.local_book)

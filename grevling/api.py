@@ -75,7 +75,6 @@ class Workspace(ABC):
 
 
 class WorkspaceCollection(ABC):
-
     @abstractmethod
     def __enter__(self) -> WorkspaceCollection:
         ...
@@ -98,7 +97,6 @@ class WorkspaceCollection(ABC):
 
 
 class Workflow(ABC):
-
     @abstractmethod
     def __enter__(self) -> Workflow:
         ...
@@ -111,7 +109,9 @@ class Workflow(ABC):
     def get_workflow(name: str):
         cls = util.find_subclass(Workflow, name, attr='name')
         if not cls:
-            raise ImportError(f"Unknown workflow, or additional dependencies required: {name}")
+            raise ImportError(
+                f"Unknown workflow, or additional dependencies required: {name}"
+            )
         return cls
 
     @abstractmethod

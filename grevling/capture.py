@@ -30,13 +30,27 @@ class Capture:
                 prefix = r'\s+'.join(re.escape(p) for p in spec['prefix'].split())
             else:
                 prefix = re.escape(spec['prefix'])
-            pattern = prefix + r'\s*[:=]?\s*' + skip + '(?P<' + spec['name'] + '>' + pattern + ')'
+            pattern = (
+                prefix
+                + r'\s*[:=]?\s*'
+                + skip
+                + '(?P<'
+                + spec['name']
+                + '>'
+                + pattern
+                + ')'
+            )
             mode = spec.get('mode', 'last')
             type_overrides = {spec['name']: tp}
             return cls(pattern, mode, type_overrides)
         return util.call_yaml(cls, spec)
 
-    def __init__(self, pattern: str, mode: str = 'last', type_overrides: Optional[api.Types] = None):
+    def __init__(
+        self,
+        pattern: str,
+        mode: str = 'last',
+        type_overrides: Optional[api.Types] = None,
+    ):
         self._regex = re.compile(pattern)
         self._mode = mode
         self._type_overrides = type_overrides or {}

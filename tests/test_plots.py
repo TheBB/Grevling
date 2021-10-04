@@ -45,15 +45,18 @@ def test_plots():
         'xmode': 'linear',
         'ymode': 'linear',
     }
-    compare_object(plot.objects[0], {
-        'mode': 'line',
-        'legend': 'isq',
-        'color': 'blue',
-        'line': 'solid',
-        'marker': 'none',
-        'x': np.array([1, 2, 3, 4, 5]),
-        'y': np.array([1, 4, 9, 16, 25]),
-    })
+    compare_object(
+        plot.objects[0],
+        {
+            'mode': 'line',
+            'legend': 'isq',
+            'color': 'blue',
+            'line': 'solid',
+            'marker': 'none',
+            'x': np.array([1, 2, 3, 4, 5]),
+            'y': np.array([1, 4, 9, 16, 25]),
+        },
+    )
 
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {
@@ -65,15 +68,18 @@ def test_plots():
         'xmode': 'log',
         'ymode': 'linear',
     }
-    compare_object(plot.objects[0], {
-        'mode': 'line',
-        'legend': 'misc',
-        'color': 'blue',
-        'line': 'solid',
-        'marker': 'none',
-        'x': np.array([1, 2, 3, 4, 5]),
-        'y': np.array([1, 2, 3, 4, 5]) + 97 + 31/5,
-    })
+    compare_object(
+        plot.objects[0],
+        {
+            'mode': 'line',
+            'legend': 'misc',
+            'color': 'blue',
+            'line': 'solid',
+            'marker': 'none',
+            'x': np.array([1, 2, 3, 4, 5]),
+            'y': np.array([1, 2, 3, 4, 5]) + 97 + 31 / 5,
+        },
+    )
 
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {
@@ -85,15 +91,18 @@ def test_plots():
         'xmode': 'log',
         'ymode': 'linear',
     }
-    compare_object(plot.objects[0], {
-        'mode': 'line',
-        'legend': 'misc',
-        'color': 'blue',
-        'line': 'solid',
-        'marker': 'none',
-        'x': np.array([1, 2, 3, 4, 5]),
-        'y': np.array([1, 2, 3, 4, 5]) + 98 + 31/5,
-    })
+    compare_object(
+        plot.objects[0],
+        {
+            'mode': 'line',
+            'legend': 'misc',
+            'color': 'blue',
+            'line': 'solid',
+            'marker': 'none',
+            'x': np.array([1, 2, 3, 4, 5]),
+            'y': np.array([1, 2, 3, 4, 5]) + 98 + 31 / 5,
+        },
+    )
 
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {
@@ -105,15 +114,18 @@ def test_plots():
         'xmode': 'log',
         'ymode': 'linear',
     }
-    compare_object(plot.objects[0], {
-        'mode': 'line',
-        'legend': 'misc',
-        'color': 'blue',
-        'line': 'solid',
-        'marker': 'none',
-        'x': np.array([1, 2, 3, 4, 5]),
-        'y': np.array([1, 2, 3, 4, 5]) + 99 + 31/5,
-    })
+    compare_object(
+        plot.objects[0],
+        {
+            'mode': 'line',
+            'legend': 'misc',
+            'color': 'blue',
+            'line': 'solid',
+            'marker': 'none',
+            'x': np.array([1, 2, 3, 4, 5]),
+            'y': np.array([1, 2, 3, 4, 5]) + 99 + 31 / 5,
+        },
+    )
 
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {
@@ -122,15 +134,18 @@ def test_plots():
         'xmode': 'linear',
         'ymode': 'log',
     }
-    compare_object(plot.objects[0], {
-        'mode': 'line',
-        'legend': 'fresult',
-        'color': 'blue',
-        'line': 'solid',
-        'marker': 'none',
-        'x': np.arange(1, 11),
-        'y': np.arange(1, 11),
-    })
+    compare_object(
+        plot.objects[0],
+        {
+            'mode': 'line',
+            'legend': 'fresult',
+            'color': 'blue',
+            'line': 'solid',
+            'marker': 'none',
+            'x': np.arange(1, 11),
+            'y': np.arange(1, 11),
+        },
+    )
 
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {
@@ -139,15 +154,18 @@ def test_plots():
         'xmode': 'log',
         'ymode': 'log',
     }
-    compare_object(plot.objects[0], {
-        'mode': 'line',
-        'legend': 'fresult',
-        'color': 'blue',
-        'line': 'solid',
-        'marker': 'none',
-        'x': np.arange(1, 11),
-        'y': np.arange(1, 11),
-    })
+    compare_object(
+        plot.objects[0],
+        {
+            'mode': 'line',
+            'legend': 'fresult',
+            'color': 'blue',
+            'line': 'solid',
+            'marker': 'none',
+            'x': np.arange(1, 11),
+            'y': np.arange(1, 11),
+        },
+    )
 
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {
@@ -156,15 +174,18 @@ def test_plots():
         'xmode': 'linear',
         'ymode': 'linear',
     }
-    compare_object(plot.objects[0], {
-        'mode': 'line',
-        'legend': 'fresult',
-        'color': 'blue',
-        'line': 'solid',
-        'marker': 'none',
-        'x': np.arange(1, 11),
-        'y': np.arange(1, 11),
-    })
+    compare_object(
+        plot.objects[0],
+        {
+            'mode': 'line',
+            'legend': 'fresult',
+            'color': 'blue',
+            'line': 'solid',
+            'marker': 'none',
+            'x': np.arange(1, 11),
+            'y': np.arange(1, 11),
+        },
+    )
 
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {
@@ -173,51 +194,66 @@ def test_plots():
         'xmode': 'linear',
         'ymode': 'linear',
     }
-    compare_object(plot.objects[0], {
-        'mode': 'line',
-        'legend': 'i is 1 - vresult',
-        'color': 'blue',
-        'line': 'solid',
-        'marker': 'none',
-        'x': np.array([1]),
-        'y': np.array([1]),
-    })
-    compare_object(plot.objects[1], {
-        'mode': 'line',
-        'legend': 'i is 2 - vresult',
-        'color': 'red',
-        'line': 'solid',
-        'marker': 'none',
-        'x': np.array([1, 2]),
-        'y': np.array([1, 2]),
-    })
-    compare_object(plot.objects[2], {
-        'mode': 'line',
-        'legend': 'i is 3 - vresult',
-        'color': 'green',
-        'line': 'solid',
-        'marker': 'none',
-        'x': np.array([1, 2, 3]),
-        'y': np.array([1, 2, 3]),
-    })
-    compare_object(plot.objects[3], {
-        'mode': 'line',
-        'legend': 'i is 4 - vresult',
-        'color': 'magenta',
-        'line': 'solid',
-        'marker': 'none',
-        'x': np.array([1, 2, 3, 4]),
-        'y': np.array([1, 2, 3, 4]),
-    })
-    compare_object(plot.objects[4], {
-        'mode': 'line',
-        'legend': 'i is 5 - vresult',
-        'color': 'cyan',
-        'line': 'solid',
-        'marker': 'none',
-        'x': np.array([1, 2, 3, 4, 5]),
-        'y': np.array([1, 2, 3, 4, 5]),
-    })
+    compare_object(
+        plot.objects[0],
+        {
+            'mode': 'line',
+            'legend': 'i is 1 - vresult',
+            'color': 'blue',
+            'line': 'solid',
+            'marker': 'none',
+            'x': np.array([1]),
+            'y': np.array([1]),
+        },
+    )
+    compare_object(
+        plot.objects[1],
+        {
+            'mode': 'line',
+            'legend': 'i is 2 - vresult',
+            'color': 'red',
+            'line': 'solid',
+            'marker': 'none',
+            'x': np.array([1, 2]),
+            'y': np.array([1, 2]),
+        },
+    )
+    compare_object(
+        plot.objects[2],
+        {
+            'mode': 'line',
+            'legend': 'i is 3 - vresult',
+            'color': 'green',
+            'line': 'solid',
+            'marker': 'none',
+            'x': np.array([1, 2, 3]),
+            'y': np.array([1, 2, 3]),
+        },
+    )
+    compare_object(
+        plot.objects[3],
+        {
+            'mode': 'line',
+            'legend': 'i is 4 - vresult',
+            'color': 'magenta',
+            'line': 'solid',
+            'marker': 'none',
+            'x': np.array([1, 2, 3, 4]),
+            'y': np.array([1, 2, 3, 4]),
+        },
+    )
+    compare_object(
+        plot.objects[4],
+        {
+            'mode': 'line',
+            'legend': 'i is 5 - vresult',
+            'color': 'cyan',
+            'line': 'solid',
+            'marker': 'none',
+            'x': np.array([1, 2, 3, 4, 5]),
+            'y': np.array([1, 2, 3, 4, 5]),
+        },
+    )
 
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {
@@ -226,24 +262,172 @@ def test_plots():
         'xmode': 'linear',
         'ymode': 'linear',
     }
-    compare_object(plot.objects[0], {
-        'mode': 'scatter',
-        'legend': 'misc',
-        'color': 'blue',
-        'line': 'none',
-        'marker': 'circle',
-        'x': np.array([
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-            2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-            4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-            8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-            16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16
-        ]),
-        'y': np.array([
-            99, 100, 100, 101, 101, 101, 102, 102, 102, 103, 103, 103, 104, 104, 105,
-            100, 101, 101, 102, 102, 102, 103, 103, 103, 104, 104, 104, 105, 105, 106,
-            102, 103, 103, 104, 104, 104, 105, 105, 105, 106, 106, 106, 107, 107, 108,
-            106, 107, 107, 108, 108, 108, 109, 109, 109, 110, 110, 110, 111, 111, 112,
-            114, 115, 115, 116, 116, 116, 117, 117, 117, 118, 118, 118, 119, 119, 120,
-        ]),
-    }, sort_xy=True)
+    compare_object(
+        plot.objects[0],
+        {
+            'mode': 'scatter',
+            'legend': 'misc',
+            'color': 'blue',
+            'line': 'none',
+            'marker': 'circle',
+            'x': np.array(
+                [
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                    2,
+                    2,
+                    2,
+                    2,
+                    2,
+                    2,
+                    2,
+                    2,
+                    2,
+                    2,
+                    2,
+                    2,
+                    2,
+                    2,
+                    2,
+                    4,
+                    4,
+                    4,
+                    4,
+                    4,
+                    4,
+                    4,
+                    4,
+                    4,
+                    4,
+                    4,
+                    4,
+                    4,
+                    4,
+                    4,
+                    8,
+                    8,
+                    8,
+                    8,
+                    8,
+                    8,
+                    8,
+                    8,
+                    8,
+                    8,
+                    8,
+                    8,
+                    8,
+                    8,
+                    8,
+                    16,
+                    16,
+                    16,
+                    16,
+                    16,
+                    16,
+                    16,
+                    16,
+                    16,
+                    16,
+                    16,
+                    16,
+                    16,
+                    16,
+                    16,
+                ]
+            ),
+            'y': np.array(
+                [
+                    99,
+                    100,
+                    100,
+                    101,
+                    101,
+                    101,
+                    102,
+                    102,
+                    102,
+                    103,
+                    103,
+                    103,
+                    104,
+                    104,
+                    105,
+                    100,
+                    101,
+                    101,
+                    102,
+                    102,
+                    102,
+                    103,
+                    103,
+                    103,
+                    104,
+                    104,
+                    104,
+                    105,
+                    105,
+                    106,
+                    102,
+                    103,
+                    103,
+                    104,
+                    104,
+                    104,
+                    105,
+                    105,
+                    105,
+                    106,
+                    106,
+                    106,
+                    107,
+                    107,
+                    108,
+                    106,
+                    107,
+                    107,
+                    108,
+                    108,
+                    108,
+                    109,
+                    109,
+                    109,
+                    110,
+                    110,
+                    110,
+                    111,
+                    111,
+                    112,
+                    114,
+                    115,
+                    115,
+                    116,
+                    116,
+                    116,
+                    117,
+                    117,
+                    117,
+                    118,
+                    118,
+                    118,
+                    119,
+                    119,
+                    120,
+                ]
+            ),
+        },
+        sort_xy=True,
+    )

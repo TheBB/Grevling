@@ -21,8 +21,13 @@ class SingleFileMap:
             return cls(spec, spec, **kwargs)
         return util.call_yaml(cls, spec, **kwargs)
 
-    def __init__(self, source: str, target: Optional[str] = None,
-                 template: bool = False, mode: str = 'simple'):
+    def __init__(
+        self,
+        source: str,
+        target: Optional[str] = None,
+        template: bool = False,
+        mode: str = 'simple',
+    ):
         if target is None:
             target = source if mode == 'simple' else '.'
         if template:
@@ -33,7 +38,9 @@ class SingleFileMap:
         self.template = template
         self.mode = mode
 
-    def iter_paths(self, context: api.Context, source: api.Workspace) -> Iterable[Tuple[Path, Path]]:
+    def iter_paths(
+        self, context: api.Context, source: api.Workspace
+    ) -> Iterable[Tuple[Path, Path]]:
         if self.mode == 'simple':
             yield (
                 Path(render(self.source, context)),
@@ -45,8 +52,13 @@ class SingleFileMap:
             for path in source.glob(render(self.source, context)):
                 yield (path, target / path)
 
-    def copy(self, context: api.Context, source: api.Workspace, target: api.Workspace,
-             ignore_missing: bool = False) -> bool:
+    def copy(
+        self,
+        context: api.Context,
+        source: api.Workspace,
+        target: api.Workspace,
+        ignore_missing: bool = False,
+    ) -> bool:
         for sourcepath, targetpath in self.iter_paths(context, source):
 
             if not source.exists(sourcepath):
@@ -56,7 +68,9 @@ class SingleFileMap:
                     continue
                 return False
             else:
-                util.log.debug(f'{source.name}/{sourcepath} -> {target.name}/{targetpath}')
+                util.log.debug(
+                    f'{source.name}/{sourcepath} -> {target.name}/{targetpath}'
+                )
 
             if not self.template:
                 with source.read_file(sourcepath) as f:
@@ -71,7 +85,6 @@ class SingleFileMap:
 
 
 class FileMap(list):
-
     @classmethod
     def load(cls, files: List[Dict] = [], templates: List[Dict] = []) -> FileMap:
         mapping = cls()
@@ -79,7 +92,13 @@ class FileMap(list):
         mapping.extend(SingleFileMap.load(spec) for spec in files)
         return mapping
 
-    def copy(self, context: api.Context, source: api.Workspace, target: api.Workspace, **kwargs) -> bool:
+    def copy(
+        self,
+        context: api.Context,
+        source: api.Workspace,
+        target: api.Workspace,
+        **kwargs,
+    ) -> bool:
         for mapper in self:
             if not mapper.copy(context, source, target, **kwargs):
                 return False

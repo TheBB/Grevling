@@ -10,8 +10,10 @@ from . import api
 def quote_shell(text):
     return shlex.quote(text)
 
+
 def rnd(number, ndigits):
     return f'{number:.{ndigits}f}'
+
 
 def sci(number, ndigits):
     return f'{number:.{ndigits}e}'

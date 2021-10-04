@@ -19,19 +19,19 @@ import grevling.workflow.local
 
 
 def workflows(func):
-    func = click.option('--local', 'workflow', is_flag=True, flag_value='local', default=True)(func)
+    func = click.option(
+        '--local', 'workflow', is_flag=True, flag_value='local', default=True
+    )(func)
     func = click.option('--azure', 'workflow', is_flag=True, flag_value='azure')(func)
     return func
 
 
 class CustomClickException(click.ClickException):
-
     def show(self):
         util.log.critical(str(self))
 
 
 class CaseType(click.Path):
-
     def convert(self, value, param, ctx):
         if isinstance(value, Case):
             return value
@@ -61,7 +61,9 @@ def print_version(ctx, param, value):
 
 
 @click.group()
-@click.option('--version', is_flag=True, callback=print_version, expose_value=False, is_eager=True)
+@click.option(
+    '--version', is_flag=True, callback=print_version, expose_value=False, is_eager=True
+)
 @click.option('--debug', 'verbosity', flag_value='DEBUG')
 @click.option('--info', 'verbosity', flag_value='INFO', default=True)
 @click.option('--warning', 'verbosity', flag_value='WARNING')
@@ -157,4 +159,10 @@ def dump(case: Case, fmt: str, output: io.IOBase):
     with case.lock():
         data = case.load_dataframe()
     if fmt == 'json':
-        json.dump(data.to_dict('records'), output, sort_keys=True, indent=4, cls=util.JSONEncoder)
+        json.dump(
+            data.to_dict('records'),
+            output,
+            sort_keys=True,
+            indent=4,
+            cls=util.JSONEncoder,
+        )
