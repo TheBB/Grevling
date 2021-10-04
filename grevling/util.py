@@ -1,73 +1,81 @@
+import asyncio
 from contextlib import contextmanager
 from functools import wraps
 import inspect
 from itertools import product, chain
 import json
 import logging
-import multiprocessing
 
 from typing import List
 
-import multiprocessing_logging
 import numpy as np
 import pandas as pd
 import rich.logging
-from typing_inspect import get_origin
+from typing_inspect import get_origin, get_args
 
 
 class LoggerAdapter(logging.LoggerAdapter):
-
-    __context: List[str]
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.__context = []
+
+    def find_context(self):
+        frame = inspect.currentframe()
+        while frame:
+            bindings = frame.f_locals
+            if '__grevling_log_context__' in bindings:
+                return bindings['__grevling_log_context__']
+            frame = frame.f_back
+        return []
 
     def process(self, msg, kwargs):
-        context = []
-        procname = multiprocessing.current_process().name
-        if procname != 'M':
-            context.append(f'[bold magenta]{procname}[/]')
-        context.extend(self.__context)
-        context.append(msg)
-        msg = ' · '.join(context)
-        kwargs.setdefault('extra', {}).update({
-            'procname': multiprocessing.current_process().name,
-            'markup': True
-        })
+        context = self.find_context()
+        msg = ' · '.join(chain(context, [msg]))
+        kwargs.setdefault('extra', {}).update({'markup': True})
         return msg, kwargs
-
-    def push_context(self, ctx: str):
-        self.__context.append(ctx)
-
-    def pop_context(self):
-        self.__context.pop()
 
     @contextmanager
     def with_context(self, ctx: str):
-        self.push_context(ctx)
+        context = self.find_context()
+        frame = inspect.currentframe()
+        frame = frame.f_back.f_back
+        bindings = frame.f_locals
+
+        bindings['__grevling_log_context__'] = [*context, ctx]
         try:
             yield
         finally:
-            self.pop_context()
+            bindings['__grevling_log_context__'] = context
 
 
 def with_context(fmt: str):
     def decorator(func: callable):
         signature = inspect.signature(func)
-        @wraps(func)
-        def inner(*args, **kwargs):
+
+        def calculate_context(*args, **kwargs):
             binding = signature.bind(*args, **kwargs)
             binding.apply_defaults()
-            context = fmt.format(**binding.arguments)
-            with log.with_context(context):
-                return func(*args, **kwargs)
-        return inner
+            return fmt.format(**binding.arguments)
+
+        if asyncio.iscoroutinefunction(func):
+
+            async def inner(*args, **kwargs):
+                with log.with_context(calculate_context(*args, **kwargs)):
+                    return await func(*args, **kwargs)
+
+        else:
+
+            def inner(*args, **kwargs):
+                with log.with_context(calculate_context(*args, **kwargs)):
+                    return func(*args, **kwargs)
+
+        return wraps(func)(inner)
+
     return decorator
 
 
 logging.basicConfig(level='INFO')
 log: LoggerAdapter = LoggerAdapter(logging.getLogger(), {})
+
 
 def initialize_logging(level='INFO', show_time=False):
     logging.basicConfig(
@@ -80,16 +88,13 @@ def initialize_logging(level='INFO', show_time=False):
 
     global log
     log = LoggerAdapter(logging.getLogger(), {})
-    multiprocessing_logging.install_mp_handler()
 
 
 def initialize_process():
-    proc = multiprocessing.current_process()
-    proc.name = 'W' + ':'.join(map(str, proc._identity))
+    pass
 
 
 class JSONEncoder(json.JSONEncoder):
-
     def default(self, obj):
         if isinstance(obj, np.integer):
             return int(obj)
@@ -149,24 +154,76 @@ def find_subclass(cls, name, root=False, attr='__tag__'):
 
 def completer(options):
     matches = []
+
     def complete(text, state):
         if state == 0:
             matches.clear()
             matches.extend(c for c in options if c.startswith(text.lower()))
         return matches[state] if state < len(matches) else None
+
     return complete
 
 
 def format_seconds(secs: float):
     if secs < 0.1:
-        return '<0.1s'
+        return '< 0.1 s'
     if secs < 60:
-        return f'{secs:.1f}s'
+        return f'{secs:.1f} s'
     mins, secs = divmod(secs, 60)
     if mins < 60:
-        return f'{mins:.0f}m{secs:.0f}s'
+        return f'{mins:.0f} m {secs:.0f}s'
     hours, mins = divmod(mins, 60)
     if hours < 24:
-        return f'{hours:.0f}h{mins:.0f}m{secs:.0f}s'
+        return f'{hours:.0f} h {mins:.0f} m {secs:.0f} s'
     days, hours = divmod(hours, 24)
-    return f'{days:.0f}d{hours:.0f}h{mins:.0f}m{secs:.0f}s'
+    return f'{days:.0f} d {hours:.0f} h {mins:.0f} m {secs:.0f} s'
+
+
+def call_yaml(func, mapping, *args, **kwargs):
+    signature = inspect.signature(func)
+    mapping = {key.replace('-', '_'): value for key, value in mapping.items()}
+    binding = signature.bind(*args, **kwargs, **mapping)
+    return func(*binding.args, **binding.kwargs)
+
+
+def coerce(tp, value):
+    if is_list_type(tp) and not isinstance(value, list):
+        eltype = get_args(tp)[0]
+        return coerce(eltype, value)
+    elif not isinstance(tp, str) and not is_list_type(tp):
+        if tp is bool:
+            return bool(int(value))
+        else:
+            return tp(value)
+    return value
+
+
+def coerce_into(tp, value, prev=None):
+    value = coerce(tp, value)
+    if is_list_type(tp) and isinstance(prev, list):
+        prev.append(value)
+        return prev
+    elif is_list_type(tp) and not isinstance(value, list):
+        return [value]
+    return value
+
+
+def to_queue(it):
+    q = asyncio.Queue()
+    for i in it:
+        q.put_nowait(i)
+    return q
+
+
+def deprecated(info, name=None):
+    def decorator(func):
+        iname = name or func.__name__
+
+        @wraps(func)
+        def inner(*args, **kwargs):
+            log.warn(f'{iname} is deprecated: {info}')
+            return func(*args, **kwargs)
+
+        return inner
+
+    return decorator

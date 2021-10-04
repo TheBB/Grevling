@@ -37,7 +37,7 @@ script:
   - string command here
   - [list, command, here]
   - /usr/bin/nontrivial-name with args
-  - [/usr/bin/nontrivial-name, with, args, as, list]
+  - [/usr/bin/nontrivial-name-2, with, args, as, list]
   - name: somecommand
     command: run this thing
     capture-output: yes

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from distutils.core import setup
+from setuptools import setup, find_packages
 
 setup(
     name='Grevling',
@@ -10,20 +10,20 @@ setup(
     author_email='eivind.fonn@sintef.no',
     license='AGPL3',
     url='https://github.com/TheBB/Grevling',
-    packages=['grevling'],
+    packages=find_packages(),
+    python_requires='>=3.7',
     install_requires=[
         'bidict',
         'click',
         'fasteners',
         'mako',
-        'multiprocessing-logging',
         'numpy',
         'pandas',
         'pyarrow',
         'rich',
         'ruamel.yaml',
         'simpleeval',
-        'strictyaml',
+        'strictyaml>=1.4',
         'typing-inspect',
     ],
     extras_require={
