@@ -19,7 +19,7 @@ from .capture import ResultCollector
 from .plotting import Plot
 from .render import render
 from .schema import load_and_validate
-from .context import ContextManager
+from .context import ContextProvider
 from .parameters import ParameterSpace
 from .filemap import FileMap
 from .script import Script, ScriptTemplate
@@ -61,7 +61,7 @@ class Case:
     storagepath: Path
     dataframepath: Path
 
-    context_mgr: ContextManager
+    context_mgr: ContextProvider
 
     premap: FileMap
     postmap: FileMap
@@ -101,7 +101,7 @@ class Case:
         with open(yamlpath, mode='r') as f:
             casedata = load_and_validate(yamldata, yamlpath)
 
-        self.context_mgr = ContextManager.load(casedata)
+        self.context_mgr = ContextProvider.load(casedata)
 
         # Read file mappings
         self.premap = FileMap.load(
