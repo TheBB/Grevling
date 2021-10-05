@@ -162,8 +162,7 @@ def plot(case: Case):
 @click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
 @click.argument('output', type=click.File('w'))
 def dump(case: Case, fmt: str, output: io.IOBase):
-    with case.lock():
-        data = case.load_dataframe()
+    data = case.load_dataframe()
     if fmt == 'json':
         json.dump(
             data.to_dict('records'),
