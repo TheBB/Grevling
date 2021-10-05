@@ -63,7 +63,10 @@ class Scalar(Type):
         return self.coerce(new)
 
     def to_pandas(self, value) -> Any:
-        return self.pandas(self.coerce(value))
+        value = self.coerce(value)
+        if self.pandas == object:
+            return value
+        return self.pandas(value)
 
     def to_json(self, value) -> Any:
         return self.json(self.coerce(value))
@@ -78,6 +81,9 @@ class Integer(Scalar):
     python = int
     pandas = pd.Int64Dtype()
     json = int
+
+    def to_pandas(self, value):
+        return self.coerce(value)
 
 
 class Float(Scalar):
@@ -140,6 +146,9 @@ class Boolean(Scalar):
 
     def from_string(self, value):
         return bool(int(value))
+
+    def to_pandas(self, value):
+        return self.coerce(value)
 
 
 class List(Type):

@@ -135,5 +135,5 @@ class ResultCollector(dict):
         for key, value in self.items():
             if key == '_index':
                 continue
-            data.at[index, key] = value
+            data.at[index, key] = self._types.to_pandas(key, value)
         return data
