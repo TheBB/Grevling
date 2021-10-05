@@ -9,7 +9,7 @@ from typing import Any, Dict, List as PyList, get_origin, get_args, Optional
 
 import pandas as pd
 
-from . import util
+from . import util, api
 
 
 class Type(ABC):
@@ -122,6 +122,11 @@ class String(Scalar):
     python = str
     pandas = object
     json = str
+
+    def coerce(self, value):
+        if isinstance(value, bool):
+            return str(int(value))
+        return super().coerce(value)
 
 
 class DateTime(Scalar):
@@ -243,6 +248,11 @@ class Object(Type):
     def __init__(self, types: TypeManager):
         self.types = types
 
+    def __eq__(self, other):
+        if isinstance(other, Object):
+            return self.types == other.types
+        return False
+
     def __contains__(self, key):
         return key in self.types
 
@@ -256,8 +266,13 @@ class Object(Type):
         if isinstance(value, self.python):
             return value
         if isinstance(value, dict):
-            value.pop('_version', None)
-            return self.python.from_rawdata({k: self.types.coerce(k, v) for k, v in value.items()})
+            coerced_data = {
+                k: self.types.coerce(k, v) for k, v in value.items()
+                if k != '_version'
+            }
+            if '_version' in value:
+                coerced_data['_version'] = value['_version']
+            return self.python.from_rawdata(coerced_data)
         raise TypeError(f"Unable to coerce {type(value)} to object")
 
     def coerce_into(self, new, existing):
@@ -291,7 +306,7 @@ class TypedObject(metaclass=TypedObjectMeta):
 
     _type: Object
     _data: Dict
-    _version: int
+    _version: int = 1
 
     @classmethod
     def upgrade_data(cls, from_version: int, data: Dict) -> Dict:
@@ -300,13 +315,20 @@ class TypedObject(metaclass=TypedObjectMeta):
     @classmethod
     def from_rawdata(cls, data):
         obj = cls.__new__(cls)
+        version = data.pop('_version', cls._version)
+        while version < cls._version:
+            data = cls.upgrade_data(version, data)
+            version += 1
         obj._data = data
         return obj
 
     def __init__(self, data: Optional[Dict] = None):
         self._data = {}
         if data is not None:
-            data.pop('_version', None)
+            version = data.pop('_version', self._version)
+            while version < self._version:
+                data = self.upgrade_data(version, data)
+                version += 1
             self._data = self._type.coerce_into(data, {})
 
     def __getattr__(self, key):
@@ -331,14 +353,11 @@ class PersistentObject(TypedObject):
 
     _path: Path
 
-    def __init__(self, path: Path):
+    def __init__(self, path: api.PathStr):
+        path = Path(path)
         if path.exists():
             with open(path, 'r') as f:
                 data = json.load(f)
-            version = data.pop('_version')
-            while version < self._version:
-                data = self.upgrade_data(version, data)
-                version += 1
             super().__init__(data)
         else:
             super().__init__()
