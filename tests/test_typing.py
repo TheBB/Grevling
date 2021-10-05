@@ -153,14 +153,14 @@ def test_upgrade():
             data['mystr'] = 'lol'
             return data
 
-    obj = TestObj2({'myint': 1, '_version': 1})
+    obj = TestObj2(myint=1, _version=1)
     assert obj.myint == 1
     assert obj.mystr == 'lol'
 
     class OuterObj2(TypedObject):
         inner: TestObj2
 
-    obj = OuterObj2({'inner': {'myint': 1, '_version': 1}})
+    obj = OuterObj2(inner=dict(myint=1, _version=1))
     assert obj.inner.myint == 1
     assert obj.inner.mystr == 'lol'
 

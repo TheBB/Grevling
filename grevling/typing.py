@@ -324,9 +324,10 @@ class TypedObject(metaclass=TypedObjectMeta):
         obj._fill_in_defaults()
         return obj
 
-    def __init__(self, data: Optional[Dict] = None):
+    def __init__(self, data: Optional[Dict] = None, **kwargs):
         self._data = {}
-        if data is not None:
+        data = {**(data or {}), **kwargs}
+        if data:
             version = data.pop('_version', self._version)
             while version < self._version:
                 data = self.upgrade_data(version, data)
