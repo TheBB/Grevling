@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractclassmethod, abstractmethod
 from datetime import datetime
+from enum import Enum, IntEnum
 import json
 from pathlib import Path
 
@@ -177,6 +178,38 @@ class Boolean(Scalar):
 
     def to_pandas(self, value):
         return self.coerce(value)
+
+
+class Enumeration(Scalar):
+
+    names = []
+    pandas = str
+    json = str
+
+    def __init__(self, cls):
+        self.python = cls
+
+    def coerce(self, value):
+        if isinstance(value, self.python):
+            return value
+        if isinstance(value, str):
+            return self.python[value]
+        if isinstance(value, int) and issubclass(self.python, IntEnum):
+            return self.python(value)
+        raise ValueError(f"Unable to coerce {value} to {self.python}")
+
+    def to_string(self, value) -> str:
+        return value.name
+
+    def from_string(self, value):
+        return self.python[value]
+
+    def to_json(self, value):
+        return value.name
+
+    def to_pandas(self, value):
+        return value.name
+
 
 
 class List(Type):

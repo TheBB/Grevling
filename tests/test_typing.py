@@ -1,10 +1,11 @@
 from datetime import datetime
+from enum import Enum, IntEnum
 from pathlib import Path
 
 import pytest
 
 from grevling.typing import (
-    Type, Integer, String, Boolean, Float, DateTime, List,
+    Enumeration, Type, Integer, String, Boolean, Float, DateTime, List,
     TypedObject, PersistentObject
 )
 
@@ -51,6 +52,19 @@ def test_coerce():
     assert List(Integer()).coerce(['1']) == [1]
     assert List(Integer()).coerce(['1', False, 3]) == [1, 0, 3]
 
+    class SEnum(Enum):
+        A = 'a'
+        B = 'b'
+
+    assert Enumeration(SEnum).coerce('A') == SEnum.A
+
+    class IEnum(IntEnum):
+        A = 1
+        B = 2
+
+    assert Enumeration(IEnum).coerce('A') == IEnum.A
+    assert Enumeration(IEnum).coerce(2) == IEnum.B
+
 
 def test_coerce_into():
     assert Integer().coerce_into(1, 0) == 1
@@ -81,6 +95,20 @@ def test_coerce_into():
     assert List(Integer()).coerce_into([1], []) == [1]
     assert List(Integer()).coerce_into([1], None) == [1]
     assert List(Integer()).coerce_into([1], [2, 3]) == [2, 3, 1]
+
+    class SEnum(Enum):
+        A = 'a'
+        B = 'b'
+
+    assert Enumeration(SEnum).coerce_into('A', None) == SEnum.A
+
+    class IEnum(IntEnum):
+        A = 1
+        B = 2
+
+    assert Enumeration(IEnum).coerce_into('A', None) == IEnum.A
+    assert Enumeration(IEnum).coerce_into(2, None) == IEnum.B
+
 
 
 def test_object():
