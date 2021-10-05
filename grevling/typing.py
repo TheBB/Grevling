@@ -5,9 +5,10 @@ from datetime import datetime
 import json
 from pathlib import Path
 
-from typing import Any, Dict, List as PyList, get_origin, get_args, Optional
+from typing import Any, Dict, List as PyList, Optional
 
 import pandas as pd
+from typing_inspect import get_origin, get_args
 
 from . import util, api
 

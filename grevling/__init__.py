@@ -12,7 +12,6 @@ from typing import List, Iterable, Optional, Any
 
 from fasteners import InterProcessLock
 import pandas as pd
-from typing_inspect import get_origin, get_args
 
 from .api import Status
 from .capture import ResultCollector
