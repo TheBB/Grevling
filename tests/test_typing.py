@@ -174,7 +174,10 @@ def test_persistent():
         inner: TestObj1
 
     path = Path(__file__).parent / 'temp.json'
-    path.unlink(missing_ok=True)
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
 
     with OuterObj1(path) as obj:
         obj.inner = TestObj1()
