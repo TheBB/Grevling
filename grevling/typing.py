@@ -321,6 +321,7 @@ class TypedObject(metaclass=TypedObjectMeta):
             data = cls.upgrade_data(version, data)
             version += 1
         obj._data = data
+        obj._fill_in_defaults()
         return obj
 
     def __init__(self, data: Optional[Dict] = None):
@@ -331,6 +332,7 @@ class TypedObject(metaclass=TypedObjectMeta):
                 data = self.upgrade_data(version, data)
                 version += 1
             self._data = self._type.coerce_into(data, {})
+        self._fill_in_defaults()
 
     def __getattr__(self, key):
         if key in self._type:
@@ -348,6 +350,15 @@ class TypedObject(metaclass=TypedObjectMeta):
 
     def to_json(self):
         return self._type.to_json(self)
+
+    def _fill_in_defaults(self):
+        for key, tp in self._type.types.items():
+            if hasattr(self, key):
+                continue
+            if hasattr(self, '_defaults') and key in self._defaults:
+                setattr(self, key, self._defaults[key])
+            elif isinstance(tp, Object):
+                setattr(self, key, tp.python())
 
 
 class PersistentObject(TypedObject):

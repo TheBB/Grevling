@@ -203,3 +203,38 @@ def test_persistent():
         assert obj.inner.myint == 19
 
     path.unlink()
+
+
+def test_defaults():
+
+    class TestObj1(TypedObject):
+        myint: int
+        mystr: str
+        _defaults = {'myint': 1}
+
+    obj = TestObj1()
+    assert obj.myint == 1
+    assert not hasattr(obj, 'mystr')
+
+    obj = TestObj1({'myint': 2})
+    assert obj.myint == 2
+    assert not hasattr(obj, 'mystr')
+
+    obj = TestObj1({'mystr': 'b'})
+    assert obj.myint == 1
+    assert obj.mystr == 'b'
+
+    class OuterObj1(TypedObject):
+        inner: TestObj1
+
+    obj = OuterObj1()
+    assert obj.inner.myint == 1
+    assert not hasattr(obj.inner, 'mystr')
+
+    obj = OuterObj1({'inner': {'myint': 2}})
+    assert obj.inner.myint == 2
+    assert not hasattr(obj.inner, 'mystr')
+
+    obj = OuterObj1({'inner': {'mystr': 'b'}})
+    assert obj.inner.myint == 1
+    assert obj.inner.mystr == 'b'
