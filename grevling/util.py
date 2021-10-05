@@ -6,12 +6,9 @@ from itertools import product, chain
 import json
 import logging
 
-from typing import List
-
 import numpy as np
 import pandas as pd
 import rich.logging
-from typing_inspect import get_origin, get_args
 
 
 class LoggerAdapter(logging.LoggerAdapter):
@@ -126,10 +123,6 @@ def flatten(array):
     if array.dtype == object:
         array = np.array(array.tolist()).flatten()
     return array
-
-
-def is_list_type(tp):
-    return get_origin(tp) == list or get_origin(tp) == List
 
 
 def dict_product(names, iterables):

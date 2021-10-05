@@ -1,11 +1,16 @@
-from abc import ABC, abstractmethod, abstractproperty
-from datetime import datetime
+from __future__ import annotations
 
-from typing import Any, Dict, List as PyList
+from abc import ABC, abstractclassmethod, abstractmethod
+from datetime import datetime
+import json
+from pathlib import Path
+
+from typing import Any, Dict, List as PyList, Optional
 
 import pandas as pd
+from typing_inspect import get_origin, get_args
 
-from . import util
+from . import util, api
 
 
 class Type(ABC):
@@ -23,6 +28,18 @@ class Type(ABC):
         if not subcls:
             raise ValueError(f"Unknown type: {name}")
         return subcls()
+
+    @classmethod
+    def find_python(cls, pytype):
+        for subclass in util.subclasses(cls):
+            retval = subclass.fits_python(pytype)
+            if retval is not None:
+                return retval
+        raise TypeError(f"Unknown python type: {pytype}")
+
+    @abstractclassmethod
+    def fits_python(cls, pytype):
+        ...
 
     @abstractmethod
     def coerce(self, value):
@@ -44,6 +61,12 @@ class Type(ABC):
 class Scalar(Type):
 
     is_list = False
+
+    @classmethod
+    def fits_python(cls, pytype):
+        if hasattr(cls, 'python') and cls.python == pytype:
+            return cls()
+        return None
 
     def __eq__(self, other):
         if isinstance(other, Scalar):
@@ -101,6 +124,11 @@ class String(Scalar):
     pandas = object
     json = str
 
+    def coerce(self, value):
+        if isinstance(value, bool):
+            return str(int(value))
+        return super().coerce(value)
+
 
 class DateTime(Scalar):
 
@@ -157,6 +185,16 @@ class List(Type):
 
     is_list = True
 
+    @classmethod
+    def fits_python(cls, pytype):
+        if get_origin(pytype) != list:
+            return None
+        arg, = get_args(pytype)
+        eltype = Type.fits_python(arg)
+        if not eltype:
+            return None
+        return cls(eltype)
+
     def __init__(self, eltype: Scalar):
         self.eltype = eltype
         self.json = self.python = PyList[eltype.python]
@@ -199,3 +237,148 @@ class TypeManager(Dict[str, Type]):
 
     def to_json(self, key, value):
         return self[key].to_json(value)
+
+
+class Object(Type):
+
+    types: TypeManager
+    python: type
+    pandas: object
+    json: dict
+
+    def __init__(self, types: TypeManager):
+        self.types = types
+
+    def __eq__(self, other):
+        if isinstance(other, Object):
+            return self.types == other.types
+        return False
+
+    def __contains__(self, key):
+        return key in self.types
+
+    @classmethod
+    def fits_python(cls, pytype):
+        if issubclass(pytype, TypedObject):
+            return pytype._type
+        return None
+
+    def coerce(self, value):
+        if isinstance(value, self.python):
+            return value
+        if isinstance(value, dict):
+            coerced_data = {
+                k: self.types.coerce(k, v) for k, v in value.items()
+                if k != '_version'
+            }
+            if '_version' in value:
+                coerced_data['_version'] = value['_version']
+            return self.python.from_rawdata(coerced_data)
+        raise TypeError(f"Unable to coerce {type(value)} to object")
+
+    def coerce_into(self, new, existing):
+        new_data = self.coerce(new)._data
+        return {**existing, **new_data}
+
+    def to_json(self, value):
+        obj = self.coerce(value)
+        data = {k: self.types.to_json(k, v) for k, v in obj._data.items()}
+        data['_version'] = obj._version
+        return data
+
+    def to_pandas(self, value):
+        assert False
+
+
+class TypedObjectMeta(type):
+
+    def __new__(cls, name, bases, attrs):
+        types = TypeManager({
+            k: Type.find_python(v) for k, v in attrs.get('__annotations__', {}).items()
+            if not k.startswith('_')
+        })
+        gtype = attrs['_type'] = Object(types)
+        pytype = super().__new__(cls, name, bases, attrs)
+        gtype.python = pytype
+        return pytype
+
+
+class TypedObject(metaclass=TypedObjectMeta):
+
+    _type: Object
+    _data: Dict
+    _version: int = 1
+
+    @classmethod
+    def upgrade_data(cls, from_version: int, data: Dict) -> Dict:
+        return data
+
+    @classmethod
+    def from_rawdata(cls, data):
+        obj = cls.__new__(cls)
+        version = data.pop('_version', cls._version)
+        while version < cls._version:
+            data = cls.upgrade_data(version, data)
+            version += 1
+        obj._data = data
+        obj._fill_in_defaults()
+        return obj
+
+    def __init__(self, data: Optional[Dict] = None, **kwargs):
+        self._data = {}
+        data = {**(data or {}), **kwargs}
+        if data:
+            version = data.pop('_version', self._version)
+            while version < self._version:
+                data = self.upgrade_data(version, data)
+                version += 1
+            self._data = self._type.coerce_into(data, {})
+        self._fill_in_defaults()
+
+    def __getattr__(self, key):
+        if key in self._type:
+            try:
+                return self._data[key]
+            except KeyError:
+                raise AttributeError(key)
+        return super().__getattr__(key)
+
+    def __setattr__(self, key, value):
+        if key in self._type:
+            self._data = self._type.coerce_into({key: value}, self._data)
+            return
+        return super().__setattr__(key, value)
+
+    def to_json(self):
+        return self._type.to_json(self)
+
+    def _fill_in_defaults(self):
+        for key, tp in self._type.types.items():
+            if hasattr(self, key):
+                continue
+            if hasattr(self, '_defaults') and key in self._defaults:
+                setattr(self, key, self._defaults[key])
+            elif isinstance(tp, Object):
+                setattr(self, key, tp.python())
+
+
+class PersistentObject(TypedObject):
+
+    _path: Path
+
+    def __init__(self, path: api.PathStr):
+        path = Path(path)
+        if path.exists():
+            with open(path, 'r') as f:
+                data = json.load(f)
+            super().__init__(data)
+        else:
+            super().__init__()
+        self._path = path
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        with open(self._path, 'w') as f:
+            json.dump(self.to_json(), f)
