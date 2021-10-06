@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from enum import Enum, IntEnum
 from pathlib import Path
@@ -5,8 +7,16 @@ from pathlib import Path
 import pytest
 
 from grevling.typing import (
-    Enumeration, Type, Integer, String, Boolean, Float, DateTime, List,
-    TypedObject, PersistentObject
+    Enumeration,
+    Type,
+    Integer,
+    String,
+    Boolean,
+    Float,
+    DateTime,
+    List,
+    TypedObject,
+    PersistentObject,
 )
 
 
@@ -110,15 +120,13 @@ def test_coerce_into():
     assert Enumeration(IEnum).coerce_into(2, None) == IEnum.B
 
 
-
 def test_object():
-
-    class TestObj(TypedObject):
+    class InnerObj(TypedObject):
         myint: int
         mystr: str
         mybool: bool
 
-    obj = TestObj()
+    obj = InnerObj()
     obj.myint = '1'
     obj.mystr = 5
     obj.mybool = '0'
@@ -134,7 +142,7 @@ def test_object():
         'mybool': False,
     }
 
-    obj = TestObj({'myint': 1, 'mystr': '5'})
+    obj = InnerObj({'myint': 1, 'mystr': '5'})
     assert obj.myint == 1
     assert obj.mystr == '5'
     assert hasattr(obj, 'mystr')
@@ -143,63 +151,84 @@ def test_object():
         obj.mybool
 
 
+class InnerObj1(TypedObject):
+
+    _version = 2
+    myint: int
+
+    @classmethod
+    def upgrade_data(cls, from_version, data):
+        assert from_version == 1
+        data['myint'] += 15
+        return data
+
+
+class OuterObj1(TypedObject):
+    inner: InnerObj1
+
+
+class InnerObj2(TypedObject):
+
+    _version = 2
+    myint: int
+    mystr: str
+
+    @classmethod
+    def upgrade_data(cls, from_version, data):
+        assert from_version == 1
+        data['mystr'] = 'lol'
+        return data
+
+
+class OuterObj2(TypedObject):
+    inner: InnerObj2
+
+
 def test_upgrade():
 
-    class TestObj1(TypedObject):
-
-        _version = 2
-        myint: int
-
-        @classmethod
-        def upgrade_data(cls, from_version, data):
-            assert from_version == 1
-            data['myint'] += 15
-            return data
-
-    obj = TestObj1({'myint': 1, '_version': 1})
+    obj = InnerObj1({'myint': 1, '_version': 1})
     assert obj.myint == 16
     assert obj.to_json() == {
         'myint': 16,
         '_version': 2,
     }
 
-    class OuterObj1(TypedObject):
-        inner: TestObj1
-
     obj = OuterObj1({'inner': {'myint': 1, '_version': 1}})
     assert obj.inner.myint == 16
 
-    class TestObj2(TypedObject):
-
-        _version = 2
-        myint: int
-        mystr: str
-
-        @classmethod
-        def upgrade_data(cls, from_version, data):
-            assert from_version == 1
-            data['mystr'] = 'lol'
-            return data
-
-    obj = TestObj2(myint=1, _version=1)
+    obj = InnerObj2(myint=1, _version=1)
     assert obj.myint == 1
     assert obj.mystr == 'lol'
-
-    class OuterObj2(TypedObject):
-        inner: TestObj2
 
     obj = OuterObj2(inner=dict(myint=1, _version=1))
     assert obj.inner.myint == 1
     assert obj.inner.mystr == 'lol'
 
 
+class InnerObj3(TypedObject):
+    myint: int
+
+
+class OuterObj3(PersistentObject):
+    inner: InnerObj3
+
+
+class InnerObj4(TypedObject):
+    _version = 2
+    myint: int
+
+    @classmethod
+    def upgrade_data(cls, from_version, data):
+        assert from_version == 1
+        data['myint'] += 15
+        return data
+
+
+class OuterObj4(PersistentObject):
+    inner: InnerObj4
+
+
 def test_persistent():
-
-    class TestObj1(TypedObject):
-        myint: int
-
-    class OuterObj1(PersistentObject):
-        inner: TestObj1
 
     path = Path(__file__).parent / 'temp.json'
     try:
@@ -207,62 +236,51 @@ def test_persistent():
     except FileNotFoundError:
         pass
 
-    with OuterObj1(path) as obj:
-        obj.inner = TestObj1()
+    with OuterObj3(path) as obj:
+        obj.inner = InnerObj3()
         obj.inner.myint = 4
 
-    with OuterObj1(path) as obj:
+    with OuterObj3(path) as obj:
         assert obj.inner.myint == 4
 
-    class TestObj2(TypedObject):
-        _version = 2
-        myint: int
-
-        @classmethod
-        def upgrade_data(cls, from_version, data):
-            assert from_version == 1
-            data['myint'] += 15
-            return data
-
-    class OuterObj2(PersistentObject):
-        inner: TestObj2
-
-    with OuterObj2(path) as obj:
+    with OuterObj4(path) as obj:
         assert obj.inner.myint == 19
 
     path.unlink()
 
 
+class InnerObj5(TypedObject):
+    myint: int
+    mystr: str
+    _defaults = {'myint': 1}
+
+
+class OuterObj5(TypedObject):
+    inner: InnerObj5
+
+
 def test_defaults():
 
-    class TestObj1(TypedObject):
-        myint: int
-        mystr: str
-        _defaults = {'myint': 1}
-
-    obj = TestObj1()
+    obj = InnerObj5()
     assert obj.myint == 1
     assert not hasattr(obj, 'mystr')
 
-    obj = TestObj1({'myint': 2})
+    obj = InnerObj5({'myint': 2})
     assert obj.myint == 2
     assert not hasattr(obj, 'mystr')
 
-    obj = TestObj1({'mystr': 'b'})
+    obj = InnerObj5({'mystr': 'b'})
     assert obj.myint == 1
     assert obj.mystr == 'b'
 
-    class OuterObj1(TypedObject):
-        inner: TestObj1
-
-    obj = OuterObj1()
+    obj = OuterObj5()
     assert obj.inner.myint == 1
     assert not hasattr(obj.inner, 'mystr')
 
-    obj = OuterObj1({'inner': {'myint': 2}})
+    obj = OuterObj5({'inner': {'myint': 2}})
     assert obj.inner.myint == 2
     assert not hasattr(obj.inner, 'mystr')
 
-    obj = OuterObj1({'inner': {'mystr': 'b'}})
+    obj = OuterObj5({'inner': {'mystr': 'b'}})
     assert obj.inner.myint == 1
     assert obj.inner.mystr == 'b'

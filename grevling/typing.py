@@ -6,7 +6,7 @@ from enum import Enum, IntEnum
 import json
 from pathlib import Path
 
-from typing import Any, Dict, List as PyList, Optional
+from typing import Any, Dict, List as PyList, Optional, get_type_hints
 
 import pandas as pd
 from typing_inspect import get_origin, get_args
@@ -326,8 +326,11 @@ class Object(Type):
 class TypedObjectMeta(type):
 
     def __new__(cls, name, bases, attrs):
+        temptype = super().__new__(cls, name, bases, attrs)
+        annotations = get_type_hints(temptype)
+
         types = TypeManager({
-            k: Type.find_python(v) for k, v in attrs.get('__annotations__', {}).items()
+            k: Type.find_python(v) for k, v in annotations.items()
             if not k.startswith('_')
         })
         gtype = attrs['_type'] = Object(types)
