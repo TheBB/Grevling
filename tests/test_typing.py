@@ -259,6 +259,12 @@ class OuterObj5(TypedObject):
     inner: InnerObj5
 
 
+class InnerObj6(TypedObject):
+    a: bool
+    b: bool
+    _defaults = {'a': False, 'b': False}
+
+
 def test_defaults():
 
     obj = InnerObj5()
@@ -284,3 +290,11 @@ def test_defaults():
     obj = OuterObj5({'inner': {'mystr': 'b'}})
     assert obj.inner.myint == 1
     assert obj.inner.mystr == 'b'
+
+    obj = InnerObj6()
+    obj.a = True
+    assert obj.a
+    assert not obj.b
+    obj.b = True
+    assert obj.a
+    assert obj.b

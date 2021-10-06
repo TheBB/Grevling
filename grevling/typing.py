@@ -311,6 +311,7 @@ class Object(Type):
 
     def coerce_into(self, new, existing):
         new_data = self.coerce(new)._data
+        new_data = {k: v for k, v in new_data.items() if k in new}
         return {**existing, **new_data}
 
     def to_json(self, value):
@@ -393,9 +394,9 @@ class TypedObject(metaclass=TypedObjectMeta):
             if hasattr(self, key):
                 continue
             if hasattr(self, '_defaults') and key in self._defaults:
-                setattr(self, key, self._defaults[key])
+                self._data[key] = self._defaults[key]
             elif isinstance(tp, Object):
-                setattr(self, key, tp.python())
+                self._data[key] = tp.python()
 
 
 class PersistentObject(TypedObject):
