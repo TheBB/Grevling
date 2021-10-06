@@ -22,6 +22,7 @@ from .context import ContextProvider
 from .parameters import ParameterSpace
 from .filemap import FileMap
 from .script import Script, ScriptTemplate
+from .typing import PersistentObject
 from .workflow.local import LocalWorkspaceCollection, LocalWorkspace, LocalWorkflow
 from . import util, api
 
@@ -29,9 +30,27 @@ from . import util, api
 __version__ = '1.2.1'
 
 
+class CaseState(PersistentObject):
+
+    running: bool  # True if instances are currently running
+    has_data: bool  # True if any instances have been run and downloaded
+    has_captured: bool  # True if all finished instances have had data captured
+    has_collected: bool  # True if data from all finished instances have been collected
+    has_plotted: bool  # True if all plots have been generated from finished instances
+
+    _defaults = {
+        'running': False,
+        'has_data': False,
+        'has_captured': False,
+        'has_collected': False,
+        'has_plotted': False,
+    }
+
+
 class Case:
 
     lock: Optional[InterProcessLock]
+    state: CaseState
 
     yamlpath: Path
     sourcepath: Path
@@ -118,9 +137,11 @@ class Case:
 
     def __enter__(self) -> Case:
         self.acquire_lock()
+        self.state = CaseState(self.storagepath / 'state.json').__enter__()
         return self
 
     def __exit__(self, *args, **kwargs):
+        self.state.__exit__(*args, **kwargs)
         self.release_lock(*args, **kwargs)
 
     @property
@@ -131,18 +152,21 @@ class Case:
     def types(self) -> api.Types:
         return self.context_mgr.types
 
+    def has_data(self) -> bool:
+        return self.state.has_data
+
     def clear_cache(self):
-        # This will delete the lockfile, so release it first
-        self.release_lock(None, None, None)
+        self.__exit__(None, None, None)
         shutil.rmtree(self.storagepath)
         self.storagepath.mkdir(parents=True, exist_ok=True)
-        self.acquire_lock()
+        self.__enter__()
 
     def clear_dataframe(self):
         self.dataframepath.unlink(missing_ok=True)
+        self.state.has_collected = False
 
     def load_dataframe(self) -> pd.DataFram:
-        if self.dataframepath.is_file():
+        if self.state.has_collected:
             return pd.read_parquet(self.dataframepath, engine='pyarrow')
         data = {
             k: pd.Series([], dtype=v.pandas)
@@ -153,11 +177,6 @@ class Case:
 
     def save_dataframe(self, df: pd.DataFrame):
         df.to_parquet(self.dataframepath, engine='pyarrow', index=True)
-
-    def has_data(self) -> bool:
-        for _ in self.instances(Status.Downloaded):
-            return True
-        return False
 
     def _check_decide_diff(
         self, diff: List[str], prev_file: Path, interactive: bool = True
@@ -275,6 +294,7 @@ class Case:
     def capture(self):
         for instance in self.instances(Status.Downloaded):
             instance.capture()
+        self.state.has_captured = True
 
     def collect(self):
         data = self.load_dataframe()
@@ -283,10 +303,12 @@ class Case:
             data = collector.commit_to_dataframe(data)
         data = data.sort_index()
         self.save_dataframe(data)
+        self.state.has_collected = True
 
     def plot(self):
         for plot in self._plots:
             plot.generate_all(self)
+        self.state.has_plotted = True
 
     # Deprecated methods
 

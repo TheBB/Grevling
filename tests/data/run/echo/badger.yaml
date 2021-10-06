@@ -8,6 +8,13 @@ script:
     capture: a=(?P<a>\S+) b=(?P<b>\S+) c=(?P<c>\S+)
     capture-output: on
     capture-walltime: on
+plots:
+  - parameters:
+      alpha: variate
+      bravo: category
+    filename: plot
+    format: [csv]
+    yaxis: charlie
 types:
   a: int
   b: str
