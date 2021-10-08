@@ -8,14 +8,14 @@ import datetime
 import os
 from pathlib import Path
 import shlex
-import subprocess
 from time import time as osclock
 
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
-from . import api, util, typing
-from .capture import Capture, ResultCollector
+from . import api, util
+from .capture import Capture, CaptureCollection
 from .render import render
+from .typing import TypeManager, Stage
 
 
 @contextmanager
@@ -108,7 +108,7 @@ class Command:
         log_ws.write_file(f'{self.name}.stdout', result.stdout)
         log_ws.write_file(f'{self.name}.stderr', result.stderr)
         log_ws.write_file(
-            'grevling.txt', f'walltime/{self.name}={duration}\n', append=True
+            'grevling.txt', f'g_walltime_{self.name}={duration}\n', append=True
         )
 
         if result.returncode:
@@ -168,8 +168,8 @@ class CommandTemplate:
         elif isinstance(capture, list):
             self.captures.extend(Capture.load(c) for c in capture)
 
-    def add_types(self, types: api.Types):
-        types[f'walltime/{self.name}'] = typing.Float()
+    def add_types(self, types: TypeManager):
+        types.add(f'g_walltime_{self.name}', float, Stage.post)
         for cap in self.captures:
             cap.add_types(types)
 
@@ -197,7 +197,7 @@ class CommandTemplate:
             container_args=shell_list_render(self.container_args, context),
         )
 
-    def capture(self, collector: ResultCollector, workspace: api.Workspace):
+    def capture(self, collector: CaptureCollection, workspace: api.Workspace):
         try:
             with workspace.open_file(f'{self.name}.stdout', 'r') as f:
                 stdout = f.read()
@@ -214,18 +214,18 @@ class Script:
 
     async def run(self, cwd: Path, log_ws: api.Workspace) -> bool:
         log_ws.write_file(
-            'grevling.txt', f'_started={datetime.datetime.now()}\n', append=True
+            'grevling.txt', f'g_started={datetime.datetime.now()}\n', append=True
         )
         try:
             for cmd in self.commands:
                 if not await cmd.execute(cwd, log_ws):
-                    log_ws.write_file('grevling.txt', '_success=0\n', append=True)
+                    log_ws.write_file('grevling.txt', 'g_success=0\n', append=True)
                     return False
-            log_ws.write_file('grevling.txt', '_success=1\n', append=True)
+            log_ws.write_file('grevling.txt', 'g_success=1\n', append=True)
             return True
         finally:
             log_ws.write_file(
-                'grevling.txt', f'_finished={datetime.datetime.now()}\n', append=True
+                'grevling.txt', f'g_finished={datetime.datetime.now()}\n', append=True
             )
 
 
@@ -244,7 +244,7 @@ class ScriptTemplate:
     def __init__(self):
         self.commands = []
 
-    def capture(self, collector: ResultCollector, workspace: api.Workspace):
+    def capture(self, collector: CaptureCollection, workspace: api.Workspace):
         for command in self.commands:
             command.capture(collector, workspace=workspace)
 
@@ -255,6 +255,6 @@ class ScriptTemplate:
         for command in self.commands:
             command.add_types(types)
 
-    def capture(self, collector: ResultCollector, workspace: api.Workspace):
+    def capture(self, collector: CaptureCollection, workspace: api.Workspace):
         for cmd in self.commands:
             cmd.capture(collector, workspace)

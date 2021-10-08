@@ -13,11 +13,13 @@ from typing import List, Iterable, Optional, Any
 from fasteners import InterProcessLock
 import pandas as pd
 
+from grevling.typing import TypeManager
+
 from .api import Status
-from .capture import ResultCollector
 from .plotting import Plot
 from .render import render
 from .schema import load_and_validate
+from .capture import CaptureCollection
 from .context import ContextProvider
 from .parameters import ParameterSpace
 from .filemap import FileMap
@@ -96,7 +98,7 @@ class Case:
 
         # Read settings
         settings = casedata.get('settings', {})
-        self._logdir = settings.get('logdir', '${_index}')
+        self._logdir = settings.get('logdir', '${g_index}')
         self._ignore_missing = settings.get('ignore-missing-files', False)
 
         # Construct plot objects
@@ -145,9 +147,9 @@ class Case:
         if self.dataframepath.is_file():
             return pd.read_parquet(self.dataframepath, engine='pyarrow')
         data = {
-            k: pd.Series([], dtype=v.pandas)
-            for k, v in self.types.items()
-            if k != '_index'
+            k: pd.Series([], dtype=v)
+            for k, v in self.types.pandas().items()
+            if k != 'g_index'
         }
         return pd.DataFrame(index=pd.Int64Index([]), data=data)
 
@@ -241,8 +243,8 @@ class Case:
 
     def create_instances(self) -> Iterable[Instance]:
         for i, ctx in enumerate(self.context_mgr.fullspace()):
-            ctx['_index'] = i
-            ctx['_logdir'] = render(self._logdir, ctx)
+            ctx.g_index = i
+            ctx.g_logdir = render(self._logdir, ctx)
             yield Instance.create(self, ctx)
 
     def create_instance(
@@ -307,7 +309,6 @@ class Case:
     @util.deprecated("use Case.instances() instead", name='Case.iter_instancedirs')
     def iter_instancedirs(self) -> Iterable[api.Workspace]:
         for path in self.storagepath.iterdir():
-            print(path)
             if not (path / '.grevling' / 'context.json').exists():
                 continue
             yield LocalWorkspace(path)
@@ -350,7 +351,7 @@ class Instance:
         self._context = context
 
         if context:
-            self.logdir = context['_logdir']
+            self.logdir = context.g_logdir
         else:
             self.logdir = logdir
 
@@ -385,7 +386,7 @@ class Instance:
         return self._context
 
     @property
-    def types(self) -> api.Types:
+    def types(self) -> TypeManager:
         return self._case.types
 
     def __getitem__(self, key: str) -> Any:
@@ -405,7 +406,7 @@ class Instance:
 
     @property
     def index(self) -> int:
-        return self.context['_index']
+        return self.context.g_index
 
     @property
     def script(self) -> Script:
@@ -413,7 +414,7 @@ class Instance:
 
     def write_context(self):
         with self.local_book.open_file('context.json', 'w') as f:
-            json.dump(self.context, f, sort_keys=True, indent=4, cls=util.JSONEncoder)
+            f.write(self.context.json(sort_keys=True, indent=4))
 
     def open_workspace(self, workspaces, name='') -> api.Workspace:
         return workspaces.open_workspace(self.logdir, name)
@@ -435,8 +436,8 @@ class Instance:
         assert self.remote_book
         assert self.status == Status.Finished
 
-        collector = ResultCollector(self.types)
-        collector.collect_from_dict(self.context)
+        collector = self.types.capture_model()
+        collector.update(self.context)
 
         bookmap = FileMap.load(
             files=[{'source': '*', 'mode': 'glob'}],
@@ -444,26 +445,26 @@ class Instance:
         bookmap.copy(self.context, self.remote_book, self.local_book)
         collector.collect_from_info(self.local_book)
 
-        ignore_missing = self._case._ignore_missing or not collector['_success']
+        ignore_missing = self._case._ignore_missing or not collector['g_success']
         self._case.postmap.copy(
             self.context, self.remote, self.local, ignore_missing=ignore_missing
         )
 
         self._case.script.capture(collector, self.local_book)
+        collector = collector.validate()
         collector.commit_to_file(self.local_book)
 
         self.status = Status.Downloaded
 
     def capture(self):
         assert self.status == Status.Downloaded
-
-        collector = ResultCollector(self.types)
-        collector.collect_from_dict(self.context)
+        collector = self.types.capture_model()
+        collector.update(self.context)
         collector.collect_from_info(self.local_book)
         self._case.script.capture(collector, self.local_book)
         collector.commit_to_file(self.local_book)
 
-    def cached_capture(self) -> ResultCollector:
-        collector = ResultCollector(self.types)
+    def cached_capture(self) -> CaptureCollection:
+        collector = self.types.capture_model()
         collector.collect_from_cache(self.local_book)
         return collector

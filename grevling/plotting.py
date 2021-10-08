@@ -14,7 +14,7 @@ import pandas as pd
 
 from .parameters import ParameterSpace
 from . import util, typing
-from .util import ignore
+from .util import ignore, is_list_type
 from .render import render
 
 
@@ -470,10 +470,10 @@ class Plot:
                 spec[k] = [spec[k]]
 
         # Either all the axes are list type or none of them are
-        list_type = types[spec['yaxis'][0]].is_list
-        assert all(types[k].is_list == list_type for k in spec['yaxis'][1:])
+        list_type = is_list_type(types[spec['yaxis'][0]].tp)
+        assert all(is_list_type(types[k].tp) == list_type for k in spec['yaxis'][1:])
         if spec['xaxis']:
-            assert types[spec['xaxis']].is_list == list_type
+            assert is_list_type(types[spec['xaxis']].tp) == list_type
 
         # If the x-axis has list type, the effective number of variates is one higher
         eff_variates = nvariate + list_type
@@ -572,7 +572,7 @@ class Plot:
 
         for index in case.parameters.subspace(*fixed):
             index = {**index, **constants}
-            context = case.context_mgr.evaluate_context(
+            context = case.context_mgr.raw_evaluate(
                 index.copy(), allowed_missing=unfixed
             )
             self.generate_single(case, context, index)

@@ -6,6 +6,10 @@ from itertools import product, chain
 import json
 import logging
 
+from typing import List
+
+from typing_inspect import get_origin, get_args
+
 import numpy as np
 import pandas as pd
 import rich.logging
@@ -198,3 +202,7 @@ def deprecated(info, name=None):
         return inner
 
     return decorator
+
+
+def is_list_type(tp):
+    return get_origin(tp) == list or get_origin(tp) == List
