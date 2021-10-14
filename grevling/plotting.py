@@ -14,7 +14,7 @@ import pandas as pd
 
 from .parameters import ParameterSpace
 from . import util, typing
-from .util import ignore
+from .util import ignore, is_list_type
 from .render import render
 
 
@@ -470,10 +470,10 @@ class Plot:
                 spec[k] = [spec[k]]
 
         # Either all the axes are list type or none of them are
-        list_type = types[spec['yaxis'][0]].is_list
-        assert all(types[k].is_list == list_type for k in spec['yaxis'][1:])
+        list_type = is_list_type(types[spec['yaxis'][0]].tp)
+        assert all(is_list_type(types[k].tp) == list_type for k in spec['yaxis'][1:])
         if spec['xaxis']:
-            assert types[spec['xaxis']].is_list == list_type
+            assert is_list_type(types[spec['xaxis']].tp) == list_type
 
         # If the x-axis has list type, the effective number of variates is one higher
         eff_variates = nvariate + list_type
@@ -563,7 +563,6 @@ class Plot:
     def generate_all(self, case):
         # Collect all the fixed parameters and iterate over all those combinations
         fixed = self._parameters_of_kind('fixed')
-        unfixed = set(case.parameters.keys()) - set(fixed)
 
         constants = {
             param: self._parameters[param].arg
@@ -572,17 +571,12 @@ class Plot:
 
         for index in case.parameters.subspace(*fixed):
             index = {**index, **constants}
-            context = case.context_mgr.evaluate_context(
-                index.copy(), allowed_missing=unfixed
-            )
+            context = case.context_mgr.raw_evaluate(index.copy(), allowed_missing=True)
             self.generate_single(case, context, index)
 
     def generate_single(self, case, context: dict, index):
         # Collect all the categorized parameters and iterate over all those combinations
         categories = self._parameters_of_kind('category')
-        noncats = set(case.parameters.keys()) - set(
-            self._parameters_of_kind('fixed', 'category')
-        )
         backends = Backends(*self._format)
         plotter = operator.attrgetter(f'add_{self._type}')
 
@@ -590,7 +584,7 @@ class Plot:
         styles = self._styles.styles(case.parameters, *categories)
         for sub_index, basestyle in zip(sub_indices, styles):
             sub_context = case.context_mgr.evaluate_context(
-                {**context, **sub_index}, allowed_missing=noncats
+                {**context, **sub_index}, allowed_missing=True
             )
             sub_index = {**index, **sub_index}
 

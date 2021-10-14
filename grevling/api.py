@@ -6,7 +6,9 @@ from fnmatch import fnmatch
 from io import IOBase
 from pathlib import Path
 
-from typing import Dict, Any, ContextManager, Iterable, Union, Optional, TYPE_CHECKING
+from typing import ContextManager, Iterable, Union, Optional, TYPE_CHECKING
+
+from pydantic import BaseModel
 
 from . import util
 
@@ -14,8 +16,6 @@ if TYPE_CHECKING:
     from .workflow import Pipe
 
 
-Context = Dict[str, Any]
-Types = Dict[str, Any]
 PathStr = Union[Path, str]
 
 
@@ -117,3 +117,28 @@ class Workflow(ABC):
     @abstractmethod
     def pipeline() -> Pipe:
         ...
+
+
+class Context(BaseModel):
+
+    class Config:
+        validate_assignment = True
+
+    def __getitem__(self, key):
+        return self.__dict__[key]
+
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
+
+    def keys(self):
+        return self.__dict__.keys()
+
+    def values(self):
+        return self.__dict__.values()
+
+    def items(self):
+        return self.__dict__.items()
+
+    def update(self, mapping):
+        for k, v in mapping.items():
+            self[k] = v

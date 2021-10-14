@@ -1,10 +1,13 @@
+from datetime import datetime
 from pathlib import Path
 import re
+
+from typing import List
 
 import numpy as np
 
 from grevling import Case
-import grevling.typing as tp
+from grevling.typing import Field, Stage
 
 
 DATADIR = Path(__file__).parent / 'data'
@@ -131,30 +134,33 @@ def test_parse():
     assert case.script.commands[5].captures[4]._mode == 'all'
 
     assert case.types == {
-        '_index': tp.Integer(),
-        '_logdir': tp.String(),
-        '_started': tp.DateTime(),
-        '_finished': tp.DateTime(),
-        '_success': tp.Boolean(),
-        'alpha': tp.Integer(),
-        'bravo': tp.Float(),
-        'charlie': tp.Float(),
-        'delta': tp.Float(),
-        'echo': tp.Float(),
-        'foxtrot': tp.String(),
-        'dblalpha': tp.Integer(),
-        'one': tp.Integer(),
-        'first': tp.String(),
-        'multi': tp.List(tp.String()),
-        'last': tp.Float(),
-        'someint': tp.Integer(),
-        'somefloat': tp.List(tp.Float()),
-        'walltime/string': tp.Float(),
-        'walltime/list': tp.Float(),
-        'walltime/nontrivial-name': tp.Float(),
-        'walltime/nontrivial-name-2': tp.Float(),
-        'walltime/somecommand': tp.Float(),
-        'walltime/nontrivial-stuff': tp.Float(),
+        'g_index': Field(int, None, Stage.pre),
+        'g_logdir': Field(str, None, Stage.pre),
+        'g_started': Field(datetime, None, Stage.post),
+        'g_finished': Field(datetime, None, Stage.post),
+        'g_success': Field(bool, None, Stage.post),
+        'alpha': Field(int, None, Stage.pre),
+        'bravo': Field(float, None, Stage.pre),
+        'charlie': Field(float, None, Stage.pre),
+        'delta': Field(float, None, Stage.pre),
+        'echo': Field(float, None, Stage.pre),
+        'echo': Field(float, None, Stage.pre),
+        'foxtrot': Field(str, None, Stage.pre),
+        'dblalpha': Field(int, None, Stage.pre),
+        'float': Field(float, None, Stage.pre),
+        'int': Field(int, None, Stage.pre),
+        'one': Field(int, None, Stage.post),
+        'first': Field(str, None, Stage.post),
+        'multi': Field(List[str], [], Stage.post),
+        'last': Field(float, None, Stage.post),
+        'someint': Field(int, None, Stage.post),
+        'somefloat': Field(List[float], [], Stage.post),
+        'g_walltime_string': Field(float, None, Stage.post),
+        'g_walltime_list': Field(float, None, Stage.post),
+        'g_walltime_nontrivial-name': Field(float, None, Stage.post),
+        'g_walltime_nontrivial-name-2': Field(float, None, Stage.post),
+        'g_walltime_somecommand': Field(float, None, Stage.post),
+        'g_walltime_nontrivial-stuff': Field(float, None, Stage.post),
     }
 
     assert case._logdir == 'loop-de-loop'
