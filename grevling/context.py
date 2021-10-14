@@ -1,28 +1,15 @@
 from __future__ import annotations
 
 from datetime import datetime
+from operator import methodcaller
 
 from typing import Dict, Any, Sequence, Iterable, Type
 
-import numpy as np
-from simpleeval import SimpleEval, DEFAULT_FUNCTIONS, NameNotDefined
+from asteval import Interpreter
 
 from .parameters import ParameterSpace
 from .typing import TypeManager, Stage, find_type
 from . import util, api
-
-
-BUILTINS = {
-    **DEFAULT_FUNCTIONS,
-    'log': np.log,
-    'log2': np.log2,
-    'log10': np.log10,
-    'sqrt': np.sqrt,
-    'abs': np.abs,
-    'ord': ord,
-    'sin': np.sin,
-    'cos': np.cos,
-}
 
 
 def _guess_eltype(collection: Sequence) -> Type:
@@ -97,33 +84,26 @@ class ContextProvider:
         allowed_missing: bool = False,
         add_constants: bool = True,
     ) -> Dict[str, Any]:
-        evaluator = SimpleEval(functions=BUILTINS)
-        evaluator.names.update(context)
-        evaluator.names.update(
+        evaluator = Interpreter()
+        evaluator.symtable.update(context)
+        evaluator.symtable.update(
             {k: v for k, v in self.constants.items() if k not in context}
         )
 
-        if allowed_missing is False:
-            allowed_missing = set()
-        elif allowed_missing is not True:
-            allowed_missing = set(allowed_missing)
-
         for name, code in self.evaluables.items():
-            try:
-                result = evaluator.eval(code) if isinstance(code, str) else code
-            except NameNotDefined as error:
-                if allowed_missing is True:
+            if not isinstance(code, str):
+                result = code
+            else:
+                result = evaluator.eval(code)
+                only_nameerror = set(tp for tp, _ in map(methodcaller('get_error'), evaluator.error)) == {'NameError'}
+                if evaluator.error and only_nameerror and allowed_missing:
                     util.log.debug(f'Skipped evaluating: {name}')
                     continue
-                elif error.name in allowed_missing:
-                    allowed_missing.add(name)
-                    util.log.debug(f'Skipped evaluating: {name}')
-                    continue
-                else:
-                    raise
+                elif evaluator.error:
+                    raise ValueError(f"Errors occurred evaluating '{name}'")
             if verbose:
                 util.log.debug(f'Evaluated: {name} = {repr(result)}')
-            evaluator.names[name] = context[name] = result
+            evaluator.symtable[name] = context[name] = result
 
         if add_constants:
             for k, v in self.constants.items():
