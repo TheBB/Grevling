@@ -1,3 +1,4 @@
+asteval==0.9.25
 bidict==0.21.2
 click==8.0.1
 fasteners==0.14.1
@@ -9,6 +10,5 @@ plotly==4.14.3
 pyarrow==3.0.0
 rich==9.12.4
 ruamel.yaml==0.16.12
-simpleeval==0.9.10
 strictyaml==1.4.4
 typing-inspect==0.6.0

@@ -13,6 +13,7 @@ setup(
     packages=find_packages(),
     python_requires='>=3.7',
     install_requires=[
+        'asteval',
         'bidict',
         'click',
         'fasteners',
@@ -23,7 +24,6 @@ setup(
         'pydantic',
         'rich',
         'ruamel.yaml',
-        'simpleeval',
         'strictyaml>=1.4',
         'typing-inspect',
     ],

@@ -563,7 +563,6 @@ class Plot:
     def generate_all(self, case):
         # Collect all the fixed parameters and iterate over all those combinations
         fixed = self._parameters_of_kind('fixed')
-        unfixed = set(case.parameters.keys()) - set(fixed)
 
         constants = {
             param: self._parameters[param].arg
@@ -572,17 +571,12 @@ class Plot:
 
         for index in case.parameters.subspace(*fixed):
             index = {**index, **constants}
-            context = case.context_mgr.raw_evaluate(
-                index.copy(), allowed_missing=unfixed
-            )
+            context = case.context_mgr.raw_evaluate(index.copy(), allowed_missing=True)
             self.generate_single(case, context, index)
 
     def generate_single(self, case, context: dict, index):
         # Collect all the categorized parameters and iterate over all those combinations
         categories = self._parameters_of_kind('category')
-        noncats = set(case.parameters.keys()) - set(
-            self._parameters_of_kind('fixed', 'category')
-        )
         backends = Backends(*self._format)
         plotter = operator.attrgetter(f'add_{self._type}')
 
@@ -590,7 +584,7 @@ class Plot:
         styles = self._styles.styles(case.parameters, *categories)
         for sub_index, basestyle in zip(sub_indices, styles):
             sub_context = case.context_mgr.evaluate_context(
-                {**context, **sub_index}, allowed_missing=noncats
+                {**context, **sub_index}, allowed_missing=True
             )
             sub_index = {**index, **sub_index}
 
