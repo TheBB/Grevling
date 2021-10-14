@@ -3,12 +3,15 @@ from __future__ import annotations
 import json
 import re
 
-from typing import Any, List, Optional
+from typing import Optional, List, TYPE_CHECKING
 
-import pandas as pd
+from pydantic import validate_model
+from pydantic.fields import SHAPE_LIST
 
-from . import util, api, typing
-from .typing import TypeManager
+from . import util, api
+
+if TYPE_CHECKING:
+    from .typing import TypeManager
 
 
 class Capture:
@@ -23,8 +26,8 @@ class Capture:
             return cls(spec)
         if spec.get('type') in ('integer', 'float'):
             pattern, tp = {
-                'integer': (r'[-+]?[0-9]+', typing.Integer()),
-                'float': (r'[-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?', typing.Float()),
+                'integer': (r'[-+]?[0-9]+', int),
+                'float': (r'[-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?', float),
             }[spec['type']]
             skip = r'(\S+\s+){' + str(spec.get('skip-words', 0)) + '}'
             if spec.get('flexible-prefix', False):
@@ -56,15 +59,17 @@ class Capture:
         self._mode = mode
         self._type_overrides = type_overrides or {}
 
-    def add_types(self, types: api.Types):
+    def add_types(self, types: TypeManager):
         for group in self._regex.groupindex.keys():
-            single = self._type_overrides.get(group, typing.String())
+            single = self._type_overrides.get(group, str)
+            if group in types:
+                continue
             if self._mode == 'all':
-                types.setdefault(group, typing.List(single))
+                types.add(group, List[single], 'post')
             else:
-                types.setdefault(group, single)
+                types.add(group, single, 'post')
 
-    def find_in(self, collector: ResultCollector, string: str):
+    def find_in(self, collector: Capture, string: str):
         matches = self._regex.finditer(string)
         if self._mode == 'first':
             try:
@@ -86,13 +91,18 @@ class Capture:
                 collector.collect(name, value)
 
 
-class ResultCollector(dict):
+class CaptureCollection(api.Context):
 
-    _types: TypeManager
+    def collect(self, name, value):
+        if self.__fields__[name].shape == SHAPE_LIST:
+            self[name].append(value)
+        else:
+            self[name] = value
 
-    def __init__(self, types: TypeManager):
-        super().__init__()
-        self._types = types
+    def collect_from_file(self, ws: api.Workspace, filename: str):
+        with ws.open_file(filename, 'r') as f:
+            data = json.load(f)
+        self.update(data)
 
     def collect_from_context(self, ws: api.Workspace):
         self.collect_from_file(ws, 'context.json')
@@ -100,40 +110,27 @@ class ResultCollector(dict):
     def collect_from_cache(self, ws: api.Workspace):
         self.collect_from_file(ws, 'captured.json')
 
-    def collect_from_file(self, ws: api.Workspace, filename: str):
-        with ws.open_file(filename, 'r') as f:
-            data = json.load(f)
-        for key, value in data.items():
-            self.collect(key, value)
-
     def collect_from_info(self, ws: api.Workspace):
         with ws.open_file('grevling.txt', 'r') as f:
             for line in f:
                 key, value = line.strip().split('=', 1)
-                self.collect(key, value)
+                self[key] = value
 
-    def collect_from_dict(self, d: dict):
-        for k, v in d.items():
-            self.collect(k, v)
-
-    def collect(self, name: str, value: Any):
-        if name not in self._types:
-            return
-        self[name] = self._types.coerce_into(name, value, self.get(name))
+    def validate(self) -> Capture:
+        data, _, error = validate_model(self.__class__, self.__dict__)
+        if error is not None:
+            raise error
+        return self.__class__(**data)
 
     def commit_to_file(self, ws: api.Workspace):
-        json_data = {
-            key: self._types.to_json(key, value)
-            for key, value in self.items()
-        }
         with ws.open_file('captured.json', 'w') as f:
-            json.dump(json_data, f, sort_keys=True, indent=4, cls=util.JSONEncoder)
+            f.write(self.json())
 
-    def commit_to_dataframe(self, data: pd.DataFrame):
-        index = self['_index']
+    def commit_to_dataframe(self, data):
+        index = self['g_index']
         data.loc[index, :] = [None] * data.shape[1]
         for key, value in self.items():
-            if key == '_index':
+            if key == 'g_index':
                 continue
-            data.at[index, key] = self._types.to_pandas(key, value)
+            data.at[index, key] = value
         return data

@@ -20,6 +20,7 @@ setup(
         'numpy',
         'pandas',
         'pyarrow',
+        'pydantic',
         'rich',
         'ruamel.yaml',
         'simpleeval',

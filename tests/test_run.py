@@ -20,8 +20,8 @@ def read_file(path: Path) -> str:
 
 
 def check_df(left, right):
-    blacklist = {'_started', '_finished', '_logdir'}
-    to_remove = [c for c in left.columns if c.startswith('walltime/') or c in blacklist]
+    blacklist = {'g_started', 'g_finished', 'g_logdir'}
+    to_remove = [c for c in left.columns if c.startswith('g_walltime_') or c in blacklist]
     pd.testing.assert_frame_equal(
         left.drop(columns=to_remove).sort_index(axis=1), right.sort_index(axis=1)
     )
@@ -46,7 +46,7 @@ def test_echo():
                 'a': pd.array([1, 1, 1, 2, 2, 2, 3, 3, 3], dtype=pd.Int64Dtype()),
                 'b': ['a', 'b', 'c', 'a', 'b', 'c', 'a', 'b', 'c'],
                 'c': [1.0, 1.0, 1.0, 3.0, 3.0, 3.0, 5.0, 5.0, 5.0],
-                '_success': pd.array([True] * 9, dtype=pd.BooleanDtype()),
+                'g_success': pd.array([True] * 9, dtype=pd.BooleanDtype()),
             },
         ),
     )
@@ -72,7 +72,7 @@ def test_cat():
                 'b': ['a', 'b', 'c', 'a', 'b', 'c', 'a', 'b', 'c'],
                 'c': [1.0, 1.0, 1.0, 3.0, 3.0, 3.0, 5.0, 5.0, 5.0],
                 'a_auto': pd.array([1, 1, 1, 2, 2, 2, 3, 3, 3], dtype=pd.Int64Dtype()),
-                '_success': pd.array([True] * 9, dtype=pd.BooleanDtype()),
+                'g_success': pd.array([True] * 9, dtype=pd.BooleanDtype()),
             },
         ),
     )
@@ -173,7 +173,7 @@ def test_capture():
                     [2, 4, 6, 8],
                     [3, 6, 9, 12],
                 ],
-                '_success': pd.array([True] * 9, dtype=pd.BooleanDtype()),
+                'g_success': pd.array([True] * 9, dtype=pd.BooleanDtype()),
             },
         ),
     )
@@ -255,7 +255,7 @@ def test_double_capture():
                     [2, 4, 6, 8],
                     [3, 6, 9, 12],
                 ],
-                '_success': pd.array([True] * 9, dtype=pd.BooleanDtype()),
+                'g_success': pd.array([True] * 9, dtype=pd.BooleanDtype()),
             },
         ),
     )
@@ -279,7 +279,7 @@ def test_failing():
                 'return': pd.array([0, 1], dtype=pd.Int64Dtype()),
                 'next': pd.array([0, pd.NA], dtype=pd.Int64Dtype()),
                 'after': pd.array([13, pd.NA], dtype=pd.Int64Dtype()),
-                '_success': pd.array([True, False], dtype=pd.BooleanDtype()),
+                'g_success': pd.array([True, False], dtype=pd.BooleanDtype()),
             },
         ),
     )
