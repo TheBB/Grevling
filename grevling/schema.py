@@ -218,6 +218,7 @@ CASE_SCHEMA = Map(
         Optional('constants'): MapPattern(
             Str(), NullNone() | Int() | Float() | Bool() | Str()
         ),
+        Optional('where'): Str() | Seq(Str()),
         Optional('templates'): Seq(FileMapping(glob_allowed=True)),
         Optional('prefiles'): Seq(FileMapping(glob_allowed=True)),
         Optional('postfiles'): Seq(FileMapping(glob_allowed=True)),
