@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from operator import methodcaller
 
-from typing import Dict, Any, Sequence, Iterable, Type
+from typing import Dict, Any, Sequence, Iterable, Type, List
 
 from asteval import Interpreter
 
@@ -27,6 +27,7 @@ class ContextProvider:
     evaluables: Dict[str, str]
     constants: Dict[str, Any]
     templates: Dict[str, Any]
+    conditions: List[str]
     types: TypeManager
 
     @classmethod
@@ -37,6 +38,11 @@ class ContextProvider:
         self.parameters = ParameterSpace.load(data.get('parameters', {}))
         self.evaluables = dict(data.get('evaluate', {}))
         self.constants = dict(data.get('constants', {}))
+
+        conditions = data.get('where', [])
+        if isinstance(conditions, str):
+            conditions = [conditions]
+        self.conditions = conditions
 
         self.types = TypeManager()
         self.types.add('g_index', int, 'pre')
@@ -114,7 +120,17 @@ class ContextProvider:
 
     def subspace(self, *names: str, **kwargs) -> Iterable[Dict]:
         for values in self.parameters.subspace(*names):
-            yield self.evaluate(values, **kwargs)
+            context = self.evaluate(values, **kwargs)
+            if not self.conditions:
+                yield context
+                continue
+            evaluator = Interpreter()
+            evaluator.symtable.update(context.__dict__)
+            for condition in self.conditions:
+                if not evaluator.eval(condition):
+                    break
+            else:
+                yield context
 
     def fullspace(self, **kwargs) -> Iterable[Dict]:
         yield from self.subspace(*self.parameters, **kwargs)

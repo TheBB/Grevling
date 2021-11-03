@@ -267,11 +267,11 @@ class Case:
         ctx = self.context_mgr.evaluate_context(ctx)
         if index is None:
             index = 0
-        ctx['_index'] = index
+        ctx.g_index = index
         if logdir is None:
             logdir = render(self._logdir, ctx)
-        ctx['_logdir'] = str(logdir)
-        workspace = LocalWorkspace(Path(ctx['_logdir']), name='LOG')
+        ctx.g_logdir = str(logdir)
+        workspace = LocalWorkspace(Path(ctx.g_logdir), name='LOG')
         return Instance.create(self, ctx, local=workspace)
 
     def instances(self, *statuses: api.Status) -> Iterable[Instance]:
