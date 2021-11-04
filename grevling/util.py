@@ -6,11 +6,12 @@ from itertools import product, chain
 import json
 import logging
 
-from typing import List
+from typing import List, Optional
 
 from typing_inspect import get_origin, get_args
 
 import numpy as np
+from numpy.polynomial import Legendre
 import pandas as pd
 import rich.logging
 
@@ -206,3 +207,15 @@ def deprecated(info, name=None):
 
 def is_list_type(tp):
     return get_origin(tp) == list or get_origin(tp) == List
+
+
+def unitvec(n: int, length: Optional[int] = None) -> np.ndarray:
+    if length is None:
+        length = n + 1
+    retval = np.zeros((length,))
+    retval[n] = 1
+    return retval
+
+
+def legendre(n: int, a: float, b: float, x: float):
+    return Legendre(unitvec(n), [a, b])(x)
