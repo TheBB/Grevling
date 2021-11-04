@@ -88,7 +88,6 @@ class ContextProvider:
         context,
         verbose: bool = True,
         allowed_missing: bool = False,
-        add_constants: bool = True,
     ) -> Dict[str, Any]:
         evaluator = Interpreter()
         evaluator.symtable.update(context)
@@ -110,11 +109,6 @@ class ContextProvider:
             if verbose:
                 util.log.debug(f'Evaluated: {name} = {repr(result)}')
             evaluator.symtable[name] = context[name] = result
-
-        if add_constants:
-            for k, v in self.constants.items():
-                if k not in context:
-                    context[k] = v
 
         return context
 
