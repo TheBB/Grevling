@@ -100,7 +100,7 @@ class ContextProvider:
             if not isinstance(code, str):
                 result = code
             else:
-                result = evaluator.eval(code)
+                result = evaluator.eval(code, show_errors=False)
                 only_nameerror = set(tp for tp, _ in map(methodcaller('get_error'), evaluator.error)) == {'NameError'}
                 if evaluator.error and only_nameerror and allowed_missing:
                     util.log.debug(f'Skipped evaluating: {name}')
