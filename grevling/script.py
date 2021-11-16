@@ -181,7 +181,7 @@ class CommandTemplate:
 
         if self.env:
             kwargs['env'] = os.environ.copy()
-            for k, v in self._env.items():
+            for k, v in self.env.items():
                 kwargs['env'][k] = render(v, context)
 
         command = shell_list_render(self.command, context)
