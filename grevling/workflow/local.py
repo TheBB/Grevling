@@ -13,7 +13,7 @@ from ..api import Status
 from .. import util, api
 
 if TYPE_CHECKING:
-    from .. import Instance
+    from .. import Instance, Case
 
 
 class RunInstance(PipeSegment):
@@ -49,11 +49,11 @@ class LocalWorkflow(api.Workflow):
     def __exit__(self, *args, **kwargs):
         self.workspaces.__exit__(*args, **kwargs)
 
-    def pipeline(self) -> Pipeline:
+    def pipeline(self, case: Case) -> Pipeline:
         return Pipeline(
             PrepareInstance(self.workspaces),
             RunInstance(self.workspaces, ncopies=self.nprocs),
-            DownloadResults(self.workspaces),
+            DownloadResults(self.workspaces, case),
         )
 
 

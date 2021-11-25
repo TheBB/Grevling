@@ -32,8 +32,7 @@ def test_plots():
     MockBackend.plots = []
     with Case(DATADIR / 'run' / 'plot') as case:
         case.clear_cache()
-        with LocalWorkflow() as w:
-            w.pipeline().run(case.create_instances())
+        assert case.run()
         case.capture()
         case.collect()
         case.plot()

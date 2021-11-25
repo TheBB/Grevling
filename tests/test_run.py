@@ -30,8 +30,7 @@ def check_df(left, right):
 def test_echo():
     with Case(DATADIR / 'run' / 'echo') as case:
         case.clear_cache()
-        with LocalWorkflow() as w:
-            assert w.pipeline().run(case.create_instances())
+        assert case.run()
         case.collect()
         data = case.load_dataframe()
 
@@ -55,8 +54,7 @@ def test_echo():
 def test_cat():
     with Case(DATADIR / 'run' / 'cat') as case:
         case.clear_cache()
-        with LocalWorkflow() as w:
-            w.pipeline().run(case.create_instances())
+        assert case.run()
         case.collect()
         data = case.load_dataframe()
 
@@ -81,8 +79,7 @@ def test_cat():
 def test_files():
     with Case(DATADIR / 'run' / 'files') as case:
         case.clear_cache()
-        with LocalWorkflow() as w:
-            assert w.pipeline().run(case.create_instances())
+        assert case.run()
 
     for a in range(1, 4):
         for b in 'abc':
@@ -101,8 +98,7 @@ def test_files():
 def test_capture():
     with Case(DATADIR / 'run' / 'capture') as case:
         case.clear_cache()
-        with LocalWorkflow() as w:
-            assert w.pipeline().run(case.create_instances())
+        assert case.run()
         case.collect()
         data = case.load_dataframe()
 
@@ -182,8 +178,7 @@ def test_capture():
 def test_double_capture():
     with Case(DATADIR / 'run' / 'capture') as case:
         case.clear_cache()
-        with LocalWorkflow() as w:
-            assert w.pipeline().run(case.create_instances())
+        assert case.run()
         case.collect()
         case.capture()
         data = case.load_dataframe()
@@ -264,8 +259,7 @@ def test_double_capture():
 def test_failing():
     with Case(DATADIR / 'run' / 'failing') as case:
         case.clear_cache()
-        with LocalWorkflow() as w:
-            assert w.pipeline().run(case.create_instances())
+        assert case.run()
         case.collect()
         data = case.load_dataframe()
 
@@ -288,8 +282,7 @@ def test_failing():
 def test_stdout():
     with Case(DATADIR / 'run' / 'stdout') as case:
         case.clear_cache()
-        with LocalWorkflow() as w:
-            assert w.pipeline().run(case.create_instances())
+        assert case.run()
 
     path = case.storagepath
     assert read_file(path / 'out-0' / '.grevling' / 'good.stdout') == 'stdout 0\n'
@@ -308,8 +301,7 @@ def test_stdout():
 def test_docker():
     with Case(DATADIR / 'run' / 'docker') as case:
         case.clear_cache()
-        with LocalWorkflow() as w:
-            assert w.pipeline().run(case.create_instances())
+        assert case.run()
 
 
 @pytest.mark.skipif(shutil.which('sleep') is None, reason="requires sleep")
@@ -318,7 +310,7 @@ def test_sleep():
         case.clear_cache()
         with LocalWorkflow(nprocs=20) as w:
             start = time()
-            assert w.pipeline().run(case.create_instances())
+            assert w.pipeline(case).run(case.create_instances())
             duration = time() - start
 
     # The case is configured to launch 20 processes, each sleeping 1/2 second

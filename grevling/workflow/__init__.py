@@ -10,7 +10,7 @@ import traceback
 from typing import Iterable, Any, Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .. import Instance
+    from .. import Instance, Case
 
 from .. import util, api
 
@@ -71,6 +71,9 @@ class PipeSegment(Pipe):
             self.npiped += 1
             in_queue.task_done()
 
+    def finalize(self, succcess: bool):
+        pass
+
     @abstractmethod
     async def apply(self, arg: Any) -> Any:
         ...
@@ -87,7 +90,10 @@ class Pipeline(Pipe):
         queue = util.to_queue(inputs)
         ninputs = queue.qsize()
         await self.work(queue)
-        return self.pipes[-1].npiped == ninputs
+        success = self.pipes[-1].npiped == ninputs
+        for pipe in self.pipes:
+            pipe.finalize(success)
+        return success
 
     async def work(
         self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None
@@ -126,9 +132,13 @@ class DownloadResults(PipeSegment):
 
     name = 'Download'
 
-    def __init__(self, workspaces: api.WorkspaceCollection):
+    workspaces: api.WorkspaceCollection
+    case: Case
+
+    def __init__(self, workspaces: api.WorkspaceCollection, case: Case):
         super().__init__()
         self.workspaces = workspaces
+        self.case = case
 
     @util.with_context('I {instance.index}')
     @util.with_context('Down')
@@ -136,3 +146,7 @@ class DownloadResults(PipeSegment):
         with instance.bind_remote(self.workspaces):
             instance.download()
         return instance
+
+    def finalize(self, success: bool):
+        if success:
+            self.case.state.running = False

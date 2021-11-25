@@ -1,0 +1,87 @@
+from pathlib import Path
+
+from grevling import Case, CaseState, Instance
+from grevling.workflow import PipeSegment
+from grevling.workflow.local import LocalWorkflow
+
+
+DATADIR = Path(__file__).parent / 'data'
+
+
+class VerifyRunningPipe(PipeSegment):
+
+    name = 'Test'
+
+    async def apply(self, instance: Instance) -> Instance:
+        assert instance._case.state.running
+        return instance
+
+
+def test_casestate():
+    with Case(DATADIR / 'run' / 'echo') as case:
+        case.clear_cache()
+
+        assert not case.state.running
+        assert not case.state.has_data
+        assert not case.state.has_captured
+        assert not case.state.has_collected
+        assert not case.state.has_plotted
+
+        with LocalWorkflow() as w:
+            pipeline = w.pipeline(case)
+            pipeline.pipes.insert(1, VerifyRunningPipe())
+            assert pipeline.run(case.create_instances())
+
+        assert not case.state.running
+        assert case.state.has_data
+        assert not case.state.has_captured
+        assert not case.state.has_collected
+        assert not case.state.has_plotted
+
+        case.capture()
+
+        assert not case.state.running
+        assert case.state.has_data
+        assert case.state.has_captured
+        assert not case.state.has_collected
+        assert not case.state.has_plotted
+
+        case.collect()
+
+        assert not case.state.running
+        assert case.state.has_data
+        assert case.state.has_captured
+        assert case.state.has_collected
+        assert not case.state.has_plotted
+
+    with Case(DATADIR / 'run' / 'echo') as case:
+
+        assert not case.state.running
+        assert case.state.has_data
+        assert case.state.has_captured
+        assert case.state.has_collected
+        assert not case.state.has_plotted
+
+        case.plot()
+
+        assert not case.state.running
+        assert case.state.has_data
+        assert case.state.has_captured
+        assert case.state.has_collected
+        assert case.state.has_plotted
+
+        case.run()
+
+        assert not case.state.running
+        assert case.state.has_data
+        assert not case.state.has_captured
+        assert not case.state.has_collected
+        assert not case.state.has_plotted
+
+        case.clear_cache()
+
+        assert not case.state.running
+        assert not case.state.has_data
+        assert not case.state.has_captured
+        assert not case.state.has_collected
+        assert not case.state.has_plotted

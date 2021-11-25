@@ -304,16 +304,12 @@ class Case:
             plot.generate_all(self)
         self.state.has_plotted = True
 
-    # Deprecated methods
-
-    @util.deprecated(
-        "use LocalWorkflow.pipeline().run(case.create_instances()) instead",
-        name='Case.run',
-    )
-    def run(self, nprocs=1):
+    def run(self, nprocs=1) -> bool:
         nprocs = nprocs or 1
         with LocalWorkflow(nprocs=nprocs) as workflow:
-            workflow.pipeline().run(self.create_instances())
+            return workflow.pipeline(self).run(self.create_instances())
+
+    # Deprecated methods
 
     def run_single(self, namespace: api.Context, logdir: Path, index: int = 0):
         instance = self.create_instance(namespace, logdir=logdir, index=index)
@@ -344,6 +340,7 @@ class Instance:
     logdir: str
     status: Status
 
+    _case: Case
     _context: Optional[api.Context]
     _status: Optional[Status]
 
@@ -444,6 +441,7 @@ class Instance:
         )
 
         self.status = Status.Prepared
+        self._case.state.running = True
 
     def download(self):
         assert self.remote
@@ -469,6 +467,10 @@ class Instance:
         collector.commit_to_file(self.local_book)
 
         self.status = Status.Downloaded
+        self._case.state.has_data = True
+        self._case.state.has_captured = False
+        self._case.state.has_collected = False
+        self._case.state.has_plotted = False
 
     def capture(self):
         assert self.status == Status.Downloaded

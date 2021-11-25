@@ -14,6 +14,7 @@ from . import util
 
 if TYPE_CHECKING:
     from .workflow import Pipe
+    from . import Case
 
 
 PathStr = Union[Path, str]
@@ -115,7 +116,7 @@ class Workflow(ABC):
         return cls
 
     @abstractmethod
-    def pipeline() -> Pipe:
+    def pipeline(self, case: Case) -> Pipe:
         ...
 
 
