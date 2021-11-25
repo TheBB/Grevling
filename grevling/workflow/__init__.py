@@ -40,10 +40,20 @@ class PipeSegment(Pipe):
 
     name: str
     npiped: int
+    ncopies: int
+    tasks: List[asyncio.Task]
 
     def __init__(self, ncopies: int = 1):
         self.ncopies = ncopies
         self.npiped = 0
+        self.tasks = []
+
+    def create_tasks(self, *args):
+        self.tasks = [asyncio.create_task(self.work(*args)) for _ in range(self.ncopies)]
+
+    async def close_tasks(self):
+        for task in self.tasks:
+            task.cancel()
 
     async def _run(self, inputs: Iterable[Any]) -> bool:
         queue = util.to_queue(inputs)
@@ -55,21 +65,24 @@ class PipeSegment(Pipe):
     async def work(
         self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None
     ):
-        while True:
-            arg = await in_queue.get()
-            try:
-                ret = await self.apply(arg)
-            except Exception as e:
-                util.log.error(str(e))
-                with StringIO() as buf:
-                    traceback.print_exc(file=buf)
-                    util.log.error(buf.getvalue())
-                in_queue.task_done()
-                continue
-            if out_queue:
-                await out_queue.put(ret)
-            self.npiped += 1
-            in_queue.task_done()
+        try:
+            while True:
+                arg = await in_queue.get()
+                try:
+                    ret = await self.apply(arg)
+                    if out_queue:
+                        await out_queue.put(ret)
+                    self.npiped += 1
+                    in_queue.task_done()
+                except Exception as e:
+                    util.log.error(str(e))
+                    with StringIO() as buf:
+                        traceback.print_exc(file=buf)
+                        util.log.error(buf.getvalue())
+                    in_queue.task_done()
+                    continue
+        except asyncio.CancelledError:
+            pass
 
     def finalize(self, succcess: bool):
         pass
@@ -104,12 +117,14 @@ class Pipeline(Pipe):
         out_queues = chain(queues, [out_queue])
 
         for pipe, inq, outq in zip(self.pipes, in_queues, out_queues):
-            for _ in range(pipe.ncopies):
-                asyncio.create_task(pipe.work(inq, outq))
+            pipe.create_tasks(inq, outq)
 
         for pipe, queue in zip(self.pipes, chain([in_queue], queues)):
             await queue.join()
+            await pipe.close_tasks()
             util.log.info(f"{pipe.name} finished: {pipe.npiped} instances handled")
+
+        await asyncio.gather(*chain.from_iterable(pipe.tasks for pipe in self.pipes))
 
 
 class PrepareInstance(PipeSegment):
