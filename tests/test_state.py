@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from grevling import Case, CaseState, Instance
+from grevling.api import Status
 from grevling.workflow import PipeSegment
 from grevling.workflow.local import LocalWorkflow
 
@@ -14,6 +15,21 @@ class VerifyRunningPipe(PipeSegment):
 
     async def apply(self, instance: Instance) -> Instance:
         assert instance._case.state.running
+        return instance
+
+
+class VerifyInstanceStatus(PipeSegment):
+
+    name = 'Test'
+
+    status: Status
+
+    def __init__(self, status: Status):
+        super().__init__()
+        self.status = status
+
+    async def apply(self, instance: Instance) -> Instance:
+        assert instance.status == self.status
         return instance
 
 
@@ -85,3 +101,23 @@ def test_casestate():
         assert not case.state.has_captured
         assert not case.state.has_collected
         assert not case.state.has_plotted
+
+
+def test_instance_status():
+    with Case(DATADIR / 'run' / 'echo') as case:
+        case.clear_cache()
+
+        with LocalWorkflow() as w:
+            pipeline = w.pipeline(case)
+
+            pipeline.pipes = [
+                VerifyInstanceStatus(Status.Created),
+                pipeline.pipes[0],
+                VerifyInstanceStatus(Status.Prepared),
+                pipeline.pipes[1],
+                VerifyInstanceStatus(Status.Finished),
+                pipeline.pipes[2],
+                VerifyInstanceStatus(Status.Downloaded),
+            ]
+
+            assert pipeline.run(case.create_instances())
