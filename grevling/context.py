@@ -91,6 +91,9 @@ class ContextProvider:
         add_constants: bool = True,
     ) -> Dict[str, Any]:
         evaluator = Interpreter()
+        evaluator.symtable.update({
+            'legendre': util.legendre,
+        })
         evaluator.symtable.update(context)
         evaluator.symtable.update(
             {k: v for k, v in self.constants.items() if k not in context}
@@ -100,7 +103,7 @@ class ContextProvider:
             if not isinstance(code, str):
                 result = code
             else:
-                result = evaluator.eval(code)
+                result = evaluator.eval(code, show_errors=False)
                 only_nameerror = set(tp for tp, _ in map(methodcaller('get_error'), evaluator.error)) == {'NameError'}
                 if evaluator.error and only_nameerror and allowed_missing:
                     util.log.debug(f'Skipped evaluating: {name}')

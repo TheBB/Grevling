@@ -8,9 +8,9 @@ import sys
 
 from typing import List
 
+from asteval import Interpreter
 import click
 from ruamel.yaml.parser import ParserError as YAMLParserError
-from simpleeval import SimpleEval
 from strictyaml import YAMLValidationError
 
 import grevling
@@ -121,7 +121,7 @@ def run(case: Case, workflow: str, nprocs: int):
 @workflows
 @click.argument('context', nargs=-1, type=str)
 def run_with(case: Case, target: str, workflow: str, context: List[str]):
-    evaluator = SimpleEval()
+    evaluator = Interpreter()
     parsed_context = {}
     for s in context:
         k, v = s.split('=', 1)
