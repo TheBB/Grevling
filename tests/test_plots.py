@@ -30,7 +30,7 @@ def compare_object(actual, expected, sort_xy=False):
 
 def test_plots():
     MockBackend.plots = []
-    with Case(DATADIR / 'run' / 'plot') as case:
+    with Case(DATADIR / 'run' / 'plot' / 'grevling.yaml') as case:
         case.clear_cache()
         assert case.run()
         case.capture()

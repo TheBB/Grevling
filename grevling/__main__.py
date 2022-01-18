@@ -37,13 +37,12 @@ class CaseType(click.Path):
         if isinstance(value, Case):
             return value
         path = Path(super().convert(value, param, ctx))
+        casefile = path
         if path.is_dir():
-            for candidate in ['grevling.yaml', 'badger.yaml']:
+            for candidate in ['grevling.gold', 'grevling.yaml', 'badger.yaml']:
                 if (path / candidate).exists():
                     casefile = path / candidate
                     break
-        else:
-            casefile = path
         if not casefile.exists():
             raise click.FileError(str(casefile), hint='does not exist')
         if not casefile.is_file():

@@ -17,6 +17,7 @@ setup(
         'bidict',
         'click',
         'fasteners',
+        'goldpy>=0.4.2',
         'mako',
         'numpy',
         'pandas',

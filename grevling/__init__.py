@@ -11,6 +11,7 @@ import shutil
 from typing import List, Iterable, Optional, Any
 
 from fasteners import InterProcessLock
+import goldpy as gold
 import pandas as pd
 
 from grevling.typing import TypeManager
@@ -46,7 +47,7 @@ class Case:
     lock: Optional[InterProcessLock]
     state: CaseState
 
-    yamlpath: Path
+    configpath: Path
     sourcepath: Path
     storagepath: Path
     dataframepath: Path
@@ -62,20 +63,20 @@ class Case:
 
     def __init__(
         self,
-        yamlpath: api.PathStr = '.',
+        configpath: api.PathStr = '.',
         storagepath: Optional[Path] = None,
         yamldata: Optional[str] = None,
     ):
-        if isinstance(yamlpath, str):
-            yamlpath = Path(yamlpath)
-        if yamlpath.is_dir():
-            for candidate in ['grevling', 'badger']:
-                if (yamlpath / f'{candidate}.yaml').exists():
-                    yamlpath = yamlpath / f'{candidate}.yaml'
+        if isinstance(configpath, str):
+            yamlpath = Path(configpath)
+        if configpath.is_dir():
+            for candidate in ['grevling.gold', 'grevling.yaml', 'badger.yaml']:
+                if (configpath / candidate).exists():
+                    configpath = configpath / candidate
                     break
-        assert yamlpath.is_file()
-        self.yamlpath = yamlpath
-        self.sourcepath = yamlpath.parent
+        assert configpath.is_file()
+        self.configpath = configpath
+        self.sourcepath = configpath.parent
         self.local_space = LocalWorkspace(self.sourcepath, 'SRC')
 
         if storagepath is None:
@@ -86,10 +87,13 @@ class Case:
 
         self.dataframepath = storagepath / 'dataframe.parquet'
 
-        with open(yamlpath, mode='r') as f:
-            yamldata = f.read()
-        with open(yamlpath, mode='r') as f:
-            casedata = load_and_validate(yamldata, yamlpath)
+        if configpath.suffix == '.yaml':
+            with open(configpath, mode='r') as f:
+                yamldata = f.read()
+            with open(configpath, mode='r') as f:
+                casedata = load_and_validate(yamldata, configpath)
+        else:
+            casedata = gold.evaluate_file(str(configpath))
 
         self.context_mgr = ContextProvider.load(casedata)
 

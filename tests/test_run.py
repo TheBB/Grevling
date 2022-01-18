@@ -27,8 +27,9 @@ def check_df(left, right):
     )
 
 
-def test_echo():
-    with Case(DATADIR / 'run' / 'echo') as case:
+@pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
+def test_echo(suffix):
+    with Case(DATADIR / 'run' / 'echo' / f'grevling{suffix}') as case:
         case.clear_cache()
         assert case.run()
         case.collect()
@@ -51,8 +52,9 @@ def test_echo():
     )
 
 
-def test_cat():
-    with Case(DATADIR / 'run' / 'cat') as case:
+@pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
+def test_cat(suffix):
+    with Case(DATADIR / 'run' / 'cat' / f'grevling{suffix}') as case:
         case.clear_cache()
         assert case.run()
         case.collect()
@@ -76,8 +78,9 @@ def test_cat():
     )
 
 
-def test_files():
-    with Case(DATADIR / 'run' / 'files') as case:
+@pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
+def test_files(suffix):
+    with Case(DATADIR / 'run' / 'files' / f'grevling{suffix}') as case:
         case.clear_cache()
         assert case.run()
 
@@ -95,8 +98,9 @@ def test_files():
             assert read_file(path / 'some' / 'deep' / 'directory' / 'empty3.dat') == ''
 
 
-def test_capture():
-    with Case(DATADIR / 'run' / 'capture') as case:
+@pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
+def test_capture(suffix):
+    with Case(DATADIR / 'run' / 'capture' / f'grevling{suffix}') as case:
         case.clear_cache()
         assert case.run()
         case.collect()
@@ -175,8 +179,9 @@ def test_capture():
     )
 
 
-def test_double_capture():
-    with Case(DATADIR / 'run' / 'capture') as case:
+@pytest.mark.parametrize('suffix', ['.gold'])
+def test_double_capture(suffix):
+    with Case(DATADIR / 'run' / 'capture' / f'grevling{suffix}') as case:
         case.clear_cache()
         assert case.run()
         case.collect()
@@ -256,8 +261,9 @@ def test_double_capture():
     )
 
 
-def test_failing():
-    with Case(DATADIR / 'run' / 'failing') as case:
+@pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
+def test_failing(suffix):
+    with Case(DATADIR / 'run' / 'failing' / f'grevling{suffix}') as case:
         case.clear_cache()
         assert case.run()
         case.collect()
@@ -279,8 +285,9 @@ def test_failing():
     )
 
 
-def test_stdout():
-    with Case(DATADIR / 'run' / 'stdout') as case:
+@pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
+def test_stdout(suffix):
+    with Case(DATADIR / 'run' / 'stdout' / f'grevling{suffix}') as case:
         case.clear_cache()
         assert case.run()
 
@@ -298,15 +305,17 @@ def test_stdout():
 @pytest.mark.skipif(
     os.name == 'nt' or shutil.which('docker') is None, reason="requires docker and *nix"
 )
-def test_docker():
-    with Case(DATADIR / 'run' / 'docker') as case:
+@pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
+def test_docker(suffix):
+    with Case(DATADIR / 'run' / 'docker' / f'grevling{suffix}') as case:
         case.clear_cache()
         assert case.run()
 
 
 @pytest.mark.skipif(shutil.which('sleep') is None, reason="requires sleep")
-def test_sleep():
-    with Case(DATADIR / 'run' / 'sleep') as case:
+@pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
+def test_sleep(suffix):
+    with Case(DATADIR / 'run' / 'sleep' / f'grevling{suffix}') as case:
         case.clear_cache()
         with LocalWorkflow(nprocs=20) as w:
             start = time()

@@ -1,13 +1,16 @@
 from pathlib import Path
 
+import pytest
+
 from grevling import Case
 
 
 DATADIR = Path(__file__).parent / 'data'
 
 
-def test_conditions():
-    with Case(DATADIR / 'valid' / 'conditions.yaml') as case:
+@pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
+def test_conditions(suffix):
+    with Case(DATADIR / 'valid' / f'conditions{suffix}') as case:
         contexts = list(instance.context for instance in case.create_instances())
     vals = [(ctx.g_index, ctx.a, ctx.b) for ctx in contexts]
     assert vals == [
