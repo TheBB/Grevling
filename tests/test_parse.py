@@ -5,6 +5,7 @@ import re
 from typing import List
 
 import numpy as np
+import pytest
 
 from grevling import Case
 from grevling.typing import Field, Stage
@@ -13,8 +14,9 @@ from grevling.typing import Field, Stage
 DATADIR = Path(__file__).parent / 'data'
 
 
-def test_parse():
-    case = Case(DATADIR / 'valid' / 'diverse.yaml')
+@pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
+def test_parse(suffix):
+    case = Case(DATADIR / 'valid' / f'diverse{suffix}')
 
     for name, param in case.parameters.items():
         assert param.name == name
