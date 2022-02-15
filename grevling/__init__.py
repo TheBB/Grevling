@@ -1015,7 +1015,7 @@ class Case:
         logger(f"{nsuccess} of {size} succeeded")
 
     def capture(self):
-        for index, namespace in enumerate(self._context.fullspace()):
+        for index, namespace in enumerate(self.context_mgr.fullspace()):
             namespace['_index'] = index
             namespace['_logdir'] = logdir = self.storagepath / render(self._logdir, namespace)
             if not logdir.exists():
