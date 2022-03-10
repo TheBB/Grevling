@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
+import site, sys
 from setuptools import setup, find_packages
+
+site.ENABLE_USER_SITE = '--user' in sys.argv[1:]
 
 setup(
     name='Grevling',
