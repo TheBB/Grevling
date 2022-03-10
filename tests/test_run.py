@@ -3,10 +3,12 @@ from pathlib import Path
 import shutil
 from time import time
 
+from click.testing import CliRunner
 import pandas as pd
 import pytest
 
 from grevling import Case
+from grevling.__main__ import main
 from grevling.workflow.local import LocalWorkflow
 from grevling.util import initialize_logging
 
@@ -27,12 +29,38 @@ def check_df(left, right):
     )
 
 
+def api_run(pre=[], post=['collect']):
+    def runner(path):
+        with Case(path) as case:
+            case.clear_cache()
+            for method in pre:
+                getattr(case, method)()
+            assert case.run()
+            for method in post:
+                getattr(case, method)()
+    return runner
+
+
+def cli_run(commands=['run', 'collect']):
+    def runner(path):
+        with Case(path) as case:
+            case.clear_cache()
+        r = CliRunner()
+        for cmd in commands:
+            result = r.invoke(main, [cmd, '-c', str(path)])
+            if result.exit_code != 0:
+                print(result.stdout)
+            assert result.exit_code == 0
+    return runner
+
+
+@pytest.mark.parametrize('runner', [api_run(), cli_run()])
 @pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
-def test_echo(suffix):
-    with Case(DATADIR / 'run' / 'echo' / f'grevling{suffix}') as case:
-        case.clear_cache()
-        assert case.run()
-        case.collect()
+def test_echo(runner, suffix):
+    path = DATADIR / 'run' / 'echo' / f'grevling{suffix}'
+    runner(path)
+
+    with Case(path) as case:
         data = case.load_dataframe()
 
     check_df(
@@ -52,12 +80,13 @@ def test_echo(suffix):
     )
 
 
+@pytest.mark.parametrize('runner', [api_run(), cli_run()])
 @pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
-def test_cat(suffix):
-    with Case(DATADIR / 'run' / 'cat' / f'grevling{suffix}') as case:
-        case.clear_cache()
-        assert case.run()
-        case.collect()
+def test_cat(runner, suffix):
+    path = DATADIR / 'run' / 'cat' / f'grevling{suffix}'
+    runner(path)
+
+    with Case(path) as case:
         data = case.load_dataframe()
 
     check_df(
@@ -78,15 +107,18 @@ def test_cat(suffix):
     )
 
 
+@pytest.mark.parametrize('runner', [api_run(post=[]), cli_run(commands=['run'])])
 @pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
-def test_files(suffix):
-    with Case(DATADIR / 'run' / 'files' / f'grevling{suffix}') as case:
-        case.clear_cache()
-        assert case.run()
+def test_files(runner, suffix):
+    path = DATADIR / 'run' / 'files' / f'grevling{suffix}'
+    runner(path)
+
+    with Case(path) as case:
+        storagepath = case.storagepath
 
     for a in range(1, 4):
         for b in 'abc':
-            path = case.storagepath / f'{a}-{b}'
+            path = storagepath / f'{a}-{b}'
             assert read_file(path / 'template.txt') == f'a={a} b={b} c={2*a-1}\n'
             assert read_file(path / 'other-template.txt') == f'a={a} b={b} c={2*a-1}\n'
             assert (
@@ -98,12 +130,13 @@ def test_files(suffix):
             assert read_file(path / 'some' / 'deep' / 'directory' / 'empty3.dat') == ''
 
 
+@pytest.mark.parametrize('runner', [api_run(), cli_run()])
 @pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
-def test_capture(suffix):
-    with Case(DATADIR / 'run' / 'capture' / f'grevling{suffix}') as case:
-        case.clear_cache()
-        assert case.run()
-        case.collect()
+def test_capture(runner, suffix):
+    path = DATADIR / 'run' / 'capture' / f'grevling{suffix}'
+    runner(path)
+
+    with Case(path) as case:
         data = case.load_dataframe()
 
     check_df(
@@ -179,13 +212,13 @@ def test_capture(suffix):
     )
 
 
-@pytest.mark.parametrize('suffix', ['.gold'])
-def test_double_capture(suffix):
-    with Case(DATADIR / 'run' / 'capture' / f'grevling{suffix}') as case:
-        case.clear_cache()
-        assert case.run()
-        case.collect()
-        case.capture()
+@pytest.mark.parametrize('runner', [api_run(post=['collect', 'capture']), cli_run(commands=['run', 'collect', 'capture'])])
+@pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
+def test_double_capture(runner, suffix):
+    path = DATADIR / 'run' / 'capture' / f'grevling{suffix}'
+    runner(path)
+
+    with Case(path) as case:
         data = case.load_dataframe()
 
     check_df(
@@ -261,12 +294,13 @@ def test_double_capture(suffix):
     )
 
 
+@pytest.mark.parametrize('runner', [api_run(), cli_run()])
 @pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
-def test_failing(suffix):
-    with Case(DATADIR / 'run' / 'failing' / f'grevling{suffix}') as case:
-        case.clear_cache()
-        assert case.run()
-        case.collect()
+def test_failing(runner, suffix):
+    path = DATADIR / 'run' / 'failing' / f'grevling{suffix}'
+    runner(path)
+
+    with Case(path) as case:
         data = case.load_dataframe()
 
     check_df(
@@ -285,13 +319,15 @@ def test_failing(suffix):
     )
 
 
+@pytest.mark.parametrize('runner', [api_run(post=[]), cli_run(commands=['run'])])
 @pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
-def test_stdout(suffix):
-    with Case(DATADIR / 'run' / 'stdout' / f'grevling{suffix}') as case:
-        case.clear_cache()
-        assert case.run()
+def test_stdout(runner, suffix):
+    path = DATADIR / 'run' / 'stdout' / f'grevling{suffix}'
+    runner(path)
 
-    path = case.storagepath
+    with Case(path) as case:
+        path = case.storagepath
+
     assert read_file(path / 'out-0' / '.grevling' / 'good.stdout') == 'stdout 0\n'
     assert read_file(path / 'out-0' / '.grevling' / 'good.stderr') == 'stderr 0\n'
     assert read_file(path / 'out-0' / '.grevling' / 'bad.stdout') == 'stdout 0\n'
@@ -305,11 +341,10 @@ def test_stdout(suffix):
 @pytest.mark.skipif(
     os.name == 'nt' or shutil.which('docker') is None, reason="requires docker and *nix"
 )
+@pytest.mark.parametrize('runner', [api_run(post=[]), cli_run(commands=['run'])])
 @pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
-def test_docker(suffix):
-    with Case(DATADIR / 'run' / 'docker' / f'grevling{suffix}') as case:
-        case.clear_cache()
-        assert case.run()
+def test_docker(runner, suffix):
+    runner(DATADIR / 'run' / 'docker' / f'grevling{suffix}')
 
 
 @pytest.mark.skipif(shutil.which('sleep') is None, reason="requires sleep")

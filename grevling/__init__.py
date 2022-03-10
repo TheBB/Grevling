@@ -8,10 +8,9 @@ from pathlib import Path
 import pydoc
 import shutil
 
-from typing import List, Iterable, Optional, Any
+from typing import List, Iterable, Optional, Any, Dict
 
 from fasteners import InterProcessLock
-import goldpy as gold
 import pandas as pd
 
 from grevling.typing import TypeManager
@@ -19,7 +18,7 @@ from grevling.typing import TypeManager
 from .api import Status
 from .plotting import Plot
 from .render import render
-from .schema import load_and_validate
+from .schema import load
 from .capture import CaptureCollection
 from .context import ContextProvider
 from .parameters import ParameterSpace
@@ -102,13 +101,7 @@ class Case:
                 raise ValueError("Could not find a valid grevling configuration")
             if configpath is not None and not configpath.is_file():
                 raise FileNotFoundError("Found a grevling configuration, but it's not a file")
-            if configpath.suffix == '.yaml':
-                with open(configpath, mode='r') as f:
-                    casedata = f.read()
-                with open(configpath, mode='r') as f:
-                    casedata = load_and_validate(casedata, configpath)
-            else:
-                casedata = gold.evaluate_file(str(configpath))
+            casedata = load(configpath)
 
         self.casedata = casedata
         self.context_mgr = ContextProvider.load(casedata)
@@ -191,86 +184,6 @@ class Case:
 
     def save_dataframe(self, df: pd.DataFrame):
         df.to_parquet(self.dataframepath, engine='pyarrow', index=True)
-
-    def _check_decide_diff(
-        self, diff: List[str], prev_file: Path, interactive: bool = True
-    ) -> bool:
-        decision = None
-        decisions = ['exit', 'diff', 'new-delete', 'new-keep', 'old']
-        if interactive:
-            if os.name == 'nt':
-                from pyreadline import Readline
-
-                readline = Readline()
-            else:
-                import readline
-            readline.set_completer(util.completer(decisions))
-            readline.parse_and_bind('tab: complete')
-            util.log.warning(
-                "Warning: Grevlingfile has changed and data have already been stored"
-            )
-            util.log.warning("Pick an option:")
-            util.log.warning("  exit - quit grevling and fix the problem manually")
-            util.log.warning("  diff - view a diff between old and new")
-            util.log.warning(
-                "  new-delete - accept new version and delete existing data (significant changes made)"
-            )
-            util.log.warning(
-                "  new-keep - accept new version and keep existing data (no significant changes made)"
-            )
-            util.log.warning(
-                "  old - accept old version and exit (re-run grevling to load the changed grevlingfile)"
-            )
-            while decision is None:
-                decision = input('>>> ').strip().lower()
-                if decision not in decisions:
-                    decision = None
-                    continue
-                if decision == 'diff':
-                    pydoc.pager(''.join(diff))
-                    decision = None
-                if decision == 'exit':
-                    return False
-                if decision == 'new-delete':
-                    self.clear_cache()
-                    break
-                if decision == 'new-keep':
-                    break
-                if decision == 'old':
-                    shutil.copyfile(prev_file, self.yamlpath)
-                    return False
-        else:
-            util.log.error(
-                "Error: Grevlingfile has changed and data have already been stored"
-            )
-            util.log.error(
-                "Try running 'grevling check' for more information, or delete .grevlingdata if you're sure"
-            )
-            return False
-        return True
-
-    def check(self, interactive=True) -> bool:
-        prev_file = self.storagepath / 'grevling.yaml'
-        if prev_file.exists():
-            with open(self.yamlpath, 'r') as f:
-                new_lines = f.readlines()
-            with open(prev_file, 'r') as f:
-                old_lines = f.readlines()
-            diff = list(Differ().compare(old_lines, new_lines))
-            if not all(line.startswith('  ') for line in diff) and self.has_data():
-                if not self._check_decide_diff(
-                    diff, prev_file, interactive=interactive
-                ):
-                    return False
-
-        shutil.copyfile(self.yamlpath, prev_file)
-
-        if interactive:
-            util.log.info("Derived types:")
-            for key, value in self._types.items():
-                util.log.info(f"  {key}: {_typename(value)}")
-
-        return True
 
     def create_instances(self) -> Iterable[Instance]:
         for i, ctx in enumerate(self.context_mgr.fullspace()):

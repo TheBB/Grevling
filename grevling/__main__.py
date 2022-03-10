@@ -78,22 +78,14 @@ def main(verbosity: str):
     util.initialize_logging(level=verbosity, show_time=False)
 
 
-@main.command()
-@click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
-def check(case: Case):
-    case.check(interactive=True)
-
-
 @main.command('run-all')
 @click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
 @click.option('-j', 'nprocs', default=1, type=int)
 @workflows
 def run_all(case: Case, workflow: str, nprocs: int):
-    if not case.check(interactive=False):
-        sys.exit(1)
     case.clear_cache()
     with api.Workflow.get_workflow(workflow)(nprocs) as w:
-        success = w.pipeline().run(case.create_instances())
+        success = w.pipeline(case).run(case.create_instances())
     if not success:
         util.log.error("An error happened, aborting")
         sys.exit(1)
@@ -106,11 +98,9 @@ def run_all(case: Case, workflow: str, nprocs: int):
 @click.option('-j', 'nprocs', default=1, type=int)
 @workflows
 def run(case: Case, workflow: str, nprocs: int):
-    if not case.check(interactive=False):
-        sys.exit(1)
     case.clear_cache()
     with api.Workflow.get_workflow(workflow)(nprocs) as w:
-        if not w.pipeline().run(case.create_instances()):
+        if not w.pipeline(case).run(case.create_instances()):
             sys.exit(1)
 
 
@@ -127,23 +117,19 @@ def run_with(case: Case, target: str, workflow: str, context: List[str]):
         parsed_context[k] = evaluator.eval(v)
     instance = case.create_instance(parsed_context, logdir=target)
     with api.Workflow.get_workflow(workflow)() as w:
-        if not w.pipeline().run([instance]):
+        if not w.pipeline(case).run([instance]):
             sys.exit(1)
 
 
 @main.command('capture')
 @click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
 def capture(case: Case):
-    if not case.check(interactive=False):
-        sys.exit(1)
     case.capture()
 
 
 @main.command('collect')
 @click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
 def collect(case: Case):
-    if not case.check(interactive=False):
-        sys.exit(1)
     case.clear_dataframe()
     case.collect()
 
@@ -151,8 +137,6 @@ def collect(case: Case):
 @main.command('plot')
 @click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
 def plot(case: Case):
-    if not case.check(interactive=False):
-        sys.exit(1)
     case.plot()
 
 

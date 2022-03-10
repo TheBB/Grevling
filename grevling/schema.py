@@ -4,6 +4,7 @@ import re
 
 from typing import Tuple, Dict
 
+import goldpy as gold
 from strictyaml import (
     ScalarValidator,
     Optional,
@@ -289,3 +290,10 @@ CASE_SCHEMA = Map(
 def load_and_validate(text: str, path: Path = Path('')) -> Dict:
     casedata = generic_load(text, schema=CASE_SCHEMA, label=path, allow_flow_style=True)
     return casedata.data
+
+
+def load(path: Path) -> Dict:
+    if path.suffix == '.yaml':
+        with open(path, 'r') as f:
+            return load_and_validate(f.read(), path)
+    return gold.evaluate_file(str(path))
