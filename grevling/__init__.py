@@ -169,7 +169,11 @@ class Case:
         self.__enter__()
 
     def clear_dataframe(self):
-        self.dataframepath.unlink(missing_ok=True)
+        # TODO: Py3.8: use missing_ok=True
+        try:
+            self.dataframepath.unlink()
+        except FileNotFoundError:
+            pass
         self.state.has_collected = False
 
     def load_dataframe(self) -> pd.DataFram:
