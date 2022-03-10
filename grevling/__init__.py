@@ -47,7 +47,12 @@ class Case:
     lock: Optional[InterProcessLock]
     state: CaseState
 
-    configpath: Path
+    # Configs may be provided in pure data, in which case they don't correspond to a file
+    configpath: Optional[Path]
+
+    # Raw structured data used to initialize this case
+    casedata: Dict
+
     sourcepath: Path
     storagepath: Path
     dataframepath: Path
@@ -63,20 +68,25 @@ class Case:
 
     def __init__(
         self,
-        configpath: api.PathStr = '.',
+        localpath: api.PathStr = '.',
         storagepath: Optional[Path] = None,
-        yamldata: Optional[str] = None,
+        casedata: Optional[dict] = None,
     ):
-        if isinstance(configpath, str):
-            yamlpath = Path(configpath)
-        if configpath.is_dir():
+        configpath: Optional[Path] = None
+
+        if isinstance(localpath, str):
+            localpath = Path(localpath)
+        if localpath.is_file():
+            configpath = localpath
+            localpath = configpath.parent
+        elif localpath.is_dir() and casedata is None:
             for candidate in ['grevling.gold', 'grevling.yaml', 'badger.yaml']:
-                if (configpath / candidate).exists():
-                    configpath = configpath / candidate
+                if (localpath / candidate).exists():
+                    configpath = localpath / candidate
                     break
-        assert configpath.is_file()
         self.configpath = configpath
-        self.sourcepath = configpath.parent
+
+        self.sourcepath = localpath
         self.local_space = LocalWorkspace(self.sourcepath, 'SRC')
 
         if storagepath is None:
@@ -87,14 +97,20 @@ class Case:
 
         self.dataframepath = storagepath / 'dataframe.parquet'
 
-        if configpath.suffix == '.yaml':
-            with open(configpath, mode='r') as f:
-                yamldata = f.read()
-            with open(configpath, mode='r') as f:
-                casedata = load_and_validate(yamldata, configpath)
-        else:
-            casedata = gold.evaluate_file(str(configpath))
+        if casedata is None:
+            if configpath is None:
+                raise ValueError("Could not find a valid grevling configuration")
+            if configpath is not None and not configpath.is_file():
+                raise FileNotFoundError("Found a grevling configuration, but it's not a file")
+            if configpath.suffix == '.yaml':
+                with open(configpath, mode='r') as f:
+                    casedata = f.read()
+                with open(configpath, mode='r') as f:
+                    casedata = load_and_validate(casedata, configpath)
+            else:
+                casedata = gold.evaluate_file(str(configpath))
 
+        self.casedata = casedata
         self.context_mgr = ContextProvider.load(casedata)
 
         # Read file mappings
@@ -313,12 +329,12 @@ class Case:
         with LocalWorkflow(nprocs=nprocs) as workflow:
             return workflow.pipeline(self).run(self.create_instances())
 
-    # Deprecated methods
-
     def run_single(self, namespace: api.Context, logdir: Path, index: int = 0):
         instance = self.create_instance(namespace, logdir=logdir, index=index)
         with LocalWorkflow() as workflow:
-            workflow.pipeline().run([instance])
+            workflow.pipeline(self).run([instance])
+
+    # Deprecated methods
 
     @util.deprecated("use Case.instances() instead", name='Case.iter_instancedirs')
     def iter_instancedirs(self) -> Iterable[api.Workspace]:
