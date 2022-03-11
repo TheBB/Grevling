@@ -50,7 +50,20 @@ async def run(
     else:
         proc = await asyncio.create_subprocess_exec(*command, **kwargs)
 
-    stdout, stderr = await proc.communicate()
+    assert proc.stdout is not None
+
+    stdout = b''
+    with util.log.with_context('stdout'):
+        while True:
+            line = await proc.stdout.readline()
+            if not line:
+                break
+            stdout += line
+            line = line.decode().rstrip()
+            util.log.debug(line)
+
+    remaining_stdout, stderr = await proc.communicate()
+    stdout += remaining_stdout
     return Result(stdout, stderr, proc.returncode)
 
 
