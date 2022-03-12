@@ -10,8 +10,6 @@ from typing import List
 
 from asteval import Interpreter
 import click
-from ruamel.yaml.parser import ParserError as YAMLParserError
-from strictyaml import YAMLValidationError
 
 import grevling
 from . import Case, util, api
@@ -49,7 +47,7 @@ class CaseType(click.Path):
             raise click.FileError(str(casefile), hint='is not a file')
         try:
             case = Case(path)
-        except (YAMLValidationError, YAMLParserError) as error:
+        except Exception as error:
             raise CustomClickException(str(error))
 
         case = case.__enter__()

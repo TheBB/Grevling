@@ -18,7 +18,7 @@ from grevling.typing import TypeManager
 from .api import Status
 from .plotting import Plot
 from .render import render
-from .schema import load
+from .schema import load, validate
 from .capture import CaptureCollection
 from .context import ContextProvider
 from .parameters import ParameterSpace
@@ -102,6 +102,8 @@ class Case:
             if configpath is not None and not configpath.is_file():
                 raise FileNotFoundError("Found a grevling configuration, but it's not a file")
             casedata = load(configpath)
+        else:
+            validate(casedata)
 
         self.casedata = casedata
         self.context_mgr = ContextProvider.load(casedata)
