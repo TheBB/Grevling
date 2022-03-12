@@ -7,7 +7,7 @@ site.ENABLE_USER_SITE = '--user' in sys.argv[1:]
 
 setup(
     name='Grevling',
-    version='1.2.1',
+    version='2.0.0',
     description='A batch runner tool',
     author='Eivind Fonn',
     author_email='eivind.fonn@sintef.no',
@@ -33,7 +33,7 @@ setup(
     ],
     extras_require={
         'testing': ['pytest'],
-        'deploy': ['twine', 'cibuildwheel==1.2.1'],
+        'deploy': ['twine', 'cibuildwheel==2.0.0'],
         'matplotlib': ['matplotlib'],
         'plotly': ['plotly>=4'],
     },
