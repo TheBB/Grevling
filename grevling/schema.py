@@ -5,295 +5,190 @@ import re
 from typing import Tuple, Dict
 
 import goldpy as gold
-from strictyaml import (
-    ScalarValidator,
-    Optional,
-    Any,
-    Bool,
-    Int,
-    Float,
-    Str,
-    Map,
-    NullNone,
-    MapPattern,
-    Seq,
-    FixedSeq,
-    Validator,
-    OrValidator,
-    YAMLValidationError,
-)
-
-from strictyaml.parser import generic_load
+import jsonschema
+import yaml
 
 from . import util
 
 
-class Deprecated(Validator):
 
-    _message: str
-    _inner: Validator
+_null = { 'type': 'null' }
+_scalar = { 'type': 'number' }
+_integer = { 'type': 'integer' }
+_string = { 'type': 'string' }
+_bool = { 'type': 'boolean' }
 
-    def __init__(self, message: str, inner: Validator):
-        self._message = message
-        self._inner = inner
-
-    def __call__(self, *args, **kwargs):
-        util.log.warning(self._message)
-        return self._inner(*args, **kwargs)
-
-
-class Literal(ScalarValidator):
-    """Validator that only matches a literal string."""
-
-    _expected: str
-
-    def __init__(self, expected: str):
-        super().__init__()
-        self._expected = expected
-
-    def validate_scalar(self, chunk):
-        if self._expected != chunk.contents:
-            chunk.expecting_but_found(
-                f"when expecting {self._expected}", "found non-matching string"
-            )
-        return chunk.contents
-
-
-class NullNone(ScalarValidator):
-    def validate_scalar(self, chunk):
-        val = chunk.contents
-        if val.lower() != "null":
-            chunk.expecting_but_found(
-                "when expecting a 'null', got '{}' instead.".format(val)
-            )
-        else:
-            return self.empty(chunk)
-
-    def empty(self, chunk):
-        return None
-
-
-def Choice(*args):
-    """Validator that matches a choice of several literal strings."""
-    return reduce(OrValidator, map(Literal, args))
-
-
-def Scalar():
-    """Validator that matches integers and floats."""
-    return Int() | Float()
-
-
-def FileMapping(glob_allowed: bool):
-    """Validator that matches a file mapping: a string or a mapping with
-    source and target.
-    """
-    if glob_allowed:
-        return Str() | Map(
-            {
-                'source': Str(),
-                Optional('target'): Str(),
-                Optional('mode'): Choice('simple', 'glob'),
-            }
-        )
-
-    return Str() | Map(
-        {
-            'source': Str(),
-            Optional('target'): Str(),
-        }
-    )
-
-
-def Regex():
-    """Validator that matches a regex: a mapping with pattern and optional
-    mode.
-    """
-    return Map(
-        {
-            'pattern': Str(),
-            Optional('mode'): Choice('first', 'last', 'all'),
-        }
-    )
-
-
-def NumberCapture():
-    """Validator that matches a predefined integer or float capture."""
-    return Map(
-        {
-            'type': Choice('integer', 'float'),
-            'name': Str(),
-            'prefix': Str(),
-            Optional('skip-words'): Int(),
-            Optional('flexible-prefix'): Bool(),
-            Optional('mode'): Choice('first', 'last', 'all'),
-        }
-    )
-
-
-def Capture():
-    """Validator that matches any of the valid capture specs."""
-    return First(
-        "capture",
-        Str(),
-        Regex(),
-        NumberCapture(),
-    )
-
-
-def Style():
-    """Validator that matches a plot style description."""
-    return Str() | Seq(Str())
-
-
-def PlotMode():
-    """Validator that matches a parameter mode for plotting."""
-    return First(
-        "plot mode",
-        Choice('fixed', 'variate', 'category', 'ignore', 'mean'),
-        Map({'mode': Literal('category'), 'style': Choice('color', 'line', 'marker')}),
-        Map({'mode': Literal('ignore'), 'value': Scalar() | Str()}),
-    )
-
-
-def Type():
-    """Validator that parses a type description."""
-    return Choice('int', 'integer', 'str', 'string', 'float', 'floating', 'double')
-
-
-class First(Validator):
-    """Validator that validates against a sequence of sub-validators,
-    picking the first that matches.
-    """
-
-    _validators: Tuple[Validator]
-
-    def __init__(self, name: str, *validators: Validator):
-        self._name = name
-        self._validators = validators
-
-    def __call__(self, chunk):
-        for validator in self._validators:
-            try:
-                result = validator(chunk)
-                result._selected_validator = validator
-                result._validator = self
-                return result
-            except YAMLValidationError as e:
-                pass
-        else:
-            raise YAMLValidationError(
-                f"failed to find a valid schema for {self._name}",
-                "found invalid input",
-                chunk,
-            )
-
-
-
-CASE_SCHEMA = Map(
-    {
-        Optional('containers'): MapPattern(Str(), Str() | Seq(Str())),
-        Optional('parameters'): MapPattern(
-            Str(),
-            First(
-                "parameter",
-                Seq(Scalar()),
-                Seq(Str()),
-                Map(
-                    {
-                        'type': Literal('uniform'),
-                        'interval': FixedSeq([Scalar(), Scalar()]),
-                        'num': Int(),
-                    }
-                ),
-                Map(
-                    {
-                        'type': Literal('graded'),
-                        'interval': FixedSeq([Scalar(), Scalar()]),
-                        'num': Int(),
-                        'grading': Scalar(),
-                    }
-                ),
-            ),
-        ),
-        Optional('evaluate'): MapPattern(Str(), Str()),
-        Optional('constants'): MapPattern(
-            Str(), NullNone() | Int() | Float() | Bool() | Str()
-        ),
-        Optional('where'): Str() | Seq(Str()),
-        Optional('templates'): Seq(FileMapping(glob_allowed=True)),
-        Optional('prefiles'): Seq(FileMapping(glob_allowed=True)),
-        Optional('postfiles'): Seq(FileMapping(glob_allowed=True)),
-        Optional('script'): Seq(
-            First(
-                "script command",
-                Str(),
-                Seq(Str()),
-                Map(
-                    {
-                        Optional('command'): Str() | Seq(Str()),
-                        Optional('name'): Str(),
-                        Optional('capture'): Capture() | Seq(Capture()),
-                        Optional('capture-output'): Deprecated(
-                            "capture-output is deprecated (now always on)", Bool()
-                        ),
-                        Optional('capture-walltime'): Deprecated(
-                            "capture-walltime is deprecated (now always on)", Bool()
-                        ),
-                        Optional('capture-walltime'): Bool(),
-                        Optional('retry-on-fail'): Bool(),
-                        Optional('env'): MapPattern(Str(), Str()),
-                        Optional('container'): Str(),
-                        Optional('allow-failure'): Bool(),
-                    }
-                ),
-            )
-        ),
-        Optional('types'): MapPattern(Str(), Type()),
-        Optional('plots'): Seq(
-            Map(
-                {
-                    'filename': Str(),
-                    'format': Str() | Seq(Str()),
-                    'yaxis': Str() | Seq(Str()),
-                    Optional('parameters'): MapPattern(Str(), PlotMode()),
-                    Optional('xaxis'): Str(),
-                    Optional('xlim'): FixedSeq([Scalar(), Scalar()]),
-                    Optional('ylim'): FixedSeq([Scalar(), Scalar()]),
-                    Optional('type'): Choice('scatter', 'line'),
-                    Optional('legend'): Str(),
-                    Optional('xlabel'): Str(),
-                    Optional('ylabel'): Str(),
-                    Optional('xmode'): Choice('linear', 'log'),
-                    Optional('ymode'): Choice('linear', 'log'),
-                    Optional('title'): Str(),
-                    Optional('grid'): Bool(),
-                    Optional('style'): Map(
-                        {
-                            Optional('color'): Style(),
-                            Optional('line'): Style(),
-                            Optional('marker'): Style(),
-                        }
-                    ),
-                }
-            )
-        ),
-        Optional('settings'): Map(
-            {
-                Optional('logdir'): Str(),
-                Optional('ignore-missing-files'): Bool(),
-            }
-        ),
+def _map(x):
+    return {
+        'type': 'object',
+        'patternProperties': { '.*': x },
     }
+
+def _list(x):
+    return {
+        'type': 'array',
+        'items': x,
+    }
+
+def _or(*x):
+    return { 'anyOf': list(x) }
+
+def _lit(x):
+    return { 'const': x }
+
+def _pair(x):
+    return {
+        'type': 'array',
+        'items': x,
+        'minItems': 2,
+        'maxItems': 2,
+    }
+
+def _enum(*x):
+    return { 'enum': list(x) }
+
+def _obj(required=[], **kwargs):
+    kwargs = {
+        k.replace('_', '-'): v
+        for k, v in kwargs.items()
+    }
+    if required is True:
+        required = list(kwargs)
+    return {
+        'type': 'object',
+        'required': required,
+        'additionalProperties': False,
+        'properties': kwargs,
+    }
+
+
+_capture = _or(
+    _string,
+    _obj(
+        required = ['pattern'],
+        pattern = _string,
+        mode = _enum('first', 'last', 'all'),
+    ),
+    _obj(
+        required = ['type', 'name', 'prefix'],
+        type = _enum('integer', 'float'),
+        name = _string,
+        prefix = _string,
+        skip_words = _integer,
+        flexible_prefix = _bool,
+        mode = _enum('first', 'last', 'all'),
+    )
 )
 
 
-def load_and_validate(text: str, path: Path = Path('')) -> Dict:
-    casedata = generic_load(text, schema=CASE_SCHEMA, label=path, allow_flow_style=True)
-    return casedata.data
+_filemap = _list(_or(
+    _string,
+    _obj(
+        required = ['source'],
+        source = _string,
+        target = _string,
+        mode = _enum('simple', 'glob'),
+    ),
+))
+
+
+_schema = {
+    'type': 'object',
+    'additionalProperties': False,
+    'required': [],
+    'properties': {
+        'containers': _map(_or(_string, _list(_string))),
+        'parameters': _map(_or(
+            _list(_scalar),
+            _list(_string),
+            _obj(
+                required = True,
+                type = _lit('uniform'),
+                interval = _pair(_scalar),
+                num = _scalar,
+            ),
+            _obj(
+                required = True,
+                type = _lit('graded'),
+                interval = _pair(_scalar),
+                num = _scalar,
+                grading = _scalar,
+            ),
+        )),
+        'evaluate': _map(_string),
+        'constants': _map(_or(_string, _null, _scalar, _bool)),
+        'where': _or(_string, _list(_string)),
+        'templates': _filemap,
+        'prefiles': _filemap,
+        'postfiles': _filemap,
+        'script': _list(_or(
+            _string,
+            _list(_string),
+            _obj(
+                command = _or(_string, _list(_string)),
+                name = _string,
+                capture = _or(_capture, _list(_capture)),
+                capture_output = _bool,
+                capture_walltime = _bool,
+                retry_on_fail = _bool,
+                env = _map(_string),
+                container = _string,
+                allow_failure = _bool,
+            )
+        )),
+        'types': _map(_string),
+        'plots': _list(_obj(
+            required = ['filename', 'format', 'yaxis'],
+            filename = _string,
+            format = _or(_string, _list(_string)),
+            parameters = _map(_or(
+                _enum('fixed', 'variate', 'category', 'ignore', 'mean'),
+                _obj(
+                    required = ['mode', 'style'],
+                    mode = _lit('category'),
+                    style = _enum('color', 'line', 'marker'),
+                ),
+                _obj(
+                    required = ['mode', 'value'],
+                    mode = _lit('ignore'),
+                    value = _or(_scalar, _string),
+                ),
+            )),
+            yaxis = _or(_string, _list(_string)),
+            xaxis = _string,
+            ylim = _pair(_scalar),
+            xlim = _pair(_scalar),
+            type = _enum('scatter', 'line'),
+            legend = _string,
+            xlabel = _string,
+            ylabel = _string,
+            xmode = _enum('linear', 'log'),
+            ymode = _enum('linear', 'log'),
+            title = _string,
+            grid = _bool,
+            style = _obj(
+                color = _or(_string, _list(_string)),
+                line = _or(_string, _list(_string)),
+                marker = _or(_string, _list(_string)),
+            ),
+        )),
+        'settings': _obj(
+            logdir = _string,
+            ignore_missing_files = _bool,
+        ),
+    },
+}
+
+
+def validate(data: Dict):
+    jsonschema.validate(data, _schema)
 
 
 def load(path: Path) -> Dict:
     if path.suffix == '.yaml':
         with open(path, 'r') as f:
-            return load_and_validate(f.read(), path)
-    return gold.evaluate_file(str(path))
+            data = yaml.load(f, Loader=yaml.CLoader)
+    else:
+        data = gold.evaluate_file(str(path))
+    validate(data)
+    return data
