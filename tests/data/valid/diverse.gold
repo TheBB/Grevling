@@ -1,19 +1,12 @@
-{
+let {linspace, gradspace} = import("grevling")
+
+in {
     parameters: {
         alpha: [1, 2],
         bravo: [1.0, 2.0],
         charlie: [3, 4.5],
-        delta: {
-            type: "uniform",
-            interval: [0.0, 1.0],
-            num: 5,
-        },
-        echo: {
-            type: "graded",
-            interval: [0.0, 1.0],
-            num: 5,
-            grading: 1.2
-        },
+        delta: linspace(0.0, 1.0, npts: 5),
+        echo: gradspace(0.0, 1.0, npts: 5, grading: 1.2),
         foxtrot: ["a", "b", "c"],
     },
     evaluate: {

@@ -6,6 +6,7 @@ from typing import Tuple, Dict
 
 import goldpy as gold
 import jsonschema
+import jsonschema.validators
 import yaml
 
 from . import util
@@ -17,6 +18,7 @@ _scalar = { 'type': 'number' }
 _integer = { 'type': 'integer' }
 _string = { 'type': 'string' }
 _bool = { 'type': 'boolean' }
+_callable = { 'type': 'callable' }
 
 def _map(x):
     return {
@@ -173,15 +175,29 @@ _schema = {
             ),
         )),
         'settings': _obj(
-            logdir = _string,
+            logdir = _or(_callable, _string),
             ignore_missing_files = _bool,
         ),
     },
 }
 
 
+is_callable = lambda _, fn: callable(fn)
+typechecker = jsonschema.Draft202012Validator.TYPE_CHECKER.redefine('callable', is_callable)
+CustomValidator = jsonschema.validators.extend(jsonschema.Draft202012Validator, type_checker=typechecker)
+CustomValidator.META_SCHEMA = {}
+
+
 def validate(data: Dict):
-    jsonschema.validate(data, _schema)
+    jsonschema.validate(data, _schema, cls=CustomValidator)
+
+
+class LibFinder(gold.LibFinder):
+
+    def find(self, path: str):
+        if path != 'grevling':
+            return None
+        return gold.evaluate_file(str(Path(__file__).parent / 'grevling.gold'))
 
 
 def load(path: Path) -> Dict:
@@ -189,6 +205,9 @@ def load(path: Path) -> Dict:
         with open(path, 'r') as f:
             data = yaml.load(f, Loader=yaml.CLoader)
     else:
-        data = gold.evaluate_file(str(path))
+        ctx = gold.EvaluationContext()
+        libfinder = LibFinder()
+        ctx.append_libfinder(libfinder)
+        data = gold.evaluate_file(ctx, str(path))
     validate(data)
     return data
