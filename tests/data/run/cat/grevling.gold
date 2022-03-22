@@ -28,6 +28,6 @@
         c: "float",
     },
     settings: {
-        logdir: "\${alpha}-\${bravo}",
+        logdir: ({alpha, bravo}) => "${alpha}-${bravo}",
     },
 }

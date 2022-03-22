@@ -1,6 +1,6 @@
 import shlex
 
-from typing import Optional
+from typing import Optional, Callable, Union
 
 from mako.template import Template
 
@@ -24,7 +24,10 @@ QUOTERS = {
 }
 
 
-def render(text: str, context: api.Context, mode: Optional[str] = None) -> str:
+def render(text: Union[Callable, str], context: api.Context, mode: Optional[str] = None) -> str:
+    if callable(text):
+        return context(text)
+
     filters = ['str']
     imports = [
         'from numpy import sin, cos',

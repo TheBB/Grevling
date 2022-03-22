@@ -134,6 +134,9 @@ class Context(BaseModel):
     def __setitem__(self, key, value):
         setattr(self, key, value)
 
+    def __call__(self, fn):
+        return fn(self.__dict__)
+
     def keys(self):
         return self.__dict__.keys()
 

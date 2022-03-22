@@ -12,6 +12,6 @@
         },
     ],
     settings: {
-        logdir: "out-\${retcode}",
+        logdir: ({retcode}) => "out-${retcode}",
     },
 }

@@ -21,6 +21,6 @@
         { source: "some/deep/directory/empty*.dat", mode: "glob" },
     ],
     settings: {
-        logdir: "\${alpha}-\${bravo}",
+        logdir: ({alpha, bravo}) => "${alpha}-${bravo}",
     },
 }
