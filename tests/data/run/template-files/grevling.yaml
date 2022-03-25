@@ -1,0 +1,13 @@
+parameters:
+  bravo: [a, b, c]
+prefiles:
+  - source: file-${bravo}.txt
+    target: file.txt
+templates:
+  - source: file-${bravo}.txt
+    target: templated-${bravo}.txt
+postfiles:
+  - file.txt
+  - templated-${bravo}.txt
+settings:
+  logdir: ${bravo}

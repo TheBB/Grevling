@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC, abstractclassmethod, abstractmethod
 from enum import Enum
 from fnmatch import fnmatch
 from io import IOBase
 from pathlib import Path
 
-from typing import ContextManager, Iterable, Union, Optional, TYPE_CHECKING
+from typing import Any, ContextManager, Generic, Iterable, Type, TypeVar, Union, Optional, TYPE_CHECKING
 
 from pydantic import BaseModel
 
@@ -18,6 +18,24 @@ if TYPE_CHECKING:
 
 
 PathStr = Union[Path, str]
+
+
+T = TypeVar('T', bound='SpecConstructible')
+
+class SpecConstructible(ABC):
+
+    @abstractclassmethod
+    def load(cls: Type[T], data: Any, **kwargs) -> T:
+        ...
+
+
+T = TypeVar('T')
+
+class Renderable(ABC, Generic[T]):
+
+    @abstractmethod
+    def render(self, ctx: Context) -> T:
+        ...
 
 
 class Status(Enum):
@@ -135,7 +153,7 @@ class Context(BaseModel):
         setattr(self, key, value)
 
     def __call__(self, fn):
-        return fn(self.__dict__)
+        return fn(**self.__dict__)
 
     def keys(self):
         return self.__dict__.keys()

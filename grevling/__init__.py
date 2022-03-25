@@ -18,11 +18,11 @@ from grevling.typing import TypeManager
 from .api import Status
 from .plotting import Plot
 from .render import render
-from .schema import load, validate
+from .schema import load, validate, normalize
 from .capture import CaptureCollection
 from .context import ContextProvider
 from .parameters import ParameterSpace
-from .filemap import FileMap
+from .filemap import FileMapTemplate, FileMap
 from .script import Script, ScriptTemplate
 from .typing import PersistentObject
 from .workflow.local import LocalWorkspaceCollection, LocalWorkspace, LocalWorkflow
@@ -58,8 +58,8 @@ class Case:
 
     context_mgr: ContextProvider
 
-    premap: FileMap
-    postmap: FileMap
+    premap: api.Renderable[FileMap]
+    postmap: api.Renderable[FileMap]
     script: ScriptTemplate
     _plots: List[Plot]
 
@@ -104,15 +104,14 @@ class Case:
             casedata = load(configpath)
         else:
             validate(casedata)
+            casedata = normalize(casedata)
 
         self.casedata = casedata
         self.context_mgr = ContextProvider.load(casedata)
 
         # Read file mappings
-        self.premap = FileMap.load(
-            casedata.get('prefiles', []), casedata.get('templates', [])
-        )
-        self.postmap = FileMap.load(casedata.get('postfiles', []))
+        self.premap = FileMapTemplate(casedata.get('prefiles', []))
+        self.postmap = FileMapTemplate(casedata.get('postfiles', []))
 
         # Read commands
         self.script = ScriptTemplate.load(
@@ -375,9 +374,9 @@ class Instance:
 
         src = self._case.local_space
         util.log.debug(f"Using SRC='{src}', WRK='{self.remote}'")
-        self._case.premap.copy(
-            self.context, src, self.remote, ignore_missing=self._case._ignore_missing
-        )
+
+        premap = self._case.premap.render(self.context)
+        premap.copy(self.context, src, self.remote, ignore_missing=self._case._ignore_missing)
 
         self.status = Status.Prepared
         self._case.state.running = True
@@ -390,16 +389,13 @@ class Instance:
         collector = self.types.capture_model()
         collector.update(self.context)
 
-        bookmap = FileMap.load(
-            files=[{'source': '*', 'mode': 'glob'}],
-        )
+        bookmap = FileMap.create(files=[{'source': '*', 'mode': 'glob'}])
         bookmap.copy(self.context, self.remote_book, self.local_book)
         collector.collect_from_info(self.local_book)
 
         ignore_missing = self._case._ignore_missing or not collector['g_success']
-        self._case.postmap.copy(
-            self.context, self.remote, self.local, ignore_missing=ignore_missing
-        )
+        postmap = self._case.postmap.render(self.context)
+        postmap.copy(self.context, self.remote, self.local, ignore_missing=ignore_missing)
 
         self._case.script.capture(collector, self.local_book)
         collector = collector.validate()

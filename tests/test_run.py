@@ -130,6 +130,21 @@ def test_files(runner, suffix):
             assert read_file(path / 'some' / 'deep' / 'directory' / 'empty3.dat') == ''
 
 
+@pytest.mark.parametrize('runner', [api_run(post=[]), cli_run(commands=['run'])])
+@pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
+def test_template_files(runner, suffix):
+    path = DATADIR / 'run' / 'template-files' / f'grevling{suffix}'
+    runner(path)
+
+    with Case(path) as case:
+        storagepath = case.storagepath
+
+    for b in 'abc':
+        path = storagepath / b
+        assert read_file(path / 'file.txt') == f'{b}\n${{bravo}}\n'
+        assert read_file(path / f'templated-{b}.txt') == f'{b}\n{b}\n'
+
+
 @pytest.mark.parametrize('runner', [api_run(), cli_run()])
 @pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
 def test_capture(runner, suffix):

@@ -1,8 +1,9 @@
+from copy import deepcopy
 from functools import reduce
 from pathlib import Path
 import re
 
-from typing import Tuple, Dict
+from typing import Any, Tuple, Dict
 
 import goldpy as gold
 import jsonschema
@@ -11,6 +12,11 @@ import yaml
 
 from . import util
 
+
+is_callable = lambda _, fn: callable(fn)
+typechecker = jsonschema.Draft202012Validator.TYPE_CHECKER.redefine('callable', is_callable)
+CustomValidator = jsonschema.validators.extend(jsonschema.Draft202012Validator, type_checker=typechecker)
+CustomValidator.META_SCHEMA = {}
 
 
 _null = { 'type': 'null' }
@@ -64,6 +70,46 @@ def _obj(required=[], **kwargs):
     }
 
 
+class CustomSchema:
+
+    schema: Dict
+
+    @classmethod
+    def validate(cls, data: Any) -> bool:
+        try:
+            jsonschema.validate(data, cls.schema, cls=CustomValidator)
+        except jsonschema.ValidationError:
+            return False
+        return True
+
+    @classmethod
+    def normalize(cls, data: Dict) -> Dict:
+        return data
+
+
+class FileMap(CustomSchema):
+
+    schema = _or(
+        _callable,
+        _list(_or(
+            _string,
+            _obj(
+                required = ['source'],
+                source = _string,
+                target = _string,
+                mode = _enum('simple', 'glob'),
+                template = _bool,
+            ),
+        )),
+    )
+
+    @classmethod
+    def normalize(cls, data: Any) -> Any:
+        if callable(data):
+            return data
+        return [{'source': v} if isinstance(v, str) else v for v in data]
+
+
 _capture = _or(
     _string,
     _obj(
@@ -81,17 +127,6 @@ _capture = _or(
         mode = _enum('first', 'last', 'all'),
     )
 )
-
-
-_filemap = _list(_or(
-    _string,
-    _obj(
-        required = ['source'],
-        source = _string,
-        target = _string,
-        mode = _enum('simple', 'glob'),
-    ),
-))
 
 
 _schema = {
@@ -120,9 +155,9 @@ _schema = {
         'evaluate': _map(_string),
         'constants': _map(_or(_string, _null, _scalar, _bool)),
         'where': _or(_string, _list(_string)),
-        'templates': _filemap,
-        'prefiles': _filemap,
-        'postfiles': _filemap,
+        'templates': FileMap.schema,
+        'prefiles': FileMap.schema,
+        'postfiles': FileMap.schema,
         'script': _list(_or(
             _string,
             _list(_string),
@@ -182,10 +217,19 @@ _schema = {
 }
 
 
-is_callable = lambda _, fn: callable(fn)
-typechecker = jsonschema.Draft202012Validator.TYPE_CHECKER.redefine('callable', is_callable)
-CustomValidator = jsonschema.validators.extend(jsonschema.Draft202012Validator, type_checker=typechecker)
-CustomValidator.META_SCHEMA = {}
+def normalize(data: Dict):
+    data = data.copy()
+    for key, temp in [('templates', True), ('prefiles', False), ('postfiles', False)]:
+        norm = FileMap.normalize(data.get(key, []))
+        if not callable(norm):
+            for spec in norm:
+                spec.setdefault('template', temp)
+        data[key] = norm
+    if not callable(data['prefiles']) and data['templates']:
+        data['prefiles'].extend(data.pop('templates'))
+    elif data['templates']:
+        raise ValueError("prefiles is function and templates is given")
+    return data
 
 
 def validate(data: Dict):
@@ -210,4 +254,4 @@ def load(path: Path) -> Dict:
         ctx.append_libfinder(libfinder)
         data = gold.evaluate_file(ctx, str(path))
     validate(data)
-    return data
+    return normalize(data)

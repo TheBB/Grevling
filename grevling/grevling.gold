@@ -1,0 +1,28 @@
+{
+    linspace: (lo, hi, {npts}) => {
+        type: "uniform",
+        interval: [lo, hi],
+        num: npts,
+    },
+
+    gradspace: (lo, hi, {npts, grading = 1.0}) => {
+        type: "graded",
+        interval: [lo, hi],
+        num: npts,
+        grading: grading,
+    },
+
+    copy: (from, to = null, {template = false}) => {
+        source: from,
+        target: to or from,
+        template: template,
+        mode: "simple",
+    },
+
+    glob: (from, to = ".") => {
+        source: from,
+        target: to,
+        template: false,
+        mode: "glob",
+    },
+}

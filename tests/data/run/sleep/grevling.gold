@@ -1,10 +1,8 @@
-{
+let {linspace} = import("grevling")
+
+in {
     parameters: {
-        nothing: {
-            type: "uniform",
-            interval: [0.0, 1.0],
-            num: 20,
-        },
+        nothing: linspace(0.0, 1.0, npts: 20),
     },
     script: ["sleep 0.5"],
 }

@@ -1,0 +1,16 @@
+let {copy} = import("grevling")
+
+in {
+    parameters: {bravo: ["a", "b", "c"]},
+    prefiles: ({bravo}) => [
+        copy("file-${bravo}.txt", "file.txt"),
+        copy("file-${bravo}.txt", "templated-${bravo}.txt", template: true),
+    ],
+    postfiles: ({bravo}) => [
+        copy("file.txt"),
+        copy("templated-${bravo}.txt"),
+    ],
+    settings: {
+        logdir: ({bravo}) => bravo,
+    },
+}
