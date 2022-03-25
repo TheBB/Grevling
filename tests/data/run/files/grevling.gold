@@ -1,4 +1,6 @@
-{
+let {copy, glob} = import("grevling")
+
+in {
     parameters: {
         alpha: [1, 2, 3],
         bravo: ["a", "b", "c"],
@@ -6,19 +8,17 @@
     evaluate: {
         charlie: "2 * alpha - 1",
     },
-    templates: [
-        "template.txt",
-        { source: "template.txt", target: "other-template.txt" },
-    ],
     prefiles: [
-        { source: "template.txt", target: "non-template.txt" },
-        { source: "empty*.dat", target: "some/deep/directory", mode: "glob" },
+        copy("template.txt", template: true),
+        copy("template.txt", "other-template.txt", template: true),
+        copy("template.txt", "non-template.txt"),
+        glob("empty*.dat", "some/deep/directory"),
     ],
     postfiles: [
-        "template.txt",
-        "other-template.txt",
-        "non-template.txt",
-        { source: "some/deep/directory/empty*.dat", mode: "glob" },
+        copy("template.txt"),
+        copy("other-template.txt"),
+        copy("non-template.txt"),
+        glob("some/deep/directory/empty*.dat"),
     ],
     settings: {
         logdir: ({alpha, bravo}) => "${alpha}-${bravo}",

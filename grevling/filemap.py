@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from typing import Optional, List, Dict, Iterable, Tuple
+from typing import Any, Optional, List, Dict, Iterable, Tuple
 
-from . import util, api
-from .render import render
+from . import util, api, schema
+from .render import StringRenderable, JsonRenderable, renderable
 
 
 class SingleFileMap:
@@ -16,9 +16,7 @@ class SingleFileMap:
     mode: str
 
     @classmethod
-    def load(cls, spec: dict, **kwargs) -> SingleFileMap:
-        if isinstance(spec, str):
-            return cls(spec, spec, **kwargs)
+    def load(cls, spec: Dict, **kwargs) -> SingleFileMap:
         return util.call_yaml(cls, spec, **kwargs)
 
     def __init__(
@@ -42,15 +40,11 @@ class SingleFileMap:
         self, context: api.Context, source: api.Workspace
     ) -> Iterable[Tuple[Path, Path]]:
         if self.mode == 'simple':
-            yield (
-                Path(render(self.source, context)),
-                Path(render(self.target, context)),
-            )
+            yield (Path(self.source), Path(self.target))
 
         elif self.mode == 'glob':
-            target = render(self.target, context)
-            for path in source.glob(render(self.source, context)):
-                yield (path, target / path)
+            for path in source.glob(self.source):
+                yield (path, Path(self.target) / path)
 
     def copy(
         self,
@@ -79,16 +73,20 @@ class SingleFileMap:
             else:
                 with source.read_file(sourcepath) as f:
                     text = f.read().decode()
-                target.write_file(targetpath, render(text, context).encode())
+                target.write_file(targetpath, StringRenderable(text).render(context).encode())
 
         return True
 
 
 class FileMap(list):
+
     @classmethod
-    def load(cls, files: List[Dict] = [], templates: List[Dict] = []) -> FileMap:
+    def load(cls, data: List) -> FileMap:
+        return cls.create(files=data)
+
+    @classmethod
+    def create(cls, *, files: List = []) -> FileMap:
         mapping = cls()
-        mapping.extend(SingleFileMap.load(spec, template=True) for spec in templates)
         mapping.extend(SingleFileMap.load(spec) for spec in files)
         return mapping
 
@@ -103,3 +101,7 @@ class FileMap(list):
             if not mapper.copy(context, source, target, **kwargs):
                 return False
         return True
+
+
+def FileMapTemplate(data: Any) -> api.Renderable[FileMap]:
+    return renderable(data, FileMap, schema.FileMap.validate, '[*][source,target]')

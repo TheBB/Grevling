@@ -1,9 +1,13 @@
-{
+let {copy} = import("grevling")
+
+in {
     parameters: {
         alpha: [1.234, 2.345, 3.456],
         bravo: [1, 2, 3],
     },
-    templates: [ "template.txt" ],
+    prefiles: [
+        copy("template.txt", template: true),
+    ],
     script: [
         {
             command: "cat template.txt",
