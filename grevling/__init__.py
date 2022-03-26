@@ -24,7 +24,7 @@ from .context import ContextProvider
 from .parameters import ParameterSpace
 from .filemap import FileMapTemplate, FileMap
 from .script import Script, ScriptTemplate
-from .typing import PersistentObject
+from .typing import GType, PersistentObject
 from .workflow.local import LocalWorkspaceCollection, LocalWorkspace, LocalWorkflow
 from . import util, api
 
@@ -64,6 +64,8 @@ class Case:
     _plots: List[Plot]
 
     _ignore_missing: bool
+
+    types: TypeManager
 
     def __init__(
         self,
@@ -118,8 +120,10 @@ class Case:
             casedata.get('script', []), casedata.get('containers', {})
         )
 
-        # Fill in types derived from commands
-        self.script.add_types(self.types)
+        # Read types
+        self.types = TypeManager()
+        self.types.fill_obj(self.context_mgr.parameters)
+        self.types.fill_string(casedata.get('types', {}))
 
         # Read settings
         settings = casedata.get('settings', {})
@@ -128,7 +132,7 @@ class Case:
 
         # Construct plot objects
         self._plots = [
-            Plot.load(spec, self.parameters, self.types)
+            Plot.load(spec, self.parameters)
             for spec in casedata.get('plots', [])
         ]
 
@@ -156,10 +160,6 @@ class Case:
     def parameters(self) -> ParameterSpace:
         return self.context_mgr.parameters
 
-    @property
-    def types(self) -> api.Types:
-        return self.context_mgr.types
-
     def has_data(self) -> bool:
         return self.state.has_data
 
@@ -180,9 +180,10 @@ class Case:
     def load_dataframe(self) -> pd.DataFram:
         if self.state.has_collected:
             return pd.read_parquet(self.dataframepath, engine='pyarrow')
+        types = self.type_guess()
         data = {
             k: pd.Series([], dtype=v)
-            for k, v in self.types.pandas().items()
+            for k, v in types.pandas().items()
             if k != 'g_index'
         }
         return pd.DataFrame(index=pd.Int64Index([]), data=data)
@@ -190,10 +191,16 @@ class Case:
     def save_dataframe(self, df: pd.DataFrame):
         df.to_parquet(self.dataframepath, engine='pyarrow', index=True)
 
+    def type_guess(self) -> TypeManager:
+        manager = TypeManager()
+        for instance in self.instances(Status.Downloaded):
+            manager.merge(instance.cached_capture(raw=True))
+        return manager
+
     def create_instances(self) -> Iterable[Instance]:
         for i, ctx in enumerate(self.context_mgr.fullspace()):
-            ctx.g_index = i
-            ctx.g_logdir = render(self._logdir, ctx)
+            ctx['g_index'] = i
+            ctx['g_logdir'] = render(self._logdir, ctx)
             yield Instance.create(self, ctx)
 
     def create_instance(
@@ -205,11 +212,11 @@ class Case:
         ctx = self.context_mgr.evaluate_context(ctx)
         if index is None:
             index = 0
-        ctx.g_index = index
+        ctx['g_index'] = index
         if logdir is None:
             logdir = render(self._logdir, ctx)
-        ctx.g_logdir = str(logdir)
-        workspace = LocalWorkspace(Path(ctx.g_logdir), name='LOG')
+        ctx['g_logdir'] = str(logdir)
+        workspace = LocalWorkspace(Path(ctx['g_logdir']), name='LOG')
         return Instance.create(self, ctx, local=workspace)
 
     def instances(self, *statuses: api.Status) -> Iterable[Instance]:
@@ -300,7 +307,7 @@ class Instance:
         self._context = context
 
         if context:
-            self.logdir = context.g_logdir
+            self.logdir = context['g_logdir']
         else:
             self.logdir = logdir
 
@@ -355,7 +362,7 @@ class Instance:
 
     @property
     def index(self) -> int:
-        return self.context.g_index
+        return self.context['g_index']
 
     @property
     def script(self) -> Script:
@@ -386,7 +393,7 @@ class Instance:
         assert self.remote_book
         assert self.status == Status.Finished
 
-        collector = self.types.capture_model()
+        collector = CaptureCollection(self.types)
         collector.update(self.context)
 
         bookmap = FileMap.create(files=[{'source': '*', 'mode': 'glob'}])
@@ -398,7 +405,6 @@ class Instance:
         postmap.copy(self.context, self.remote, self.local, ignore_missing=ignore_missing)
 
         self._case.script.capture(collector, self.local_book)
-        collector = collector.validate()
         collector.commit_to_file(self.local_book)
 
         self.status = Status.Downloaded
@@ -409,13 +415,13 @@ class Instance:
 
     def capture(self):
         assert self.status == Status.Downloaded
-        collector = self.types.capture_model()
+        collector = CaptureCollection(self.types)
         collector.update(self.context)
         collector.collect_from_info(self.local_book)
         self._case.script.capture(collector, self.local_book)
         collector.commit_to_file(self.local_book)
 
-    def cached_capture(self) -> CaptureCollection:
-        collector = self.types.capture_model()
+    def cached_capture(self, raw: bool = False) -> CaptureCollection:
+        collector = CaptureCollection(self.types)
         collector.collect_from_cache(self.local_book)
         return collector

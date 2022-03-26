@@ -4,11 +4,10 @@ from abc import ABC, abstractclassmethod, abstractmethod
 from enum import Enum
 from fnmatch import fnmatch
 from io import IOBase
+import json
 from pathlib import Path
 
 from typing import Any, ContextManager, Generic, Iterable, Type, TypeVar, Union, Optional, TYPE_CHECKING
-
-from pydantic import BaseModel
 
 from . import util
 
@@ -138,32 +137,10 @@ class Workflow(ABC):
         ...
 
 
-class Context(BaseModel):
-
-    class Config:
-        validate_assignment = True
-
-    def __contains__(self, key):
-        return hasattr(self, key)
-
-    def __getitem__(self, key):
-        return getattr(self, key)
-
-    def __setitem__(self, key, value):
-        setattr(self, key, value)
+class Context(dict):
 
     def __call__(self, fn):
-        return fn(**self.__dict__)
+        return fn(**self)
 
-    def keys(self):
-        return self.__dict__.keys()
-
-    def values(self):
-        return self.__dict__.values()
-
-    def items(self):
-        return self.__dict__.items()
-
-    def update(self, mapping):
-        for k, v in mapping.items():
-            self[k] = v
+    def json(self, **kwargs) -> str:
+        return json.dumps(self, **kwargs)

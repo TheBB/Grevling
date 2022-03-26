@@ -56,6 +56,7 @@ class GradedParameter(Parameter):
 
 
 class ParameterSpace(dict):
+
     @classmethod
     def load(cls, data: Dict) -> ParameterSpace:
         return cls({name: Parameter.load(name, spec) for name, spec in data.items()})

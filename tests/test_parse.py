@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from grevling import Case
-from grevling.typing import Field, Stage
+# from grevling.typing import Field, Stage
 
 
 DATADIR = Path(__file__).parent / 'data'
@@ -45,41 +45,6 @@ def test_parse(suffix):
         'int': 14,
         'float': 14.0,
     }
-
-    # assert case.premap[0]. == 'somefile'
-    # assert case.premap[0].target == 'somefile'
-    # assert case.premap[0].mode == 'simple'
-    # assert case.premap[0].template
-
-    # assert case.premap[1].source == 'from'
-    # assert case.premap[1].target == 'to'
-    # assert case.premap[1].mode == 'simple'
-    # assert case.premap[1].template
-
-    # assert case.premap[2].source == 'q'
-    # assert case.premap[2].target == 'q'
-    # assert case.premap[2].mode == 'simple'
-    # assert case.premap[2].template
-
-    # assert case.premap[3].source == 'a'
-    # assert case.premap[3].target == 'b'
-    # assert case.premap[3].mode == 'simple'
-    # assert not case.premap[3].template
-
-    # assert case.premap[4].source == 'r'
-    # assert case.premap[4].target == 's'
-    # assert case.premap[4].mode == 'simple'
-    # assert not case.premap[4].template
-
-    # assert case.postmap[0].source == 'c'
-    # assert case.postmap[0].target == 'd'
-    # assert case.postmap[0].mode == 'simple'
-    # assert not case.postmap[0].template
-
-    # assert case.postmap[1].source == 'm'
-    # assert case.postmap[1].target == '.'
-    # assert case.postmap[1].mode == 'glob'
-    # assert not case.postmap[1].template
 
     assert case.script.commands[0].command == 'string command here'
     assert case.script.commands[0].name == 'string'
@@ -134,35 +99,5 @@ def test_parse(suffix):
         ._regex.pattern.startswith(re.escape('here is a prefix'))
     )
     assert case.script.commands[5].captures[4]._mode == 'all'
-
-    assert case.types == {
-        'g_index': Field(int, None, Stage.pre),
-        'g_logdir': Field(str, None, Stage.pre),
-        'g_started': Field(datetime, None, Stage.post),
-        'g_finished': Field(datetime, None, Stage.post),
-        'g_success': Field(bool, None, Stage.post),
-        'alpha': Field(int, None, Stage.pre),
-        'bravo': Field(float, None, Stage.pre),
-        'charlie': Field(float, None, Stage.pre),
-        'delta': Field(float, None, Stage.pre),
-        'echo': Field(float, None, Stage.pre),
-        'echo': Field(float, None, Stage.pre),
-        'foxtrot': Field(str, None, Stage.pre),
-        'dblalpha': Field(int, None, Stage.pre),
-        'float': Field(float, None, Stage.pre),
-        'int': Field(int, None, Stage.pre),
-        'one': Field(int, None, Stage.post),
-        'first': Field(str, None, Stage.post),
-        'multi': Field(List[str], [], Stage.post),
-        'last': Field(float, None, Stage.post),
-        'someint': Field(int, None, Stage.post),
-        'somefloat': Field(List[float], [], Stage.post),
-        'g_walltime_string': Field(float, None, Stage.post),
-        'g_walltime_list': Field(float, None, Stage.post),
-        'g_walltime_nontrivial-name': Field(float, None, Stage.post),
-        'g_walltime_nontrivial-name-2': Field(float, None, Stage.post),
-        'g_walltime_somecommand': Field(float, None, Stage.post),
-        'g_walltime_nontrivial-stuff': Field(float, None, Stage.post),
-    }
 
     assert case._logdir == 'loop-de-loop'
