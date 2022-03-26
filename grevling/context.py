@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from operator import methodcaller
 
-from typing import Dict, Any, Sequence, Iterable, Type, List
+from typing import Callable, Dict, Any, Optional, Sequence, Iterable, Type, List
 
 from asteval import Interpreter
 
@@ -24,10 +24,15 @@ def _guess_eltype(collection: Sequence) -> Type:
 class ContextProvider:
 
     parameters: ParameterSpace
-    evaluables: Dict[str, str]
+
+    eval_func: Optional[Callable]
+    eval_dep: Dict[str, str]
+
     constants: Dict[str, Any]
     templates: Dict[str, Any]
-    conditions: List[str]
+
+    cond_func: Optional[Callable]
+    cond_dep: List[str]
 
     @classmethod
     def load(cls, spec: Dict) -> ContextProvider:
@@ -35,13 +40,23 @@ class ContextProvider:
 
     def __init__(self, data: Dict):
         self.parameters = ParameterSpace.load(data.get('parameters', {}))
-        self.evaluables = dict(data.get('evaluate', {}))
         self.constants = dict(data.get('constants', {}))
 
+        evaluables = data.get('evaluate', {})
+        if callable(evaluables):
+            self.eval_func = evaluables
+            self.eval_dep = {}
+        else:
+            self.eval_func = None
+            self.eval_dep = evaluables
+
         conditions = data.get('where', [])
-        if isinstance(conditions, str):
-            conditions = [conditions]
-        self.conditions = conditions
+        if callable(conditions):
+            self.cond_func = conditions
+            self.cond_dep = []
+        else:
+            self.cond_func = None
+            self.cond_dep = conditions
 
     def evaluate_context(self, *args, **kwargs) -> api.Context:
         return self.evaluate(*args, **kwargs)
@@ -53,9 +68,11 @@ class ContextProvider:
         self,
         context,
         verbose: bool = True,
-        allowed_missing: bool = False,
         add_constants: bool = True,
     ) -> Dict[str, Any]:
+        if self.eval_func:
+            context = {**context, **self.eval_func(**context)}
+
         evaluator = Interpreter()
         evaluator.symtable.update({
             'legendre': util.legendre,
@@ -65,16 +82,12 @@ class ContextProvider:
             {k: v for k, v in self.constants.items() if k not in context}
         )
 
-        for name, code in self.evaluables.items():
+        for name, code in self.eval_dep.items():
             if not isinstance(code, str):
                 result = code
             else:
                 result = evaluator.eval(code, show_errors=False)
-                only_nameerror = set(tp for tp, _ in map(methodcaller('get_error'), evaluator.error)) == {'NameError'}
-                if evaluator.error and only_nameerror and allowed_missing:
-                    util.log.debug(f'Skipped evaluating: {name}')
-                    continue
-                elif evaluator.error:
+                if evaluator.error:
                     raise ValueError(f"Errors occurred evaluating '{name}'")
             if verbose:
                 util.log.debug(f'Evaluated: {name} = {repr(result)}')
@@ -90,12 +103,17 @@ class ContextProvider:
     def subspace(self, *names: str, **kwargs) -> Iterable[Dict]:
         for values in self.parameters.subspace(*names):
             context = self.evaluate(values, **kwargs)
-            if not self.conditions:
+            if not self.cond_func and not self.cond_dep:
+                yield context
+                continue
+            if self.cond_func and not self.cond_func(**context):
+                continue
+            if not self.cond_dep:
                 yield context
                 continue
             evaluator = Interpreter()
             evaluator.symtable.update(context)
-            for condition in self.conditions:
+            for condition in self.cond_dep:
                 if not evaluator.eval(condition):
                     break
             else:

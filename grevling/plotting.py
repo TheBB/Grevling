@@ -568,6 +568,11 @@ class Plot:
             self._type = 'line'
         self._styles._mode = self._type
 
+        # Pick a parameter context with 'default' values
+        background = {
+            name: param[0] for name, param in case.context_mgr.parameters.items()
+        }
+
         # Collect all the fixed parameters and iterate over all those combinations
         fixed = self._parameters_of_kind('fixed')
 
@@ -577,11 +582,10 @@ class Plot:
         }
 
         for index in case.parameters.subspace(*fixed):
-            index = {**index, **constants}
-            context = case.context_mgr.raw_evaluate(index.copy(), allowed_missing=True)
+            context = {**background, **index, **constants}
             self.generate_single(case, context, index)
 
-    def generate_single(self, case, context: dict, index):
+    def generate_single(self, case, context, index):
         # Collect all the categorized parameters and iterate over all those combinations
         categories = self._parameters_of_kind('category')
         backends = Backends(*self._format)
@@ -589,15 +593,12 @@ class Plot:
 
         sub_indices = case.parameters.subspace(*categories)
         styles = self._styles.styles(case.parameters, *categories)
+        sub_context = {}
         for sub_index, basestyle in zip(sub_indices, styles):
-            sub_context = case.context_mgr.evaluate_context(
-                {**context, **sub_index}, allowed_missing=True
-            )
+            sub_context = case.context_mgr.evaluate_context({**context, **sub_index})
             sub_index = {**index, **sub_index}
 
-            cat_name, xaxis, yaxes = self.generate_category(
-                case, sub_context, sub_index
-            )
+            cat_name, xaxis, yaxes = self.generate_category(case, sub_context, sub_index)
 
             final_styles = self._styles.supplement(basestyle)
             for ax_name, data, style in zip(self._yaxis, yaxes, final_styles):
@@ -608,7 +609,7 @@ class Plot:
             template = getattr(self, f'_{attr}')
             if template is None:
                 continue
-            text = render(template, context)
+            text = render(template, sub_context)
             getattr(backends, f'set_{attr}')(text)
         backends.set_xmode(self._xmode)
         backends.set_ymode(self._ymode)
@@ -618,7 +619,7 @@ class Plot:
         if len(self._xlim) >= 2:
             backends.set_ylim(self._ylim)
 
-        filename = case.storagepath / render(self._filename, context)
+        filename = case.storagepath / render(self._filename, sub_context)
         backends.generate(filename)
 
     def generate_category(self, case, context: dict, index):
