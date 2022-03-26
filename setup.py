@@ -23,6 +23,7 @@ setup(
         'fasteners',
         'goldpy>=0.4.2',
         'jsonschema',
+        'jsonpath-ng',
         'mako',
         'numpy',
         'pandas',
