@@ -37,7 +37,7 @@ def test_parse(suffix):
     )
     assert case.parameters['foxtrot'].values == ['a', 'b', 'c']
 
-    assert case.context_mgr.evaluables == {
+    assert case.context_mgr.eval_dep == {
         'dblalpha': '2 * alpha',
     }
 

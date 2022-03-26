@@ -152,9 +152,9 @@ _schema = {
                 grading = _scalar,
             ),
         )),
-        'evaluate': _map(_string),
+        'evaluate': _or(_callable, _map(_string)),
         'constants': _map(_or(_string, _null, _scalar, _bool)),
-        'where': _or(_string, _list(_string)),
+        'where': _or(_callable, _string, _list(_string)),
         'templates': FileMap.schema,
         'prefiles': FileMap.schema,
         'postfiles': FileMap.schema,
@@ -225,6 +225,8 @@ def normalize(data: Dict):
             for spec in norm:
                 spec.setdefault('template', temp)
         data[key] = norm
+    if isinstance(data.get('where', []), str):
+        data['where'] = [data['where']]
     if not callable(data['prefiles']) and data['templates']:
         data['prefiles'].extend(data.pop('templates'))
     elif data['templates']:
