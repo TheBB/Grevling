@@ -14,7 +14,7 @@ setup(
     license='AGPL3',
     url='https://github.com/TheBB/Grevling',
     packages=find_packages(),
-    package_data={'grevling': ['grevling/grevling.gold']},
+    package_data={'grevling': ['grevling.gold']},
     python_requires='>=3.7',
     install_requires=[
         'asteval',
