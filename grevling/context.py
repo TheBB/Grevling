@@ -8,7 +8,7 @@ from typing import Dict, Any, Sequence, Iterable, Type, List
 from asteval import Interpreter
 
 from .parameters import ParameterSpace
-from .typing import TypeManager, Stage, find_type
+# from .typing import TypeManager, Stage, find_type
 from . import util, api
 
 
@@ -28,7 +28,6 @@ class ContextProvider:
     constants: Dict[str, Any]
     templates: Dict[str, Any]
     conditions: List[str]
-    types: TypeManager
 
     @classmethod
     def load(cls, spec: Dict) -> ContextProvider:
@@ -44,44 +43,11 @@ class ContextProvider:
             conditions = [conditions]
         self.conditions = conditions
 
-        self.types = TypeManager()
-        self.types.add('g_index', int, 'pre')
-        self.types.add('g_logdir', str, 'pre')
-        self.types.add('g_started', datetime, 'post')
-        self.types.add('g_finished', datetime, 'post')
-        self.types.add('g_success', bool, 'post')
-
-        for k, v in data.get('types', {}).items():
-            self.types.add(k, find_type(v), 'post')
-
-        for k, v in self.constants.items():
-            self.types.add(k, type(v), 'pre')
-
-        # Guess types of parameters
-        for name, param in self.parameters.items():
-            if name not in self.types:
-                self.types.add(name, _guess_eltype(param), 'pre')
-            else:
-                self.types[name].stage = Stage.pre
-
-        # Guess types of evaluables
-        if any(name not in self.types for name in self.evaluables):
-            contexts = list(self.parameters.fullspace())
-            for ctx in contexts:
-                self.raw_evaluate(ctx, verbose=False)
-            for name in self.evaluables:
-                if name not in self.types:
-                    values = [ctx[name] for ctx in contexts]
-                    self.types.add(name, _guess_eltype(values), 'pre')
-                else:
-                    self.types[name].stage = Stage.pre
-
     def evaluate_context(self, *args, **kwargs) -> api.Context:
         return self.evaluate(*args, **kwargs)
 
     def evaluate(self, *args, **kwargs) -> api.Context:
-        model = self.types.context_model()
-        return model(**self.raw_evaluate(*args, **kwargs))
+        return api.Context(self.raw_evaluate(*args, **kwargs))
 
     def raw_evaluate(
         self,
@@ -128,7 +94,7 @@ class ContextProvider:
                 yield context
                 continue
             evaluator = Interpreter()
-            evaluator.symtable.update(context.__dict__)
+            evaluator.symtable.update(context)
             for condition in self.conditions:
                 if not evaluator.eval(condition):
                     break

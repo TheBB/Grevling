@@ -5,29 +5,31 @@ import re
 
 from typing import Optional, List, TYPE_CHECKING
 
+from pandas import BooleanDtype
 from pydantic import validate_model
 from pydantic.fields import SHAPE_LIST
 
-from . import util, api
+
+from . import util, api, typing
 
 if TYPE_CHECKING:
-    from .typing import TypeManager
+    from .typing import TypeManager, GType
 
 
 class Capture:
 
     _regex: re.Pattern
     _mode: str
-    _type_overrides: api.Types
+    _type: Optional[GType]
 
     @classmethod
     def load(cls, spec) -> Capture:
         if isinstance(spec, str):
             return cls(spec)
         if spec.get('type') in ('integer', 'float'):
-            pattern, tp = {
-                'integer': (r'[-+]?[0-9]+', int),
-                'float': (r'[-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?', float),
+            pattern = {
+                'integer': r'[-+]?[0-9]+',
+                'float': r'[-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?',
             }[spec['type']]
             skip = r'(\S+\s+){' + str(spec.get('skip-words', 0)) + '}'
             if spec.get('flexible-prefix', False):
@@ -45,37 +47,29 @@ class Capture:
                 + ')'
             )
             mode = spec.get('mode', 'last')
-            type_overrides = {spec['name']: tp}
-            return cls(pattern, mode, type_overrides)
+            tp = typing.GType.from_string(spec['type'])
+            return cls(pattern, mode, tp)
         return util.call_yaml(cls, spec)
 
     def __init__(
         self,
         pattern: str,
         mode: str = 'last',
-        type_overrides: Optional[TypeManager] = None,
+        tp: Optional[GType] = None,
     ):
         self._regex = re.compile(pattern)
         self._mode = mode
-        self._type_overrides = type_overrides or {}
+        self._type = tp
 
-    def add_types(self, types: TypeManager):
-        for group in self._regex.groupindex.keys():
-            single = self._type_overrides.get(group, str)
-            if group in types:
-                continue
-            if self._mode == 'all':
-                types.add(group, List[single], 'post')
-            else:
-                types.add(group, single, 'post')
-
-    def find_in(self, collector: Capture, string: str):
+    def find_in(self, collector: CaptureCollection, string: str):
         matches = self._regex.finditer(string)
+
         if self._mode == 'first':
             try:
                 matches = [next(matches)]
             except StopIteration:
                 return
+            tp = self._type
 
         elif self._mode == 'last':
             try:
@@ -85,17 +79,29 @@ class Capture:
             for match in matches:
                 pass
             matches = [match]
+            tp = self._type
+
+        else:
+            tp = typing.List(self._type)
 
         for match in matches:
             for name, value in match.groupdict().items():
-                collector.collect(name, value)
+                collector.collect(name, value, tp=tp)
 
 
 class CaptureCollection(api.Context):
 
-    def collect(self, name, value):
-        if self.__fields__[name].shape == SHAPE_LIST:
-            self[name].append(value)
+    types: TypeManager
+
+    def __init__(self, types: TypeManager):
+        self.types = types
+
+    def collect(self, name, value, tp: Optional[GType] = None):
+        if tp is None:
+            tp: GType = self.types.get(name, typing.AnyType())
+        value = tp.coerce(value)
+        if tp.is_list:
+            self.setdefault(name, []).append(value)
         else:
             self[name] = value
 
@@ -114,13 +120,7 @@ class CaptureCollection(api.Context):
         with ws.open_file('grevling.txt', 'r') as f:
             for line in f:
                 key, value = line.strip().split('=', 1)
-                self[key] = value
-
-    def validate(self) -> Capture:
-        data, _, error = validate_model(self.__class__, self.__dict__)
-        if error is not None:
-            raise error
-        return self.__class__(**data)
+                self.collect(key, value)
 
     def commit_to_file(self, ws: api.Workspace):
         with ws.open_file('captured.json', 'w') as f:

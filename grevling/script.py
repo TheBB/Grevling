@@ -15,7 +15,6 @@ from typing import Dict, List, Optional, Union
 from . import api, util
 from .capture import Capture, CaptureCollection
 from .render import render
-from .typing import TypeManager, Stage
 
 
 @contextmanager
@@ -181,11 +180,6 @@ class CommandTemplate:
         elif isinstance(capture, list):
             self.captures.extend(Capture.load(c) for c in capture)
 
-    def add_types(self, types: TypeManager):
-        types.add(f'g_walltime_{self.name}', float, Stage.post)
-        for cap in self.captures:
-            cap.add_types(types)
-
     @util.with_context('{self.name}')
     def render(self, context: Dict) -> Command:
         kwargs = {
@@ -263,10 +257,6 @@ class ScriptTemplate:
 
     def render(self, context: api.Context) -> Script:
         return Script([cmd.render(context) for cmd in self.commands])
-
-    def add_types(self, types: api.Types):
-        for command in self.commands:
-            command.add_types(types)
 
     def capture(self, collector: CaptureCollection, workspace: api.Workspace):
         for cmd in self.commands:

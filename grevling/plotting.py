@@ -6,7 +6,7 @@ import csv
 import math
 import operator
 
-from typing import List, Dict, Optional, Iterable, Any, Tuple
+from typing import List, Dict, Optional, Iterable, Any, Tuple, TYPE_CHECKING
 
 from bidict import bidict
 import numpy as np
@@ -16,6 +16,9 @@ from .parameters import ParameterSpace
 from . import util, typing
 from .util import ignore, is_list_type
 from .render import render
+
+if TYPE_CHECKING:
+    from . import Case
 
 
 class Backends:
@@ -350,10 +353,10 @@ class PlotStyleManager:
         },
     }
 
-    def __init__(self, mode: str):
+    def __init__(self):
         self._category_to_style = bidict()
         self._custom_styles = dict()
-        self._mode = mode
+        self._mode = 'line'
 
     def assigned(self, category: str):
         return category in self._category_to_style
@@ -448,7 +451,7 @@ class Plot:
     _ylim: List[float]
 
     @classmethod
-    def load(cls, spec, parameters, types):
+    def load(cls, spec, parameters):
         # All parameters not mentioned are assumed to be ignored
         spec.setdefault('parameters', {})
         for param in parameters:
@@ -469,26 +472,6 @@ class Plot:
             if isinstance(spec[k], str):
                 spec[k] = [spec[k]]
 
-        # Either all the axes are list type or none of them are
-        list_type = is_list_type(types[spec['yaxis'][0]].tp)
-        assert all(is_list_type(types[k].tp) == list_type for k in spec['yaxis'][1:])
-        if spec['xaxis']:
-            assert is_list_type(types[spec['xaxis']].tp) == list_type
-
-        # If the x-axis has list type, the effective number of variates is one higher
-        eff_variates = nvariate + list_type
-
-        # If there are more than one effective variate, the plot must be scatter
-        if eff_variates > 1:
-            if spec.get('type', 'scatter') != 'scatter':
-                util.log.warning("Line plots can have at most one variate dimension")
-            spec['type'] = 'scatter'
-        elif eff_variates == 0:
-            util.log.error("Plot has no effective variate dimensions")
-            return
-        else:
-            spec.setdefault('type', 'line')
-
         return util.call_yaml(cls, spec)
 
     def __init__(
@@ -498,7 +481,7 @@ class Plot:
         format,
         yaxis,
         xaxis,
-        type,
+        type=None,
         legend=None,
         xlabel=None,
         ylabel=None,
@@ -528,7 +511,7 @@ class Plot:
         self._xlim = xlim
         self._ylim = ylim
 
-        self._styles = PlotStyleManager(type)
+        self._styles = PlotStyleManager()
         for key, value in style.items():
             if isinstance(value, list):
                 self._styles.set_values(key, value)
@@ -560,7 +543,31 @@ class Plot:
             param for param, mode in self._parameters.items() if mode.kind not in kinds
         ]
 
-    def generate_all(self, case):
+    def generate_all(self, case: Case):
+        types = case.type_guess()
+
+        # Either all the axes are list type or none of them are
+        list_type = types[self._yaxis[0]].is_list
+        assert all(types[k].is_list == list_type for k in self._yaxis[1:])
+        if self._xaxis is not None:
+            assert types[self._xaxis].is_list == list_type
+
+        # If the x-axis has list type, the effective number of variates is one higher
+        nvariate = len(self._parameters_of_kind('variate'))
+        eff_variates = nvariate + list_type
+
+        # If there are more than one effective variate, the plot must be scatter
+        if eff_variates > 1:
+            if self._type != 'scatter' and self._type is not None:
+                util.log.warning("Line plots can have at most one variate dimension")
+            self._type = 'scatter'
+        elif eff_variates == 0:
+            util.log.error("Plot has no effective variate dimensions")
+            return
+        else:
+            self._type = 'line'
+        self._styles._mode = self._type
+
         # Collect all the fixed parameters and iterate over all those combinations
         fixed = self._parameters_of_kind('fixed')
 
