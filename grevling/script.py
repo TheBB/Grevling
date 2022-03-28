@@ -32,7 +32,7 @@ async def run(
     command: List[str], shell: bool, env: Dict[str, str], cwd: Path
 ) -> Result:
     kwargs = {
-        'env': env,
+        'env': {**os.environ, **env},
         'cwd': cwd,
         'stdout': asyncio.subprocess.PIPE,
         'stderr': asyncio.subprocess.PIPE,
