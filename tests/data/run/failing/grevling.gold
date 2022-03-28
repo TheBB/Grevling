@@ -1,13 +1,13 @@
 {
     parameters: { retcode: [0, 1] },
-    script: [
+    script: ({retcode}) => [
         {
             command: "echo before 12",
             name: "before",
             capture: [{ type: "integer", prefix: "before", name: "before" }],
         },
         {
-            command: ["sh", "-c", "echo return \${retcode} && (exit \${retcode}) && echo next \${retcode}"],
+            command: ["sh", "-c", "echo return ${retcode} && (exit ${retcode}) && echo next ${retcode}"],
             capture: [
                 { type: "integer", prefix: "return", name: "return" },
                 { type: "integer", prefix: "next", name: "next", mode: "first" },

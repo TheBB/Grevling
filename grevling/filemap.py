@@ -104,4 +104,4 @@ class FileMap(list):
 
 
 def FileMapTemplate(data: Any) -> api.Renderable[FileMap]:
-    return renderable(data, FileMap, schema.FileMap.validate, '[*][source,target]')
+    return renderable(data, FileMap.load, schema.FileMap.validate, '[*][source,target]')

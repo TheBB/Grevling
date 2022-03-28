@@ -3,11 +3,12 @@ from functools import reduce
 from pathlib import Path
 import re
 
-from typing import Any, Tuple, Dict
+from typing import Any, List, Tuple, Dict
 
 import goldpy as gold
 import jsonschema
 import jsonschema.validators
+from matplotlib import container
 import yaml
 
 from . import util
@@ -87,6 +88,25 @@ class CustomSchema:
         return data
 
 
+_capture = _or(
+    _string,
+    _obj(
+        required = ['pattern'],
+        pattern = _string,
+        mode = _enum('first', 'last', 'all'),
+    ),
+    _obj(
+        required = ['type', 'name', 'prefix'],
+        type = _enum('integer', 'float'),
+        name = _string,
+        prefix = _string,
+        skip_words = _integer,
+        flexible_prefix = _bool,
+        mode = _enum('first', 'last', 'all'),
+    )
+)
+
+
 class FileMap(CustomSchema):
 
     schema = _or(
@@ -110,23 +130,37 @@ class FileMap(CustomSchema):
         return [{'source': v} if isinstance(v, str) else v for v in data]
 
 
-_capture = _or(
-    _string,
-    _obj(
-        required = ['pattern'],
-        pattern = _string,
-        mode = _enum('first', 'last', 'all'),
-    ),
-    _obj(
-        required = ['type', 'name', 'prefix'],
-        type = _enum('integer', 'float'),
-        name = _string,
-        prefix = _string,
-        skip_words = _integer,
-        flexible_prefix = _bool,
-        mode = _enum('first', 'last', 'all'),
+class Script(CustomSchema):
+
+    schema = _or(
+        _callable,
+        _list(_or(
+            _string,
+            _list(_string),
+            _obj(
+                command = _or(_string, _list(_string)),
+                name = _string,
+                capture = _or(_capture, _list(_capture)),
+                capture_output = _bool,
+                capture_walltime = _bool,
+                retry_on_fail = _bool,
+                env = _map(_string),
+                container = _string,
+                container_args = _or(_string, _list(_string)),
+                allow_failure = _bool,
+            )
+        ))
     )
-)
+
+    @classmethod
+    def normalize(cls, data: List) -> List:
+        result = []
+        for script in data:
+            if isinstance(script, (list, str)):
+                result.append({'command': script})
+            else:
+                result.append(script)
+        return result
 
 
 _schema = {
@@ -158,21 +192,7 @@ _schema = {
         'templates': FileMap.schema,
         'prefiles': FileMap.schema,
         'postfiles': FileMap.schema,
-        'script': _list(_or(
-            _string,
-            _list(_string),
-            _obj(
-                command = _or(_string, _list(_string)),
-                name = _string,
-                capture = _or(_capture, _list(_capture)),
-                capture_output = _bool,
-                capture_walltime = _bool,
-                retry_on_fail = _bool,
-                env = _map(_string),
-                container = _string,
-                allow_failure = _bool,
-            )
-        )),
+        'script': Script.schema,
         'types': _map(_string),
         'plots': _list(_obj(
             required = ['filename', 'format', 'yaxis'],
@@ -231,6 +251,10 @@ def normalize(data: Dict):
         data['prefiles'].extend(data.pop('templates'))
     elif data['templates']:
         raise ValueError("prefiles is function and templates is given")
+    if not callable(data.get('script', [])):
+        data['script'] = Script.normalize(data.get('script', []))
+        for script in data['script']:
+            script.setdefault('container-args', data.get('container-args', {}).get(script.get('container', None), []))
     return data
 
 

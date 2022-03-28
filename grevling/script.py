@@ -5,16 +5,17 @@ from collections import namedtuple
 from contextlib import contextmanager
 from dataclasses import field, InitVar, dataclass
 import datetime
+from functools import partial
 import os
 from pathlib import Path
 import shlex
 from time import time as osclock
 
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
-from . import api, util
+from . import api, util, schema
 from .capture import Capture, CaptureCollection
-from .render import render
+from .render import render, renderable
 
 
 @contextmanager
@@ -22,12 +23,6 @@ def time():
     start = osclock()
     yield lambda: end - start
     end = osclock()
-
-
-def shell_list_render(arg: Union[str, List[str]], context: api.Context) -> List[str]:
-    if isinstance(arg, str):
-        return shlex.split(render(arg, context, mode='shell'))
-    return [render(c, context) for c in arg]
 
 
 Result = namedtuple('Result', ['stdout', 'stderr', 'returncode'])
@@ -80,6 +75,36 @@ class Command:
     retry_on_fail: bool = False
     allow_failure: bool = False
 
+    captures: List[Capture] = field(default_factory=list)
+
+    @classmethod
+    def load(cls, data: Any) -> Command:
+        kwargs = {
+            'shell': False
+        }
+
+        command = data.get('command', '')
+        if isinstance(command, str):
+            command = shlex.split(command)
+            kwargs['shell'] = True
+        kwargs['name'] = data.get('name', Path(command[0]).name)
+
+        captures = data.get('capture', [])
+        if isinstance(captures, (str, dict)):
+            kwargs['captures'] = [Capture.load(captures)]
+        else:
+            kwargs['captures'] = [Capture.load(c) for c in captures]
+        kwargs['allow_failure'] = data.get('allow-failure', False)
+        kwargs['retry_on_fail'] = data.get('retry-on-fail', False)
+        kwargs['env'] = data.get('env', {})
+        kwargs['container'] = data.get('container', None)
+        container_args = data.get('container-args', [])
+        if isinstance(container_args, str):
+            container_args = shlex.split(container_args)
+        kwargs['container_args'] = container_args
+
+        return cls(args=command, **kwargs)
+
     async def execute(self, cwd: Path, log_ws: api.Workspace) -> bool:
         kwargs = {
             'cwd': cwd,
@@ -100,7 +125,7 @@ class Command:
             ]
             if command:
                 docker_command.extend(
-                    ['bash', '-c', ' '.join(shlex.quote(c) for c in command)]
+                    ['sh', '-c', ' '.join(shlex.quote(c) for c in command)]
                 )
             kwargs['shell'] = False
             command = docker_command
@@ -134,76 +159,6 @@ class Command:
 
         return True
 
-
-@dataclass()
-class CommandTemplate:
-
-    name: str = ''
-
-    command: Union[str, List[str]] = ''
-    env: Dict[str, str] = field(default_factory=dict)
-    captures: List[Capture] = field(init=False)
-
-    container: Optional[str] = None
-    container_args: Union[str, List[str]] = field(init=False)
-
-    retry_on_fail: bool = False
-    allow_failure: bool = False
-
-    # Init-only variables, used for initializing captures and container_args
-    container_args_spec: InitVar[Dict] = {}
-    capture: InitVar[Union[str, Dict, List]] = []
-
-    @classmethod
-    def load(cls, spec, containers={}) -> CommandTemplate:
-        if isinstance(spec, (str, list)):
-            return cls(command=spec)
-        spec.pop('capture-output', None)
-        spec.pop('capture-walltime', None)
-        return util.call_yaml(cls, spec, container_args_spec=containers)
-
-    def __post_init__(self, container_args_spec, capture):
-        if not self.name:
-            assert self.command
-            exe = (
-                shlex.split(self.command)[0]
-                if isinstance(self.command, str)
-                else self.command[0]
-            )
-            self.name = Path(exe).name
-
-        self.container_args = container_args_spec.get(self.container, [])
-
-        self.captures = []
-        if isinstance(capture, (str, dict)):
-            self.captures.append(Capture.load(capture))
-        elif isinstance(capture, list):
-            self.captures.extend(Capture.load(c) for c in capture)
-
-    @util.with_context('{self.name}')
-    def render(self, context: Dict) -> Command:
-        kwargs = {
-            'shell': isinstance(self.command, str),
-        }
-
-        if self.env:
-            kwargs['env'] = os.environ.copy()
-            for k, v in self.env.items():
-                kwargs['env'][k] = render(v, context)
-
-        command = shell_list_render(self.command, context)
-
-        return Command(
-            name=self.name,
-            args=command,
-            env=kwargs.get('env'),
-            shell=kwargs['shell'],
-            retry_on_fail=self.retry_on_fail,
-            allow_failure=self.allow_failure,
-            container=self.container,
-            container_args=shell_list_render(self.container_args, context),
-        )
-
     def capture(self, collector: CaptureCollection, workspace: api.Workspace):
         try:
             with workspace.open_file(f'{self.name}.stdout', 'r') as f:
@@ -218,6 +173,10 @@ class CommandTemplate:
 class Script:
 
     commands: List[Command]
+
+    @classmethod
+    def load(cls, data: List) -> Script:
+        return cls([Command.load(spec) for spec in data])
 
     async def run(self, cwd: Path, log_ws: api.Workspace) -> bool:
         log_ws.write_file(
@@ -235,29 +194,13 @@ class Script:
                 'grevling.txt', f'g_finished={datetime.datetime.now()}\n', append=True
             )
 
-
-class ScriptTemplate:
-
-    commands: List[CommandTemplate]
-
-    @classmethod
-    def load(cls, commands: List, containers: Dict) -> ScriptTemplate:
-        script = cls()
-        script.commands.extend(
-            CommandTemplate.load(spec, containers) for spec in commands
-        )
-        return script
-
-    def __init__(self):
-        self.commands = []
-
-    def capture(self, collector: CaptureCollection, workspace: api.Workspace):
-        for command in self.commands:
-            command.capture(collector, workspace=workspace)
-
-    def render(self, context: api.Context) -> Script:
-        return Script([cmd.render(context) for cmd in self.commands])
-
     def capture(self, collector: CaptureCollection, workspace: api.Workspace):
         for cmd in self.commands:
             cmd.capture(collector, workspace)
+
+
+def ScriptTemplate(data: Any) -> api.Renderable[Script]:
+    return renderable(
+        data, Script.load, schema.Script.validate,
+        '[*][command,container-args]', '[*][command,container-args][*]', '[*][env][*]',
+    )

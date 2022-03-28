@@ -60,7 +60,7 @@ class Case:
 
     premap: api.Renderable[FileMap]
     postmap: api.Renderable[FileMap]
-    script: ScriptTemplate
+    script: api.Renderable[Script]
     _plots: List[Plot]
 
     _ignore_missing: bool
@@ -116,9 +116,7 @@ class Case:
         self.postmap = FileMapTemplate(casedata.get('postfiles', []))
 
         # Read commands
-        self.script = ScriptTemplate.load(
-            casedata.get('script', []), casedata.get('containers', {})
-        )
+        self.script = ScriptTemplate(casedata.get('script', []))
 
         # Read types
         self.types = TypeManager()
@@ -338,7 +336,7 @@ class Instance:
     def context(self) -> api.Context:
         if self._context is None:
             with self.local_book.open_file('context.json', 'r') as f:
-                self._context = json.load(f)
+                self._context = api.Context(json.load(f))
         return self._context
 
     @property
@@ -404,7 +402,7 @@ class Instance:
         postmap = self._case.postmap.render(self.context)
         postmap.copy(self.context, self.remote, self.local, ignore_missing=ignore_missing)
 
-        self._case.script.capture(collector, self.local_book)
+        self._case.script.render(self.context).capture(collector, self.local_book)
         collector.commit_to_file(self.local_book)
 
         self.status = Status.Downloaded
@@ -418,7 +416,7 @@ class Instance:
         collector = CaptureCollection(self.types)
         collector.update(self.context)
         collector.collect_from_info(self.local_book)
-        self._case.script.capture(collector, self.local_book)
+        self._case.script.render(self.context).capture(collector, self.local_book)
         collector.commit_to_file(self.local_book)
 
     def cached_capture(self, raw: bool = False) -> CaptureCollection:
