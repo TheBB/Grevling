@@ -1,0 +1,6 @@
+parameters:
+  filename: ["/etc/os-release"]
+script:
+  - name: alpine
+    container: alpine
+    command: cat ${filename}
