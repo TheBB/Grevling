@@ -25,4 +25,13 @@
         template: false,
         mode: "glob",
     },
+
+    cmd: ({env = {}, container = null, allow_failure = false, retry_on_fail = false}) => {
+        capture-output: true,
+        capture-walltime: true,
+        env: env,
+        container: container,
+        allow_failure: allow_failure,
+        retry_on_fail: retry_on_fail,
+    }
 }

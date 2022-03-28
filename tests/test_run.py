@@ -359,7 +359,28 @@ def test_stdout(runner, suffix):
 @pytest.mark.parametrize('runner', [api_run(post=[]), cli_run(commands=['run'])])
 @pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
 def test_docker(runner, suffix):
-    runner(DATADIR / 'run' / 'docker' / f'grevling{suffix}')
+    path = DATADIR / 'run' / 'docker' / f'grevling{suffix}'
+    runner(path)
+
+    with Case(path) as case:
+        path = case.storagepath
+
+    assert 'Hello from Docker!' in read_file(path / '0' / '.grevling' / 'empty.stdout')
+
+
+@pytest.mark.skipif(
+    os.name == 'nt' or shutil.which('docker') is None, reason="requires docker and *nix"
+)
+@pytest.mark.parametrize('runner', [api_run(post=[]), cli_run(commands=['run'])])
+@pytest.mark.parametrize('suffix', ['.yaml'])
+def test_docker(runner, suffix):
+    path = DATADIR / 'run' / 'docker-args' / f'grevling{suffix}'
+    runner(path)
+
+    with Case(path) as case:
+        path = case.storagepath
+
+    assert 'NAME="Alpine Linux"' in read_file(path / '0' / '.grevling' / 'alpine.stdout')
 
 
 @pytest.mark.skipif(shutil.which('sleep') is None, reason="requires sleep")

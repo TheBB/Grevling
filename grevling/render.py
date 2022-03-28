@@ -1,12 +1,10 @@
 from copy import deepcopy
-from email.policy import default
 import shlex
 
 from typing import Any, Dict, Optional, Callable, Tuple, Type, TypeVar, Union
 
 from jsonpath_ng import parse
 from mako.template import Template
-from pydantic import constr
 
 from . import api
 
@@ -56,7 +54,7 @@ class JsonRenderable(api.Renderable[T]):
 
     data: Dict
     path: Tuple[str]
-    constructor: Type[T]
+    constructor: Callable[[Any], T]
     mode: Optional[str]
 
     def __init__(self, data: Dict, constructor: Type[T], *paths: str, mode: Optional[str] = None):
@@ -67,6 +65,8 @@ class JsonRenderable(api.Renderable[T]):
 
     def render(self, context: api.Context) -> T:
         def updater(value, container, key):
+            if isinstance(container, str):
+                return value
             if not isinstance(value, str):
                 return value
             renderer = StringRenderable(value, mode=self.mode)
@@ -75,7 +75,7 @@ class JsonRenderable(api.Renderable[T]):
         for path in self.paths:
             path = parse(path)
             data = path.update(data, updater)
-        return self.constructor.load(data)
+        return self.constructor(data)
 
 
 T = TypeVar('T')
@@ -84,7 +84,7 @@ class CallableRenderable(api.Renderable[T]):
 
     func: Callable
     validator: Callable
-    constructor: Type[T]
+    constructor: Callable[[Any], T]
 
     def __init__(self, func: Callable, constructor: Type[T], validator: Callable):
         self.func = func
@@ -95,14 +95,14 @@ class CallableRenderable(api.Renderable[T]):
         data = context(self.func)
         if not self.validator(data):
             raise ValueError("function validation failed")
-        return self.constructor.load(data)
+        return self.constructor(data)
 
 
 T = TypeVar('T')
 
 def renderable(
     obj: Any,
-    constructor: Type[T],
+    constructor: Callable[[Any], T],
     validator: Callable,
     *paths: str,
     mode: Optional[str] = None
