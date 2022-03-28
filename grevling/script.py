@@ -87,7 +87,7 @@ class Command:
         if isinstance(command, str):
             command = shlex.split(command)
             kwargs['shell'] = True
-        kwargs['name'] = data.get('name', Path(command[0]).name)
+        kwargs['name'] = data.get('name') or Path(command[0]).name
 
         captures = data.get('capture', [])
         if isinstance(captures, (str, dict)):

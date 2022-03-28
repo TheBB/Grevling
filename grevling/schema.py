@@ -139,13 +139,13 @@ class Script(CustomSchema):
             _list(_string),
             _obj(
                 command = _or(_string, _list(_string)),
-                name = _string,
+                name = _or(_null, _string),
                 capture = _or(_capture, _list(_capture)),
                 capture_output = _bool,
                 capture_walltime = _bool,
                 retry_on_fail = _bool,
                 env = _map(_string),
-                container = _string,
+                container = _or(_null, _string),
                 container_args = _or(_string, _list(_string)),
                 allow_failure = _bool,
             )
@@ -160,6 +160,9 @@ class Script(CustomSchema):
                 result.append({'command': script})
             else:
                 result.append(script)
+        for script in result:
+            if not isinstance(script.get('capture', []), list):
+                script['capture'] = [script['capture']]
         return result
 
 

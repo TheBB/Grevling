@@ -1,4 +1,4 @@
-let {copy} = import("grevling")
+let {copy, cmd} = import("grevling")
 
 in {
     parameters: {
@@ -9,8 +9,8 @@ in {
         copy("template.txt", template: true),
     ],
     script: [
-        {
-            command: "cat template.txt",
+        cmd(
+            "cat template.txt",
             capture: [
                 { type: "float", name: "firstalpha", prefix: "alpha:", mode: "first" },
                 { type: "float", name: "lastalpha", prefix: "alpha:", mode: "last" },
@@ -19,6 +19,6 @@ in {
                 { type: "integer", name: "lastbravo", prefix: "bravo:", mode: "last" },
                 { type: "integer", name: "allbravo", prefix: "bravo:", mode: "all" },
             ],
-        },
+        )
     ],
 }
