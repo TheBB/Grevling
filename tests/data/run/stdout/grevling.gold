@@ -8,7 +8,7 @@ in {
             name: "good",
         ),
         cmd(
-            ["sh", "-c", "echo stdout ${retcode} && >&2 echo stderr ${retcode} && exit\${retcode}"],
+            ["sh", "-c", "echo stdout ${retcode} && >&2 echo stderr ${retcode} && exit ${retcode}"],
             name: "bad",
         ),
     ],
