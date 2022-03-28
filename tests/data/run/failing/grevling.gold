@@ -1,22 +1,24 @@
-{
+let {cmd} = import("grevling")
+
+in {
     parameters: { retcode: [0, 1] },
     script: ({retcode}) => [
-        {
-            command: "echo before 12",
+        cmd(
+            "echo before 12",
             name: "before",
             capture: [{ type: "integer", prefix: "before", name: "before" }],
-        },
-        {
-            command: ["sh", "-c", "echo return ${retcode} && (exit ${retcode}) && echo next ${retcode}"],
+        ),
+        cmd(
+            ["sh", "-c", "echo return ${retcode} && (exit ${retcode}) && echo next ${retcode}"],
             capture: [
                 { type: "integer", prefix: "return", name: "return" },
                 { type: "integer", prefix: "next", name: "next", mode: "first" },
             ],
-        },
-        {
-            command: "echo after 13",
+        ),
+        cmd(
+            "echo after 13",
             name: "after",
             capture: [{ type: "integer", prefix: "after", name: "after" }],
-        },
+        ),
     ],
 }

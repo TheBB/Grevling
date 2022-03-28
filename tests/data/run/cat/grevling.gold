@@ -1,4 +1,4 @@
-let {copy} = import("grevling")
+let {copy, cmd} = import("grevling")
 
 in {
     parameters: {
@@ -12,19 +12,13 @@ in {
         copy("template.txt", template: true),
     ],
     script: [
-        {
-            command: "cat template.txt",
+        cmd(
+            "cat template.txt",
             capture: [
                 "a=(?P<a>\\S+) b=(?P<b>\\S+) c=(?P<c>\\S+)",
-                {
-                    type: "integer",
-                    name: "a_auto",
-                    prefix: "a=",
-                },
+                {type: "integer", name: "a_auto", prefix: "a="},
             ],
-            capture-output: true,
-            capture-walltime: true,
-        },
+        ),
     ],
     types: {
         a: "int",

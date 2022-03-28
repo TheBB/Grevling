@@ -1,4 +1,6 @@
-{
+let {cmd} = import("grevling")
+
+in {
     parameters: {
         alpha: [1, 2, 3],
         bravo: ["a", "b", "c"],
@@ -7,10 +9,10 @@
         charlie: 2 * alpha - 1,
     },
     script: ({alpha, bravo, charlie}) => [
-        {
-            command: "echo a=${alpha} b=${bravo} c=${charlie}",
-            capture: "a=(?P<a>\\S+) b=(?P<b>\\S+) c=(?P<c>\\S+)",
-        },
+        cmd(
+            "echo a=${alpha} b=${bravo} c=${charlie}",
+            capture: ["a=(?P<a>\\S+) b=(?P<b>\\S+) c=(?P<c>\\S+)"],
+        ),
     ],
     plots: [
         {
