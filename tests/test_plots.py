@@ -3,10 +3,12 @@ from operator import itemgetter
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from grevling import Case
-from grevling.workflow.local import LocalWorkflow
 from grevling.plotting import MockBackend
+
+from .common import api_run, cli_run
 
 
 DATADIR = Path(__file__).parent / 'data'
@@ -28,14 +30,12 @@ def compare_object(actual, expected, sort_xy=False):
     np.testing.assert_array_equal(y, expected['y'])
 
 
-def test_plots():
+@pytest.mark.parametrize('runner', [api_run(post=['collect', 'plot']), cli_run(commands=['run', 'collect', 'plot'])])
+@pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
+def test_plots(runner, suffix):
     MockBackend.plots = []
-    with Case(DATADIR / 'run' / 'plot' / 'grevling.yaml') as case:
-        case.clear_cache()
-        assert case.run()
-        case.capture()
-        case.collect()
-        case.plot()
+    path = DATADIR / 'run' / 'plot' / f'grevling{suffix}'
+    runner(path)
 
     plot = MockBackend.plots.pop(0)
     assert plot.meta == {

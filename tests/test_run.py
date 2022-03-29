@@ -3,14 +3,13 @@ from pathlib import Path
 import shutil
 from time import time
 
-from click.testing import CliRunner
 import pandas as pd
 import pytest
 
 from grevling import Case
-from grevling.__main__ import main
 from grevling.workflow.local import LocalWorkflow
-from grevling.util import initialize_logging
+
+from .common import api_run, cli_run
 
 
 DATADIR = Path(__file__).parent / 'data'
@@ -27,31 +26,6 @@ def check_df(left, right):
     pd.testing.assert_frame_equal(
         left.drop(columns=to_remove).sort_index(axis=1), right.sort_index(axis=1)
     )
-
-
-def api_run(pre=[], post=['collect']):
-    def runner(path):
-        with Case(path) as case:
-            case.clear_cache()
-            for method in pre:
-                getattr(case, method)()
-            assert case.run()
-            for method in post:
-                getattr(case, method)()
-    return runner
-
-
-def cli_run(commands=['run', 'collect']):
-    def runner(path):
-        with Case(path) as case:
-            case.clear_cache()
-        r = CliRunner()
-        for cmd in commands:
-            result = r.invoke(main, [cmd, '-c', str(path)])
-            if result.exit_code != 0:
-                print(result.stdout)
-            assert result.exit_code == 0
-    return runner
 
 
 @pytest.mark.parametrize('runner', [api_run(), cli_run()])
