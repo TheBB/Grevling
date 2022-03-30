@@ -184,7 +184,7 @@ class Case:
             for k, v in types.pandas().items()
             if k != 'g_index'
         }
-        return pd.DataFrame(index=pd.Int64Index([]), data=data)
+        return pd.DataFrame(index=pd.Index([], dtype=int), data=data)
 
     def save_dataframe(self, df: pd.DataFrame):
         df.to_parquet(self.dataframepath, engine='pyarrow', index=True)
