@@ -635,10 +635,19 @@ class Plot:
             others = [p for p in case.parameters if p != ignore]
             data = data.groupby(by=others).first().reset_index()
 
+        # Remove unnecessary columns
+        to_keep = set(self._parameters) | set(self._yaxis)
+        if self._xaxis is not None:
+            to_keep.add(self._xaxis)
+        to_remove = [c for c in data.columns if c not in to_keep]
+        data = data.drop(columns=to_remove)
+
         # Collapse mean parameters
         for mean in self._parameters_of_kind('mean'):
             others = [p for p in case.parameters if p != mean]
-            data = data.groupby(by=others).aggregate(util.flexible_mean).reset_index()
+            data = data.groupby(by=others)
+            data = data.aggregate(util.flexible_mean)
+            data = data.reset_index()
 
         # Extract data
         ydata = [util.flatten(data[f].to_numpy()) for f in self._yaxis]
