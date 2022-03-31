@@ -1,4 +1,47 @@
-{
+let plot = (
+    yaxis;
+    filename,
+    format,
+    fix = [],
+    over = [],
+    ignore = [],
+    average = [],
+    categorize = [],
+    xaxis = null,
+    grid = true,
+    xmode = "linear",
+    ymode = "linear",
+    legend = null,
+    xlabel = null,
+    ylabel = null,
+    title = null,
+) => {
+    filename: filename,
+    format: format,
+    yaxis: yaxis,
+    grid: grid,
+    xmode: xmode,
+    ymode: ymode,
+    parameters: {
+        for name in fix: $name: "fixed",
+        for name in over: $name: "variate",
+        for name in ignore: $name: "ignore",
+        for name in average: $name: "mean",
+        if islist(categorize):
+            for name in categorize:
+                $name: "category",
+        if isobject(categorize):
+            for [name, style] in items(categorize):
+                $name: {mode: "category", style: style},
+    },
+    if xaxis != null: xaxis: xaxis,
+    if legend != null: legend: legend,
+    if xlabel != null: xlabel: xlabel,
+    if ylabel != null: ylabel: ylabel,
+    if title != null: title: title,
+}
+
+in {
     linspace: (lo, hi; npts) => {
         type: "uniform",
         interval: [lo, hi],
@@ -45,4 +88,9 @@
         retry-on-fail: retry_on_fail,
         capture: capture,
     },
+
+    plot: plot,
+    semilogx: (...args; ...kwargs) => plot(...args, ...kwargs, ymode: "linear", xmode: "log"),
+    semilogy: (...args; ...kwargs) => plot(...args, ...kwargs, ymode: "log", xmode: "linear"),
+    loglog: (...args; ...kwargs) => plot(...args, ...kwargs, ymode: "log", xmode: "log"),
 }
