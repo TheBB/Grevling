@@ -2,7 +2,7 @@ let {cmd} = import("grevling")
 
 in {
     parameters: { retcode: [0, 1] },
-    script: ({retcode}) => [
+    script: {retcode} => [
         cmd(
             "echo before 12",
             name: "before",

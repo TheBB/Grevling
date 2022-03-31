@@ -1,18 +1,18 @@
 {
-    linspace: (lo, hi, {npts}) => {
+    linspace: (lo, hi; npts) => {
         type: "uniform",
         interval: [lo, hi],
         num: npts,
     },
 
-    gradspace: (lo, hi, {npts, grading = 1.0}) => {
+    gradspace: (lo, hi; npts, grading = 1.0) => {
         type: "graded",
         interval: [lo, hi],
         num: npts,
         grading: grading,
     },
 
-    copy: (from, to = null, {template = false}) => {
+    copy: (from, to = null; template = false) => {
         source: from,
         target: to or from,
         template: template,
@@ -27,16 +27,14 @@
     },
 
     cmd: (
-        cmd,
-        {
-            name = null,
-            env = {},
-            container = null,
-            container_args = [],
-            allow_failure = false,
-            retry_on_fail = false,
-            capture = [],
-        }
+        cmd;
+        name = null,
+        env = {},
+        container = null,
+        container_args = [],
+        allow_failure = false,
+        retry_on_fail = false,
+        capture = [],
     ) => {
         name: name,
         command: cmd,

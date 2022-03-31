@@ -2,7 +2,7 @@ let {cmd} = import("grevling")
 
 in {
     parameters: { retcode: [0, 1] },
-    script: ({retcode}) => [
+    script: {retcode} => [
         cmd(
             ["sh", "-c", "echo stdout ${retcode} && >&2 echo stderr ${retcode}"],
             name: "good",
@@ -13,6 +13,6 @@ in {
         ),
     ],
     settings: {
-        logdir: ({retcode}) => "out-${retcode}",
+        logdir: {retcode} => "out-${retcode}",
     },
 }
