@@ -1,4 +1,4 @@
-let {cmd} = import("grevling")
+let {cmd, plot, semilogx, semilogy, loglog} = import("grevling")
 
 let formats = ["mock", "matplotlib", "csv", "plotly"]
 let capture = (name) => [{
@@ -34,56 +34,54 @@ in {
         ),
     ],
     plots: [
-        {
-            parameters: {i: "variate"},
+        plot(
+            "isq",
+            over: ["i"],
             filename: "i-vs-isq",
             format: formats,
-            yaxis: "isq",
             grid: false,
-        },
-        {
-            parameters: {i: "variate", j: "mean", k: "fixed"},
+        ),
+        semilogx(
+            "misc",
+            over: ["i"],
+            fix: ["k"],
+            average: ["j"],
             filename: "misc-vs-i-\${k}",
             format: formats,
-            yaxis: "misc",
             title: "This is a plot for k=\${k}",
             xlabel: "x (\${k})",
             ylabel: "y (\${k})",
-            xmode: "log",
-        },
-        {
+        ),
+        semilogy(
+            "fresult",
             filename: "fresult",
             format: formats,
-            yaxis: "fresult",
-            ymode: "log",
-        },
-        {
-            parameters: {i: "mean", j: "mean", k: "ignore"},
-            yaxis: "fresult",
+        ),
+        loglog(
+            "fresult",
             filename: "fresult-mean",
             format: formats,
-            xmode: "log",
-            ymode: "log",
-        },
-        {
-            parameters: {i: "mean", j: "mean", k: "ignore"},
-            yaxis: "fresult",
+        ),
+        plot(
+            "fresult",
+            average: ["i", "j"],
+            ignore: ["k"],
             filename: "fresult-allmean",
             format: formats,
-        },
-        {
-            parameters: {i: {mode: "category", style: "color"}},
-            filename: "vresult",
+        ),
+        plot(
+            "vresult",
+            categorize: {i: "color"},
             format: formats,
-            yaxis: "vresult",
+            filename: "vresult",
             legend: "i is \${i} - \${yaxis}",
-        },
-        {
-            parameters: {for k in ["i", "j", "k"]: $k: "variate"},
+        ),
+        plot(
+            "misc",
+            over: ["i", "j", "k"],
+            xaxis: "j",
             filename: "scatter",
             format: formats,
-            xaxis: "j",
-            yaxis: ["misc"],
-        },
+        ),
     ],
 }

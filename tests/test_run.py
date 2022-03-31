@@ -40,7 +40,7 @@ def test_echo(runner, suffix):
     check_df(
         data,
         pd.DataFrame(
-            index=pd.Int64Index(range(9)),
+            index=pd.Index(range(9)),
             data={
                 'alpha': pd.array([1, 1, 1, 2, 2, 2, 3, 3, 3], dtype=pd.Int64Dtype()),
                 'bravo': ['a', 'b', 'c', 'a', 'b', 'c', 'a', 'b', 'c'],
@@ -66,7 +66,7 @@ def test_cat(runner, suffix):
     check_df(
         data,
         pd.DataFrame(
-            index=pd.Int64Index(range(9)),
+            index=pd.Index(range(9)),
             data={
                 'alpha': pd.array([1, 1, 1, 2, 2, 2, 3, 3, 3], dtype=pd.Int64Dtype()),
                 'bravo': ['a', 'b', 'c', 'a', 'b', 'c', 'a', 'b', 'c'],
@@ -131,7 +131,7 @@ def test_capture(runner, suffix):
     check_df(
         data,
         pd.DataFrame(
-            index=pd.Int64Index(range(9)),
+            index=pd.Index(range(9)),
             data={
                 'alpha': [
                     1.234,
@@ -213,7 +213,7 @@ def test_double_capture(runner, suffix):
     check_df(
         data,
         pd.DataFrame(
-            index=pd.Int64Index(range(9)),
+            index=pd.Index(range(9)),
             data={
                 'alpha': [
                     1.234,
@@ -295,7 +295,7 @@ def test_failing(runner, suffix):
     check_df(
         data,
         pd.DataFrame(
-            index=pd.Int64Index([0, 1]),
+            index=pd.Index([0, 1]),
             data={
                 'retcode': pd.array([0, 1], dtype=pd.Int64Dtype()),
                 'before': pd.array([12, 12], dtype=pd.Int64Dtype()),
