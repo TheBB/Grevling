@@ -5,7 +5,7 @@ in {
         alpha: [1, 2, 3],
         bravo: ["a", "b", "c"],
     },
-    evaluate: ({alpha}) => {
+    evaluate: {alpha} => {
         charlie: 2 * alpha - 1,
     },
     prefiles: [
@@ -21,6 +21,6 @@ in {
         glob("some/deep/directory/empty*.dat"),
     ],
     settings: {
-        logdir: ({alpha, bravo}) => "${alpha}-${bravo}",
+        logdir: {alpha, bravo} => "${alpha}-${bravo}",
     },
 }

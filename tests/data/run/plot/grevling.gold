@@ -14,14 +14,14 @@ in {
         j: [1, 2, 4, 8, 16],
         k: ["a", "b", "c"],
     },
-    evaluate: ({i, j, k}) => {
+    evaluate: {i, j, k} => {
         isq: i^2,
         jlog: log(j),
         misc: i + j + ord(k),
         pi: 3.1415,
         e: 2.7182
     },
-    script: ({i}) => [
+    script: {i} => [
         cmd(
             ["sh", "-c", "for i in `seq 1 ${i}`; do echo result $i; done"],
             name: "sh-v",
