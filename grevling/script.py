@@ -39,10 +39,10 @@ async def run(
     }
 
     if shell:
-        command = ' '.join(shlex.quote(c) for c in command)
-        proc = await asyncio.create_subprocess_shell(command, **kwargs)
+        scommand = ' '.join(shlex.quote(c) for c in command)
+        proc = await asyncio.create_subprocess_shell(scommand, **kwargs)  # type: ignore
     else:
-        proc = await asyncio.create_subprocess_exec(*command, **kwargs)
+        proc = await asyncio.create_subprocess_exec(*command, **kwargs)   # type: ignore
 
     assert proc.stdout is not None
 
@@ -53,8 +53,7 @@ async def run(
             if not line:
                 break
             stdout += line
-            line = line.decode().rstrip()
-            util.log.debug(line)
+            util.log.debug(line.decode().rstrip())
 
     remaining_stdout, stderr = await proc.communicate()
     stdout += remaining_stdout
@@ -79,7 +78,7 @@ class Command:
 
     @classmethod
     def load(cls, data: Any) -> Command:
-        kwargs = {
+        kwargs: Dict = {
             'shell': False
         }
 
@@ -135,7 +134,7 @@ class Command:
         # TODO: How to get good timings when we run async?
         with time() as duration:
             while True:
-                result = await run(command, **kwargs)
+                result = await run(command, **kwargs)  # type: ignore
                 if self.retry_on_fail and result.returncode:
                     util.log.info('Failed, retrying...')
                     continue
@@ -161,7 +160,7 @@ class Command:
 
     def capture(self, collector: CaptureCollection, workspace: api.Workspace):
         try:
-            with workspace.open_file(f'{self.name}.stdout', 'r') as f:
+            with workspace.open_str(f'{self.name}.stdout', 'r') as f:
                 stdout = f.read()
         except FileNotFoundError:
             return

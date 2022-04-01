@@ -3,11 +3,10 @@ from __future__ import annotations
 from abc import ABC, abstractclassmethod, abstractmethod
 from enum import Enum
 from fnmatch import fnmatch
-from io import IOBase
 import json
 from pathlib import Path
 
-from typing import Any, ContextManager, Generic, Iterable, Type, TypeVar, Union, Optional, TYPE_CHECKING
+from typing import IO, BinaryIO, ContextManager, Generic, Iterable, TextIO, TypeVar, Union, Optional, TYPE_CHECKING
 
 from . import util
 
@@ -19,21 +18,19 @@ if TYPE_CHECKING:
 PathStr = Union[Path, str]
 
 
-T = TypeVar('T', bound='SpecConstructible')
-
 class SpecConstructible(ABC):
 
     @abstractclassmethod
-    def load(cls: Type[T], data: Any, **kwargs) -> T:
+    def load(cls, data, **kwargs):
         ...
 
 
-T = TypeVar('T')
+U = TypeVar('U')
 
-class Renderable(ABC, Generic[T]):
+class Renderable(ABC, Generic[U]):
 
     @abstractmethod
-    def render(self, ctx: Context) -> T:
+    def render(self, ctx: Context) -> U:
         ...
 
 
@@ -59,15 +56,15 @@ class Workspace(ABC):
         ...
 
     @abstractmethod
-    def open_file(self, path: PathStr, mode: str = 'w') -> ContextManager[IOBase]:
+    def open_str(self, path: PathStr, mode: str = 'w') -> ContextManager[TextIO]:
         ...
 
     @abstractmethod
-    def write_file(self, path: PathStr, source: Union[str, bytes, IOBase, Path]):
+    def open_bytes(self, path: PathStr) -> ContextManager[BinaryIO]:
         ...
 
     @abstractmethod
-    def read_file(self, path: PathStr) -> ContextManager[IOBase]:
+    def write_file(self, path: PathStr, source: Union[str, bytes, IO, Path], append: bool = False):
         ...
 
     @abstractmethod
@@ -79,7 +76,7 @@ class Workspace(ABC):
         ...
 
     @abstractmethod
-    def subspace(self, name: str) -> Workspace:
+    def subspace(self, path: str, name: str = '') -> Workspace:
         ...
 
     @abstractmethod

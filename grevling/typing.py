@@ -8,11 +8,11 @@ from pathlib import Path
 
 from typing import Any, Dict, Optional, Type
 
-import pandas as pd
+import pandas as pd                 # type: ignore
 from pydantic import PrivateAttr
 from pydantic.main import BaseModel
 
-from . import util, api
+from . import api
 
 
 class GType(ABC):
@@ -153,7 +153,7 @@ class List(GType):
         return self.eltype.coerce(value)
 
 
-TYPES: Dict[str, Type] = {
+TYPES: Dict[str, GType] = {
     'int': Integer(),
     'integer': Integer(),
     'float': Floating(),
@@ -164,7 +164,7 @@ TYPES: Dict[str, Type] = {
 }
 
 
-class TypeManager(dict, Dict[str, GType]):
+class TypeManager(Dict[str, GType]):
 
     def __init__(self, *args, **kwargs):
         dict.__init__(self, *args, **kwargs)
@@ -173,11 +173,6 @@ class TypeManager(dict, Dict[str, GType]):
         self['g_started'] = Datetime()
         self['g_finished'] = Datetime()
         self['g_success'] = Boolean()
-
-    def get(self, key: str, default: Optional[GType] = None):
-        if key.startswith('g_walltime'):
-            return Floating()
-        return super().get(key, default)
 
     def __getitem__(self, key: str) -> GType:
         if key.startswith('g_walltime'):

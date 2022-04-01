@@ -8,7 +8,7 @@ import sys
 
 from typing import List
 
-from asteval import Interpreter
+from asteval import Interpreter                 # type: ignore
 import click
 
 import grevling
@@ -104,16 +104,16 @@ def run(case: Case, workflow: str, nprocs: int):
 
 @main.command('run-with')
 @click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
-@click.option('--target', '-t', default='.', type=click.Path())
+@click.option('--target', '-t', default='.', type=click.Path(path_type=Path))
 @workflows
 @click.argument('context', nargs=-1, type=str)
-def run_with(case: Case, target: str, workflow: str, context: List[str]):
+def run_with(case: Case, target: Path, workflow: str, context: List[str]):
     evaluator = Interpreter()
     parsed_context = {}
     for s in context:
         k, v = s.split('=', 1)
         parsed_context[k] = evaluator.eval(v)
-    instance = case.create_instance(parsed_context, logdir=target)
+    instance = case.create_instance(api.Context(parsed_context), logdir=target)
     with api.Workflow.get_workflow(workflow)() as w:
         if not w.pipeline(case).run([instance]):
             sys.exit(1)
@@ -142,7 +142,7 @@ def plot(case: Case):
 @click.option('--fmt', '-f', default='json', type=click.Choice(['json']))
 @click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
 @click.argument('output', type=click.File('w'))
-def dump(case: Case, fmt: str, output: io.IOBase):
+def dump(case: Case, fmt: str, output: io.StringIO):
     data = case.load_dataframe()
     if fmt == 'json':
         json.dump(

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from io import IOBase
 from pathlib import Path
 import shutil
 import tempfile
 
-from typing import Union, Iterable, Optional, ContextManager, TYPE_CHECKING
+from typing import IO, BinaryIO, Generator, TextIO, Union, Iterable, Optional, TYPE_CHECKING
 
 from . import Pipeline, PipeSegment, PrepareInstance, DownloadResults
 from ..api import Status
@@ -29,6 +28,7 @@ class RunInstance(PipeSegment):
     async def apply(self, instance: Instance) -> Instance:
         instance.status = Status.Started
         workspace = instance.open_workspace(self.workspaces)
+        assert isinstance(workspace, LocalWorkspace)
         await instance.script.run(workspace.root, workspace.subspace('.grevling'))
         instance.status = Status.Finished
         return instance
@@ -104,12 +104,17 @@ class LocalWorkspace(api.Workspace):
         shutil.rmtree(self.root)
 
     @contextmanager
-    def open_file(self, path, mode: str = 'w') -> ContextManager[IOBase]:
+    def open_str(self, path, mode: str = 'w') -> Generator[TextIO, None, None]:
         with open(self.root / path, mode) as f:
-            yield f
+            yield f  # type: ignore
+
+    @contextmanager
+    def open_bytes(self, path, mode: str = 'rb') -> Generator[BinaryIO, None, None]:
+        with open(self.root / path, mode) as f:
+            yield f  # type: ignore
 
     def write_file(
-        self, path, source: Union[str, bytes, IOBase, Path], append: bool = False
+        self, path, source: Union[str, bytes, IO, Path], append: bool = False
     ):
         target = self.root / path
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -122,17 +127,12 @@ class LocalWorkspace(api.Workspace):
             source = source.encode()
 
         mode = 'ab' if append else 'wb'
-        with self.open_file(path, mode) as f:
+        with self.open_bytes(path, mode) as f:
             if isinstance(source, bytes):
                 f.write(source)
             else:
                 shutil.copyfileobj(source, f)
             return
-
-    @contextmanager
-    def read_file(self, path) -> ContextManager[IOBase]:
-        with open(self.root / path, 'rb') as f:
-            yield f
 
     def files(self) -> Iterable[Path]:
         for path in self.root.rglob('*'):
@@ -144,9 +144,9 @@ class LocalWorkspace(api.Workspace):
 
     def subspace(self, path: str, name: str = '') -> api.Workspace:
         name = name or str(path)
-        path = self.root / path
-        path.mkdir(exist_ok=True, parents=True)
-        return LocalWorkspace(path, name=f'{self.name}/{name}')
+        subpath = self.root / path
+        subpath.mkdir(exist_ok=True, parents=True)
+        return LocalWorkspace(subpath, name=f'{self.name}/{name}')
 
     def top_name(self) -> str:
         return self.root.name

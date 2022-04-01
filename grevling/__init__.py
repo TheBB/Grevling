@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from difflib import Differ
 import json
-import os
 from pathlib import Path
-import pydoc
 import shutil
 
 from typing import List, Iterable, Optional, Any, Dict
 
-from fasteners import InterProcessLock
-import pandas as pd
+from fasteners import InterProcessLock              # type: ignore
+import pandas as pd                                 # type: ignore
 
 from grevling.typing import TypeManager
 
@@ -24,7 +21,7 @@ from .context import ContextProvider
 from .parameters import ParameterSpace
 from .filemap import FileMapTemplate, FileMap
 from .script import Script, ScriptTemplate
-from .typing import GType, PersistentObject
+from .typing import PersistentObject
 from .workflow.local import LocalWorkspaceCollection, LocalWorkspace, LocalWorkflow
 from . import util, api
 
@@ -108,6 +105,7 @@ class Case:
             validate(casedata)
             casedata = normalize(casedata)
 
+        assert isinstance(casedata, Dict)
         self.casedata = casedata
         self.context_mgr = ContextProvider.load(casedata)
 
@@ -212,7 +210,7 @@ class Case:
             index = 0
         ctx['g_index'] = index
         if logdir is None:
-            logdir = render(self._logdir, ctx)
+            logdir = Path(render(self._logdir, ctx))
         ctx['g_logdir'] = str(logdir)
         workspace = LocalWorkspace(Path(ctx['g_logdir']), name='LOG')
         return Instance.create(self, ctx, local=workspace)
@@ -266,7 +264,7 @@ class Case:
                 continue
             yield LocalWorkspace(path)
 
-    @property
+    @property  # type: ignore
     @util.deprecated("will be removed", name='Case.shape')
     def shape(self):
         return tuple(map(len, self._parameters.values()))
@@ -281,7 +279,6 @@ class Instance:
     remote_book: Optional[api.Workspace]
 
     logdir: str
-    status: Status
 
     _case: Case
     _context: Optional[api.Context]
@@ -307,6 +304,7 @@ class Instance:
         if context:
             self.logdir = context['g_logdir']
         else:
+            assert logdir is not None
             self.logdir = logdir
 
         if local is None:
@@ -321,33 +319,27 @@ class Instance:
     @property
     def status(self) -> api.Status:
         if not self._status:
-            with self.local_book.open_file('status.txt', 'r') as f:
+            with self.local_book.open_str('status.txt', 'r') as f:
                 status = f.read()
             self._status = Status(status)
         return self._status
 
     @status.setter
     def status(self, value: api.Status):
-        with self.local_book.open_file('status.txt', 'w') as f:
+        with self.local_book.open_str('status.txt', 'w') as f:
             f.write(value.value)
         self._status = value
 
     @property
     def context(self) -> api.Context:
         if self._context is None:
-            with self.local_book.open_file('context.json', 'r') as f:
+            with self.local_book.open_str('context.json', 'r') as f:
                 self._context = api.Context(json.load(f))
         return self._context
 
     @property
     def types(self) -> TypeManager:
         return self._case.types
-
-    def __getitem__(self, key: str) -> Any:
-        return self.context[key]
-
-    def __setitem__(self, key: str, value: Any) -> Any:
-        self.context[key] = util.coerce(self.types[key], value)
 
     @contextmanager
     def bind_remote(self, spaces: api.WorkspaceCollection):
@@ -367,7 +359,7 @@ class Instance:
         return self._case.script.render(self.context)
 
     def write_context(self):
-        with self.local_book.open_file('context.json', 'w') as f:
+        with self.local_book.open_str('context.json', 'w') as f:
             f.write(self.context.json(sort_keys=True, indent=4))
 
     def open_workspace(self, workspaces, name='') -> api.Workspace:

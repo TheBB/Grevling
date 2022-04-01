@@ -10,12 +10,11 @@ from typing import List, Dict, Optional, Iterable, Any, Tuple, TYPE_CHECKING
 
 from bidict import bidict
 import numpy as np
-import pandas as pd
+import pandas as pd                         # type: ignore
 
 from .parameters import ParameterSpace
-from . import util, typing
-from .util import ignore, is_list_type
-from .render import render
+from . import util, api
+from .render import StringRenderable, render
 
 if TYPE_CHECKING:
     from . import Case
@@ -57,20 +56,35 @@ class PlotBackend(ABC):
     def generate(self, filename: Path):
         ...
 
-    set_title = ignore
-    set_xlabel = ignore
-    set_ylabel = ignore
-    set_xmode = ignore
-    set_ymode = ignore
-    set_grid = ignore
-    set_xlim = ignore
-    set_ylim = ignore
+    def set_title(self, title: str):
+        ...
+
+    def set_xlabel(self, title: str):
+        ...
+
+    def set_ylabel(self, title: str):
+        ...
+
+    def set_xmode(self, value: str):
+        ...
+
+    def set_ymode(self, value: str):
+        ...
+
+    def set_grid(self, value: bool):
+        ...
+
+    def set_xlim(self, value: List[float]):
+        ...
+
+    def set_ylim(self, value: List[float]):
+        ...
 
 
 class MockBackend(PlotBackend):
 
     name = 'mock'
-    plots = []
+    plots: List[MockBackend] = []
 
     @classmethod
     def available(cls) -> bool:
@@ -137,15 +151,13 @@ class MatplotilbBackend(PlotBackend):
     @classmethod
     def available(cls) -> bool:
         try:
-            import matplotlib
-
+            import matplotlib  # type: ignore
             return True
         except ImportError:
             return False
 
     def __init__(self):
-        from matplotlib.figure import Figure
-
+        from matplotlib.figure import Figure  # type: ignore
         self.figure = Figure(tight_layout=True)
         self.axes = self.figure.add_subplot(1, 1, 1)
         self.legend = []
@@ -216,15 +228,13 @@ class PlotlyBackend(PlotBackend):
     @classmethod
     def available(cls) -> bool:
         try:
-            import plotly
-
+            import plotly  # type: ignore
             return True
         except:
             return False
 
     def __init__(self):
-        import plotly.graph_objects as go
-
+        import plotly.graph_objects as go  # type: ignore
         self.figure = go.Figure()
 
     def add_line(
@@ -283,7 +293,7 @@ class CSVBackend(PlotBackend):
 
     name = 'csv'
 
-    columns: List[Tuple[List[float], List[float]]]
+    columns: List[List[float]]
     legend: List[str]
 
     @classmethod
@@ -310,7 +320,7 @@ class CSVBackend(PlotBackend):
         filename = filename.with_suffix('.csv')
         util.log.info(f'Written: {filename}')
         maxlen = max(len(c) for c in self.columns)
-        cols = [list(c) + [None] * (maxlen - len(c)) for c in self.columns]
+        cols = [list(c) + [None] * (maxlen - len(c)) for c in self.columns]  # type: ignore
         with open(filename, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(self.legend)
@@ -668,7 +678,9 @@ class Plot:
 
     def generate_legend(self, context: dict, yaxis: str) -> str:
         if self._legend is not None:
-            return render(self._legend, {**context, 'yaxis': yaxis})
+            return StringRenderable(self._legend).render(
+                api.Context(**context, yaxis=yaxis)
+            )
         if any(self._parameters_of_kind('category')):
             name = ', '.join(
                 f'{k}={repr(context[k])}' for k in self._parameters_of_kind('category')

@@ -3,10 +3,13 @@ import shlex
 
 from typing import Any, Dict, Optional, Callable, Tuple, Type, TypeVar, Union
 
-from jsonpath_ng import parse
-from mako.template import Template
+from jsonpath_ng import parse, JSONPath     # type: ignore
+from mako.template import Template          # type: ignore
 
 from . import api
+
+
+T = TypeVar('T')
 
 
 def quote_shell(text):
@@ -48,8 +51,6 @@ class StringRenderable(api.Renderable[str]):
         return template.render(**context, rnd=rnd, sci=sci)
 
 
-T = TypeVar('T')
-
 class JsonRenderable(api.Renderable[T]):
 
     data: Dict
@@ -57,10 +58,10 @@ class JsonRenderable(api.Renderable[T]):
     constructor: Callable[[Any], T]
     mode: Optional[str]
 
-    def __init__(self, data: Dict, constructor: Type[T], *paths: str, mode: Optional[str] = None):
+    def __init__(self, data: Dict, constructor: Callable[[Any], T], *paths: str, mode: Optional[str] = None):
         self.paths = paths
         self.data = data
-        self.constructor = constructor
+        self.constructor = constructor          # type: ignore
         self.mode = mode
 
     def render(self, context: api.Context) -> T:
@@ -73,12 +74,10 @@ class JsonRenderable(api.Renderable[T]):
             container[key] = renderer.render(context)
         data = deepcopy(self.data)
         for path in self.paths:
-            path = parse(path)
-            data = path.update(data, updater)
-        return self.constructor(data)
+            jpath: JSONPath = parse(path)
+            data = jpath.update(data, updater)
+        return self.constructor(data)           # type: ignore
 
-
-T = TypeVar('T')
 
 class CallableRenderable(api.Renderable[T]):
 
@@ -86,19 +85,17 @@ class CallableRenderable(api.Renderable[T]):
     validator: Callable
     constructor: Callable[[Any], T]
 
-    def __init__(self, func: Callable, constructor: Type[T], validator: Callable):
-        self.func = func
-        self.constructor = constructor
-        self.validator = validator
+    def __init__(self, func: Callable, constructor: Callable[[Any], T], validator: Callable):
+        self.func = func                    # type: ignore
+        self.constructor = constructor      # type: ignore
+        self.validator = validator          # type: ignore
 
     def render(self, context: api.Context) -> T:
         data = context(self.func)
         if not self.validator(data):
             raise ValueError("function validation failed")
-        return self.constructor(data)
+        return self.constructor(data)       # type: ignore
 
-
-T = TypeVar('T')
 
 def renderable(
     obj: Any,

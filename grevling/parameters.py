@@ -36,7 +36,7 @@ class UniformParameter(Parameter):
     __tag__ = 'uniform'
 
     def __init__(self, name: str, interval: Tuple[float, float], num: int):
-        super().__init__(name, np.linspace(*interval, num=num))
+        super().__init__(name, list(np.linspace(*interval, num=num)))
 
 
 class GradedParameter(Parameter):
@@ -52,7 +52,7 @@ class GradedParameter(Parameter):
         for _ in range(num - 1):
             values.append(values[-1] + step)
             step *= grading
-        super().__init__(name, np.array(values))
+        super().__init__(name, values)
 
 
 class ParameterSpace(dict):
