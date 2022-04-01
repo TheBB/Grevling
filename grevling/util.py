@@ -6,13 +6,11 @@ from itertools import product, chain
 import json
 import logging
 
-from typing import List, Optional
-
-from typing_inspect import get_origin, get_args
+from typing import Callable, Optional
 
 import numpy as np
 from numpy.polynomial import Legendre
-import pandas as pd
+import pandas as pd                         # type: ignore
 import rich.logging
 
 
@@ -39,6 +37,7 @@ class LoggerAdapter(logging.LoggerAdapter):
     def with_context(self, ctx: str):
         context = self.find_context()
         frame = inspect.currentframe()
+        assert frame; assert frame.f_back; assert frame.f_back.f_back
         frame = frame.f_back.f_back
         bindings = frame.f_locals
 
@@ -50,7 +49,7 @@ class LoggerAdapter(logging.LoggerAdapter):
 
 
 def with_context(fmt: str):
-    def decorator(func: callable):
+    def decorator(func: Callable):
         signature = inspect.signature(func)
 
         def calculate_context(*args, **kwargs):
@@ -203,10 +202,6 @@ def deprecated(info, name=None):
         return inner
 
     return decorator
-
-
-def is_list_type(tp):
-    return get_origin(tp) == list or get_origin(tp) == List
 
 
 def unitvec(n: int, length: Optional[int] = None) -> np.ndarray:

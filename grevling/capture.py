@@ -3,12 +3,7 @@ from __future__ import annotations
 import json
 import re
 
-from typing import Optional, List, TYPE_CHECKING
-
-from pandas import BooleanDtype
-from pydantic import validate_model
-from pydantic.fields import SHAPE_LIST
-
+from typing import Iterable, Optional, TYPE_CHECKING
 
 from . import util, api, typing
 
@@ -63,10 +58,11 @@ class Capture:
 
     def find_in(self, collector: CaptureCollection, string: str):
         matches = self._regex.finditer(string)
+        filtered: Iterable[re.Match]
 
         if self._mode == 'first':
             try:
-                matches = [next(matches)]
+                filtered = [next(matches)]
             except StopIteration:
                 return
             tp = self._type
@@ -78,13 +74,14 @@ class Capture:
                 return
             for match in matches:
                 pass
-            matches = [match]
+            filtered = [match]
             tp = self._type
 
         else:
-            tp = typing.List(self._type)
+            tp = typing.List(self._type) if self._type else None
+            filtered = list(matches)
 
-        for match in matches:
+        for match in filtered:
             for name, value in match.groupdict().items():
                 collector.collect(name, value, tp=tp)
 
@@ -97,16 +94,15 @@ class CaptureCollection(api.Context):
         self.types = types
 
     def collect(self, name, value, tp: Optional[GType] = None):
-        if tp is None:
-            tp: GType = self.types.get(name, typing.AnyType())
-        value = tp.coerce(value)
-        if tp.is_list:
+        gtp: GType = tp if tp is not None else self.types.get(name, typing.AnyType())
+        value = gtp.coerce(value)
+        if gtp.is_list:
             self.setdefault(name, []).append(value)
         else:
             self[name] = value
 
     def collect_from_file(self, ws: api.Workspace, filename: str):
-        with ws.open_file(filename, 'r') as f:
+        with ws.open_str(filename, 'r') as f:
             data = json.load(f)
         self.update(data)
 
@@ -117,13 +113,13 @@ class CaptureCollection(api.Context):
         self.collect_from_file(ws, 'captured.json')
 
     def collect_from_info(self, ws: api.Workspace):
-        with ws.open_file('grevling.txt', 'r') as f:
+        with ws.open_str('grevling.txt', 'r') as f:
             for line in f:
                 key, value = line.strip().split('=', 1)
                 self.collect(key, value)
 
     def commit_to_file(self, ws: api.Workspace):
-        with ws.open_file('captured.json', 'w') as f:
+        with ws.open_str('captured.json', 'w') as f:
             f.write(self.json())
 
     def commit_to_dataframe(self, data):

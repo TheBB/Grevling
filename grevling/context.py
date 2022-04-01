@@ -1,24 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
-from operator import methodcaller
+from typing import Callable, Dict, Any, Optional, Iterable, List
 
-from typing import Callable, Dict, Any, Optional, Sequence, Iterable, Type, List
-
-from asteval import Interpreter
+from asteval import Interpreter                 # type: ignore
 
 from .parameters import ParameterSpace
-# from .typing import TypeManager, Stage, find_type
 from . import util, api
-
-
-def _guess_eltype(collection: Sequence) -> Type:
-    if all(isinstance(v, str) for v in collection):
-        return str
-    if all(isinstance(v, int) for v in collection):
-        return int
-    assert all(isinstance(v, (int, float)) for v in collection)
-    return float
 
 
 class ContextProvider:
@@ -69,7 +56,7 @@ class ContextProvider:
         context,
         verbose: bool = True,
         add_constants: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> api.Context:
         if self.eval_func:
             context = {**context, **self.eval_func(**context)}
 
@@ -98,9 +85,9 @@ class ContextProvider:
                 if k not in context:
                     context[k] = v
 
-        return context
+        return api.Context(context)
 
-    def subspace(self, *names: str, **kwargs) -> Iterable[Dict]:
+    def subspace(self, *names: str, **kwargs) -> Iterable[api.Context]:
         for values in self.parameters.subspace(*names):
             context = self.evaluate(values, **kwargs)
             if not self.cond_func and not self.cond_dep:
@@ -119,5 +106,5 @@ class ContextProvider:
             else:
                 yield context
 
-    def fullspace(self, **kwargs) -> Iterable[Dict]:
+    def fullspace(self, **kwargs) -> Iterable[api.Context]:
         yield from self.subspace(*self.parameters, **kwargs)

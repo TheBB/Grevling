@@ -1,17 +1,11 @@
-from copy import deepcopy
-from functools import reduce
 from pathlib import Path
-import re
 
-from typing import Any, List, Tuple, Dict
+from typing import Any, List, Dict
 
-import goldpy as gold
-import jsonschema
-import jsonschema.validators
-from matplotlib import container
+import goldpy as gold                   # type: ignore
+import jsonschema                       # type: ignore
+import jsonschema.validators            # type: ignore
 import yaml
-
-from . import util
 
 
 is_callable = lambda _, fn: callable(fn)
@@ -84,7 +78,7 @@ class CustomSchema:
         return True
 
     @classmethod
-    def normalize(cls, data: Dict) -> Dict:
+    def normalize(cls, data: Any) -> Any:
         return data
 
 
@@ -153,7 +147,7 @@ class Script(CustomSchema):
     )
 
     @classmethod
-    def normalize(cls, data: List) -> List:
+    def normalize(cls, data: Any) -> List:
         result = []
         for script in data:
             if isinstance(script, (list, str)):

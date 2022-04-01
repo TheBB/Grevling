@@ -22,11 +22,11 @@ class Pipe(ABC):
     def run(self, inputs: Iterable[Any]) -> bool:
         # TODO: As far as I can tell, this is only needed on Python 3.7
         if os.name == 'nt':
-            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())  # type: ignore
         return asyncio.run(self._run(inputs))
 
     @abstractmethod
-    def _run(self, inputs: Iterable[Any]) -> bool:
+    async def _run(self, inputs: Iterable[Any]) -> bool:
         ...
 
     @abstractmethod
@@ -112,7 +112,7 @@ class Pipeline(Pipe):
         self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None
     ):
         ntasks = len(self.pipes)
-        queues = [asyncio.Queue(maxsize=1) for _ in range(ntasks - 1)]
+        queues: List[asyncio.Queue] = [asyncio.Queue(maxsize=1) for _ in range(ntasks - 1)]
         in_queues = chain([in_queue], queues)
         out_queues = chain(queues, [out_queue])
 

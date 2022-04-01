@@ -67,18 +67,20 @@ class SingleFileMap:
                 )
 
             if not self.template:
-                with source.read_file(sourcepath) as f:
+                with source.open_bytes(sourcepath) as f:
                     target.write_file(targetpath, f)
 
             else:
-                with source.read_file(sourcepath) as f:
+                with source.open_bytes(sourcepath) as f:
                     text = f.read().decode()
                 target.write_file(targetpath, StringRenderable(text).render(context).encode())
 
         return True
 
 
-class FileMap(list):
+class FileMap:
+
+    elements: List[SingleFileMap]
 
     @classmethod
     def load(cls, data: List) -> FileMap:
@@ -87,7 +89,7 @@ class FileMap(list):
     @classmethod
     def create(cls, *, files: List = []) -> FileMap:
         mapping = cls()
-        mapping.extend(SingleFileMap.load(spec) for spec in files)
+        mapping.elements = [SingleFileMap.load(spec) for spec in files]
         return mapping
 
     def copy(
@@ -97,7 +99,7 @@ class FileMap(list):
         target: api.Workspace,
         **kwargs,
     ) -> bool:
-        for mapper in self:
+        for mapper in self.elements:
             if not mapper.copy(context, source, target, **kwargs):
                 return False
         return True
