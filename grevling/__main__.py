@@ -142,6 +142,16 @@ def plot(case: Case):
     case.plot()
 
 
+@main.command('metabase')
+@click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
+def metabase(case: Case):
+    with case.metabase() as success:
+        if success:
+            util.wait_for_interrupt()
+        else:
+            sys.exit(1)
+
+
 @main.command()
 @click.option('--fmt', '-f', default='json', type=click.Choice(['json']))
 @click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))

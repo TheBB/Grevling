@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import json
 from pathlib import Path
 import shutil
+import subprocess
 
 from typing import List, Iterable, Optional, Any, Dict
 
@@ -283,6 +284,42 @@ class Case:
         for plot in self._plots:
             plot.generate_all(self)
         self.state.has_plotted = True
+
+    @contextmanager
+    def metabase(self):
+        jar = util.ensure_metabase()
+        args = ['java', '-jar', str(jar.absolute())]
+        env = {
+            'MB_DB_FILE': str((self.storagepath / 'metabase').absolute()),
+            'MB_COLORIZE_LOGS': 'false',
+        }
+        process = subprocess.Popen(args, env=env, stdout=subprocess.PIPE)
+        assert process.stdout
+
+        try:
+            success = False
+            with util.log.with_context('metabase'):
+                util.log.info('Waiting for metabase to initialize...')
+                while True:
+                    if process.poll() is not None:
+                        util.log.error('Metabase failed to initialize')
+                        break
+                    line = process.stdout.readline().decode()
+                    if line.strip():
+                        util.log.debug(line.rstrip())
+                    if 'Metabase Initialization COMPLETE' in line:
+                        success = True
+                        break
+
+                if success:
+                    util.setup_metabase('http://localhost:3000', self.sqlitepath)
+                    util.log.info('Metabase initialized')
+                    util.log.info('Go to http://localhost:3000')
+                    util.log.info("Log in with email: 'g@g.gg' and password: 'g'")
+
+            yield success
+        finally:
+            process.kill()
 
     def run(self, nprocs=1) -> bool:
         nprocs = nprocs or 1

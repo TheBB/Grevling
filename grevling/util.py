@@ -5,13 +5,90 @@ import inspect
 from itertools import product, chain
 import json
 import logging
+from pathlib import Path
+from re import I
+import shutil
+import time
 
 from typing import Callable, Optional
 
 import numpy as np
 from numpy.polynomial import Legendre
 import pandas as pd                         # type: ignore
+import requests
 import rich.logging
+from tqdm import tqdm
+from xdg import xdg_data_home
+
+
+def ensure_metabase() -> Path:
+    path = xdg_data_home() / 'grevling'
+    path.mkdir(exist_ok=True)
+    path = path / 'metabase.jar'
+    if not path.exists():
+        url = 'https://downloads.metabase.com/v0.42.3/metabase.jar'
+        with requests.get(url, stream=True) as r:
+            total = int(r.headers.get('Content-Length'))
+            with tqdm.wrapattr(r.raw, 'read', total=total, desc='Downloading metabase') as raw:
+                with open(path, 'wb') as f:
+                    shutil.copyfileobj(raw, f)
+    return path
+
+
+def setup_metabase(url: str, db: Path):
+    setup_token = requests.get(f'{url}/api/session/properties').json()['setup-token']
+    if setup_token is None:
+        return
+    session = requests.post(f'{url}/api/setup', json={
+        'token': setup_token,
+        'user': {
+            'email': 'grevling@grevling.grevling',
+            'first_name': 'Grevling',
+            'last_name': 'Grevling',
+            'password': 'Grevling123',
+        },
+        'prefs': {
+            'site_name': 'Grevling',
+        },
+        'database': {
+            'engine': 'sqlite',
+            'name': 'Grevling',
+            'details': {
+                'db': str(db.absolute()),
+            },
+        },
+    }).json()['id']
+
+    headers = {'X-Metabase-Session': session}
+    requests.delete(f'{url}/api/database/1', headers=headers)
+    requests.post(f'{url}/api/user', headers=headers, json={
+        'first_name': 'Grevling',
+        'last_name': 'Grevling',
+        'email': 'g@g.gg',
+        'password': 'g',
+        'group_ids': [1, 2],
+    })
+
+    fields = list(requests.get(f'{url}/api/database/2/fields', headers=headers).json())
+    for field in fields:
+        fid = field['id']
+        name = field['name']
+        stype = field['semantic_type']
+        table = field['table_name'].lower()
+        if name == 'G Index' or stype == 'type/PK' and table != 'data':
+            requests.put(f'{url}/api/field/{fid}', headers=headers, json={'visibility_type': 'sensitive'})
+        elif stype in ('type/FK', 'type/PK'):
+            requests.put(f'{url}/api/field/{fid}', headers=headers, json={'visibility_type': 'details-only'})
+        elif name.startswith('G '):
+            requests.put(f'{url}/api/field/{fid}', headers=headers, json={'display_name': name[2:]})
+
+
+def wait_for_interrupt():
+    try:
+        while True:
+            time.sleep(5)
+    except KeyboardInterrupt:
+        pass
 
 
 class LoggerAdapter(logging.LoggerAdapter):

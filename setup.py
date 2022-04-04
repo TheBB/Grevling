@@ -32,8 +32,11 @@ setup(
         'pyarrow',
         'pydantic',
         'pyyaml',
+        'requests',
         'rich',
+        'tqdm',
         'typing-inspect',
+        'xdg',
     ],
     extras_require={
         'testing': ['pytest'],
