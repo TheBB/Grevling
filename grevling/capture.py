@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 
-from typing import Iterable, Optional, TYPE_CHECKING
+from typing import Iterable, Optional, TYPE_CHECKING, Type
 
 from . import util, api, typing
 
@@ -130,3 +130,22 @@ class CaptureCollection(api.Context):
                 continue
             data.at[index, key] = value
         return data
+
+    def commit_to_database(self, model: Type[typing.PeeweeModel]):
+        kwargs = {}
+        for key, value in self.items():
+            if model.types[key].is_list:
+                continue
+            kwargs[key] = value
+
+        inst = model.create(**kwargs)
+
+        for key, values in self.items():
+            if not model.types[key].is_list:
+                continue
+            rel_model = getattr(model, key).rel_model
+            for value in values:
+                rel_inst = rel_model()
+                rel_inst.index = inst.id
+                rel_inst.value = value
+                rel_inst.save()

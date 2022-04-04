@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Type
 
 import pandas as pd                 # type: ignore
+import peewee
 from pydantic import PrivateAttr
 from pydantic.main import BaseModel
 
@@ -19,6 +20,14 @@ class GType(ABC):
 
     pandas_type: object
     is_list: bool = False
+
+    @staticmethod
+    def from_json(data: Any) -> GType:
+        if isinstance(data, str):
+            return TYPES[data]
+        if isinstance(data, dict) and data['type'] == 'list':
+            return List(GType.from_json(data['eltype']))
+        assert False
 
     @staticmethod
     def from_string(name: str) -> GType:
@@ -49,6 +58,14 @@ class GType(ABC):
     def merge(self, other: GType) -> GType:
         ...
 
+    @abstractmethod
+    def sqlite(self, name: str, model: Type[peewee.Model]):
+        ...
+
+    @abstractmethod
+    def to_json(self):
+        ...
+
     def coerce(self, obj: Any):
         return obj
 
@@ -59,6 +76,12 @@ class AnyType(GType):
 
     def merge(self, other: GType) -> GType:
         return other
+
+    def sqlite(self, name: str, model: Type[peewee.Model]):
+        assert False
+
+    def to_json(self):
+        return 'any'
 
 
 class String(GType):
@@ -73,6 +96,12 @@ class String(GType):
         if isinstance(other, Boolean):
             return other
         raise TypeError(f"merge {self} with {other}")
+
+    def sqlite(self, name: str, model: Type[peewee.Model]):
+        model._meta.add_field(name, peewee.TextField(null=False))
+
+    def to_json(self):
+        return 'string'
 
 
 class Integer(GType):
@@ -91,6 +120,12 @@ class Integer(GType):
             return int(other)
         raise TypeError(f"can't coerce to int: {type(other)}")
 
+    def sqlite(self, name: str, model: Type[peewee.Model]):
+        model._meta.add_field(name, peewee.IntegerField(null=False))
+
+    def to_json(self):
+        return 'integer'
+
 
 class Floating(GType):
 
@@ -105,6 +140,12 @@ class Floating(GType):
         if isinstance(other, (str, int)):
             return float(other)
         raise TypeError(f"can't coerce to float: {type(other)}")
+
+    def sqlite(self, name: str, model: Type[peewee.Model]):
+        model._meta.add_field(name, peewee.FloatField(null=False))
+
+    def to_json(self):
+        return 'floating'
 
 
 class Boolean(GType):
@@ -123,6 +164,12 @@ class Boolean(GType):
             return bool(other)
         raise TypeError(f"can't coerce to bool: {type(other)}")
 
+    def sqlite(self, name: str, model: Type[peewee.Model]):
+        model._meta.add_field(name, peewee.BooleanField(null=False))
+
+    def to_json(self):
+        return 'boolean'
+
 
 class Datetime(GType):
 
@@ -132,6 +179,12 @@ class Datetime(GType):
         if isinstance(other, (Datetime, String, AnyType)):
             return self
         raise TypeError(f"merge {self} with {other}")
+
+    def sqlite(self, name: str, model: Type[peewee.Model]):
+        model._meta.add_field(name, peewee.DateTimeField(null=False))
+
+    def to_json(self):
+        return 'datetime'
 
 
 class List(GType):
@@ -152,6 +205,21 @@ class List(GType):
     def coerce(self, value: Any):
         return self.eltype.coerce(value)
 
+    def sqlite(self, name: str, model: Type[peewee.Model]):
+        RelatedModel = peewee.ModelBase(f'Related_{name}', (peewee.Model,), {
+            'Meta': type('Meta', (), {
+                'table_name': name,
+            })
+        })
+        RelatedModel._meta.add_field('index', peewee.ForeignKeyField(model, null=False, backref=name))
+        self.eltype.sqlite('value', RelatedModel)
+
+    def to_json(self):
+        return {
+            'type': 'list',
+            'eltype': self.eltype.to_json(),
+        }
+
 
 TYPES: Dict[str, GType] = {
     'int': Integer(),
@@ -161,10 +229,32 @@ TYPES: Dict[str, GType] = {
     'double': Floating(),
     'str': String(),
     'string': String(),
+    'any': AnyType(),
+    'boolean': Boolean(),
+    'datetime': Datetime(),
 }
 
 
+class PeeweeModel(peewee.Model):
+
+    types: TypeManager
+
+    @classmethod
+    def models(cls):
+        yield cls
+        yield from cls._meta.backrefs.values()
+
+    @classmethod
+    def related(cls):
+        for field, model in cls._meta.backrefs.items():
+            yield field.backref, model
+
+
 class TypeManager(Dict[str, GType]):
+
+    @staticmethod
+    def from_json(data: Dict) -> TypeManager:
+        return TypeManager({k: GType.from_json(v) for k, v in data.items()})
 
     def __init__(self, *args, **kwargs):
         dict.__init__(self, *args, **kwargs)
@@ -186,6 +276,17 @@ class TypeManager(Dict[str, GType]):
     def pandas(self) -> Dict:
         return {k: t.pandas_type for k, t in self.items()}
 
+    def sqlite_model(self) -> Type[peewee.Model]:
+        DynamicModel = peewee.ModelBase('GrevlingModel', (PeeweeModel,), {
+            'types': self,
+            'Meta': type('Meta', (), {
+                'table_name': 'data',
+            }),
+        })
+        for k, t in self.items():
+            t.sqlite(k, DynamicModel)
+        return DynamicModel
+
     def fill_string(self, data: Dict[str, str]):
         for name, typename in data.items():
             self[name] = GType.from_string(typename)
@@ -193,6 +294,9 @@ class TypeManager(Dict[str, GType]):
     def fill_obj(self, data: Dict[str, str]):
         for name, typename in data.items():
             self[name] = GType.from_obj(typename)
+
+    def to_json(self) -> Dict:
+        return {k: v.to_json() for k, v in self.items()}
 
 
 class PersistentObject(BaseModel):

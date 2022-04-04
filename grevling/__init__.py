@@ -7,8 +7,10 @@ import shutil
 
 from typing import List, Iterable, Optional, Any, Dict
 
+from cached_property import cached_property
 from fasteners import InterProcessLock              # type: ignore
 import pandas as pd                                 # type: ignore
+import peewee
 
 from grevling.typing import TypeManager
 
@@ -52,6 +54,8 @@ class Case:
     sourcepath: Path
     storagepath: Path
     dataframepath: Path
+    sqlitepath: Path
+    typeguesspath: Path
 
     context_mgr: ContextProvider
 
@@ -94,6 +98,8 @@ class Case:
         self.storage_spaces = LocalWorkspaceCollection(self.storagepath)
 
         self.dataframepath = storagepath / 'dataframe.parquet'
+        self.sqlitepath = storagepath / 'sqlite.db'
+        self.typeguesspath = storagepath / 'types.json'
 
         if casedata is None:
             if configpath is None:
@@ -152,6 +158,10 @@ class Case:
         self.state.__exit__(*args, **kwargs)
         self.release_lock(*args, **kwargs)
 
+    @cached_property
+    def sqlite_db(self) -> peewee.SqliteDatabase:
+        return peewee.SqliteDatabase(str(self.sqlitepath))
+
     @property
     def parameters(self) -> ParameterSpace:
         return self.context_mgr.parameters
@@ -187,10 +197,22 @@ class Case:
     def save_dataframe(self, df: pd.DataFrame):
         df.to_parquet(self.dataframepath, engine='pyarrow', index=True)
 
+    def sqlite_model(self):
+        types = self.type_guess()
+        model = types.sqlite_model()
+        for m in model.models():
+            m._meta.set_database(self.sqlite_db)
+        return model
+
     def type_guess(self) -> TypeManager:
+        if self.typeguesspath.exists():
+            with open(self.typeguesspath, 'r') as f:
+                return TypeManager.from_json(json.load(f))
         manager = TypeManager()
         for instance in self.instances(Status.Downloaded):
             manager.merge(instance.cached_capture(raw=True))
+        with open(self.typeguesspath, 'w') as f:
+            f.write(json.dumps(manager.to_json()))
         return manager
 
     def create_instances(self) -> Iterable[Instance]:
@@ -231,7 +253,24 @@ class Case:
             instance.capture()
         self.state.has_captured = True
 
-    def collect(self):
+    def collect(self, backend: api.CollectionBackend = api.CollectionBackend.Pandas):
+        if backend == api.CollectionBackend.Pandas:
+            self._collect_pandas()
+        elif backend == api.CollectionBackend.Sqlite:
+            self._collect_sqlite()
+
+    def _collect_sqlite(self):
+        try:
+            self.sqlitepath.unlink()
+        except FileNotFoundError:
+            pass
+        model = self.sqlite_model()
+        self.sqlite_db.create_tables(list(model.models()))
+        for instance in self.instances(Status.Downloaded):
+            collector = instance.cached_capture()
+            collector.commit_to_database(model)
+
+    def _collect_pandas(self):
         data = self.load_dataframe()
         for instance in self.instances(Status.Downloaded):
             collector = instance.cached_capture()

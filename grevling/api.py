@@ -34,6 +34,12 @@ class Renderable(ABC, Generic[U]):
         ...
 
 
+class CollectionBackend(Enum):
+
+    Pandas = 'pandas'
+    Sqlite = 'sqlite'
+
+
 class Status(Enum):
 
     Created = 'created'

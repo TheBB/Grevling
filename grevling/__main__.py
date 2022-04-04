@@ -79,15 +79,17 @@ def main(verbosity: str):
 @main.command('run-all')
 @click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
 @click.option('-j', 'nprocs', default=1, type=int)
+@click.option('--pandas', 'backend_name', flag_value='Pandas', default=True)
+@click.option('--sqlite', 'backend_name', flag_value='Sqlite')
 @workflows
-def run_all(case: Case, workflow: str, nprocs: int):
+def run_all(case: Case, workflow: str, nprocs: int, backend_name: str):
     case.clear_cache()
     with api.Workflow.get_workflow(workflow)(nprocs) as w:
         success = w.pipeline(case).run(case.create_instances())
     if not success:
         util.log.error("An error happened, aborting")
         sys.exit(1)
-    case.collect()
+    case.collect(api.CollectionBackend[backend_name])
     case.plot()
 
 
@@ -127,9 +129,11 @@ def capture(case: Case):
 
 @main.command('collect')
 @click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
-def collect(case: Case):
+@click.option('--pandas', 'backend_name', flag_value='Pandas', default=True)
+@click.option('--sqlite', 'backend_name', flag_value='Sqlite')
+def collect(case: Case, backend_name: str):
     case.clear_dataframe()
-    case.collect()
+    case.collect(api.CollectionBackend[backend_name])
 
 
 @main.command('plot')

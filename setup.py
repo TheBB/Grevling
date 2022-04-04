@@ -19,6 +19,7 @@ setup(
     install_requires=[
         'asteval',
         'bidict',
+        'cached_property',
         'click',
         'fasteners',
         'goldpy>=1.3.9',
@@ -27,6 +28,7 @@ setup(
         'mako',
         'numpy',
         'pandas',
+        'peewee',
         'pyarrow',
         'pydantic',
         'pyyaml',
