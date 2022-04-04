@@ -269,6 +269,11 @@ class TypeManager(Dict[str, GType]):
             return Floating()
         return super().__getitem__(key)
 
+    def get(self, key, default):
+        if key.startswith('g_walltime'):
+            return Floating()
+        return super().get(key, default)
+
     def merge(self, data: Dict):
         for k, t in data.items():
             self[k] = self.get(k, AnyType()).merge_object(t)
