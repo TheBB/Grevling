@@ -291,6 +291,7 @@ class Case:
         args = ['java', '-jar', str(jar.absolute())]
         env = {
             'MB_DB_FILE': str((self.storagepath / 'metabase').absolute()),
+            'MB_PLUGINS_DIR': str((jar.parent / 'metabase_plugins').absolute()),
             'MB_COLORIZE_LOGS': 'false',
         }
         process = subprocess.Popen(args, env=env, stdout=subprocess.PIPE)
