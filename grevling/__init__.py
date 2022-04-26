@@ -163,6 +163,14 @@ class Case:
     def sqlite_db(self) -> peewee.SqliteDatabase:
         return peewee.SqliteDatabase(str(self.sqlitepath))
 
+    def clear_sqlite(self):
+        # TODO: Py3.8: use missing_ok=True
+        try:
+            self.sqlitepath.unlink()
+        except FileNotFoundError:
+            pass
+        self.state.has_collected = False
+
     @property
     def parameters(self) -> ParameterSpace:
         return self.context_mgr.parameters
@@ -261,10 +269,7 @@ class Case:
             self._collect_sqlite()
 
     def _collect_sqlite(self):
-        try:
-            self.sqlitepath.unlink()
-        except FileNotFoundError:
-            pass
+        self.clear_sqlite()
         model = self.sqlite_model()
         self.sqlite_db.create_tables(list(model.models()))
         for instance in self.instances(Status.Downloaded):
@@ -272,6 +277,7 @@ class Case:
             collector.commit_to_database(model)
 
     def _collect_pandas(self):
+        self.clear_dataframe()
         data = self.load_dataframe()
         for instance in self.instances(Status.Downloaded):
             collector = instance.cached_capture()

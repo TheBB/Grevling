@@ -211,7 +211,8 @@ class List(GType):
                 'table_name': name,
             })
         })
-        RelatedModel._meta.add_field('index', peewee.ForeignKeyField(model, null=False, backref=name))
+        RelatedModel._meta.add_field('instance', peewee.ForeignKeyField(model, null=False, backref=name))
+        RelatedModel._meta.add_field('index', peewee.IntegerField(null=False))
         self.eltype.sqlite('value', RelatedModel)
 
     def to_json(self):

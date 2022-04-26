@@ -633,6 +633,21 @@ class Plot:
         backends.generate(filename)
 
     def generate_category(self, case, context: dict, index):
+        model = case.sqlite_model()
+
+        # Collapse ignorable parameters
+        subquery = model.select().group_by(*(
+            getattr(model, param)
+            for param in self._parameters_not_of_kind('ignore')
+        ))
+        query = model.select().where(model.id.in_(subquery))
+
+        # Pick the relevant rows
+        for name, value in index.items():
+            query = query.where(getattr(model, name) == value)
+
+        #
+
         # TODO: Pick only finished results
         data = case.load_dataframe()
         if isinstance(data, pd.Series):

@@ -132,7 +132,6 @@ def capture(case: Case):
 @click.option('--pandas', 'backend_name', flag_value='Pandas', default=True)
 @click.option('--sqlite', 'backend_name', flag_value='Sqlite')
 def collect(case: Case, backend_name: str):
-    case.clear_dataframe()
     case.collect(api.CollectionBackend[backend_name])
 
 

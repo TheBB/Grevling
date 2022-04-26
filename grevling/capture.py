@@ -144,8 +144,9 @@ class CaptureCollection(api.Context):
             if not model.types[key].is_list:
                 continue
             rel_model = getattr(model, key).rel_model
-            for value in values:
+            for index, value in enumerate(values):
                 rel_inst = rel_model()
-                rel_inst.index = inst.id
+                rel_inst.instance = inst.id
+                rel_inst.index = index
                 rel_inst.value = value
                 rel_inst.save()
