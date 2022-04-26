@@ -22,7 +22,7 @@ setup(
         'click',
         'fasteners',
         'goldpy>=1.3.9',
-        'jsonschema',
+        'jsonschema>=4.4',
         'jsonpath-ng',
         'mako',
         'numpy',
