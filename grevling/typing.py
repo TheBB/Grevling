@@ -170,6 +170,7 @@ class TypeManager(Dict[str, GType]):
         dict.__init__(self, *args, **kwargs)
         self['g_index'] = Integer()
         self['g_logdir'] = String()
+        self['g_sourcedir'] = String()
         self['g_started'] = Datetime()
         self['g_finished'] = Datetime()
         self['g_success'] = Boolean()

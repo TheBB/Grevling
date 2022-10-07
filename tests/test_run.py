@@ -375,7 +375,7 @@ def test_sleep(suffix):
     assert duration < 18.0
 
 
-@pytest.mark.skipif(shutil.which('sh') is None, reason="requires sh")
+@pytest.mark.skipif(os.name == 'nt' or shutil.which('sh') is None, reason="requires sh and *nix")
 @pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
 def test_workdir(suffix):
     with Case(DATADIR / 'run' / 'workdir' / f'grevling{suffix}') as case:

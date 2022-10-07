@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 import json
+import os
 from pathlib import Path
 import shutil
 
@@ -197,6 +198,7 @@ class Case:
         for i, ctx in enumerate(self.context_mgr.fullspace()):
             ctx['g_index'] = i
             ctx['g_logdir'] = render(self._logdir, ctx)
+            ctx['g_sourcedir'] = os.getcwd()
             yield Instance.create(self, ctx)
 
     def create_instance(
@@ -212,6 +214,7 @@ class Case:
         if logdir is None:
             logdir = Path(render(self._logdir, ctx))
         ctx['g_logdir'] = str(logdir)
+        ctx['g_sourcedir'] = os.getcwd()
         workspace = LocalWorkspace(Path(ctx['g_logdir']), name='LOG')
         return Instance.create(self, ctx, local=workspace)
 
