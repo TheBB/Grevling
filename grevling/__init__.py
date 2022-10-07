@@ -195,10 +195,11 @@ class Case:
         return manager
 
     def create_instances(self) -> Iterable[Instance]:
-        for i, ctx in enumerate(self.context_mgr.fullspace()):
-            ctx['g_index'] = i
+        base_ctx = {
+            'g_sourcedir': os.getcwd()
+        }
+        for i, ctx in enumerate(self.context_mgr.fullspace(context=base_ctx)):
             ctx['g_logdir'] = render(self._logdir, ctx)
-            ctx['g_sourcedir'] = os.getcwd()
             yield Instance.create(self, ctx)
 
     def create_instance(
@@ -207,14 +208,17 @@ class Case:
         logdir: Optional[Path] = None,
         index: Optional[int] = None,
     ) -> Instance:
-        ctx = self.context_mgr.evaluate_context(ctx)
         if index is None:
             index = 0
-        ctx['g_index'] = index
+        sourcedir = os.getcwd()
+        ctx = self.context_mgr.evaluate_context({
+            **ctx,
+            'g_index': index,
+            'g_sourcedir': sourcedir,
+        })
         if logdir is None:
             logdir = Path(render(self._logdir, ctx))
         ctx['g_logdir'] = str(logdir)
-        ctx['g_sourcedir'] = os.getcwd()
         workspace = LocalWorkspace(Path(ctx['g_logdir']), name='LOG')
         return Instance.create(self, ctx, local=workspace)
 
