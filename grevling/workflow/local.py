@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+import os
 from pathlib import Path
 import shutil
+import stat
 import tempfile
 
 from typing import IO, BinaryIO, Generator, TextIO, Union, Iterable, Optional, TYPE_CHECKING
@@ -148,6 +150,12 @@ class LocalWorkspace(api.Workspace):
 
     def exists(self, path) -> bool:
         return self.to_root(path).exists()
+
+    def mode(self, path) -> int:
+        return os.stat(self.to_root(path)).st_mode
+
+    def set_mode(self, path, mode: int):
+        os.chmod(self.to_root(path), stat.S_IMODE(mode))
 
     def subspace(self, path: str, name: str = '') -> api.Workspace:
         name = name or str(path)

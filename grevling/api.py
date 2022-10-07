@@ -76,6 +76,14 @@ class Workspace(ABC):
         ...
 
     @abstractmethod
+    def mode(self, path: PathStr) -> Optional[int]:
+        ...
+
+    @abstractmethod
+    def set_mode(self, path: PathStr, mode: int):
+        ...
+
+    @abstractmethod
     def subspace(self, path: str, name: str = '') -> Workspace:
         ...
 
