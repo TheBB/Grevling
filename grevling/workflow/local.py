@@ -103,20 +103,27 @@ class LocalWorkspace(api.Workspace):
     def destroy(self):
         shutil.rmtree(self.root)
 
+    def to_root(self, path: Union[Path, str]) -> Path:
+        if isinstance(path, str):
+            path = Path(path)
+        if path.is_absolute():
+            return path
+        return self.root / path
+
     @contextmanager
     def open_str(self, path, mode: str = 'w') -> Generator[TextIO, None, None]:
-        with open(self.root / path, mode) as f:
+        with open(self.to_root(path), mode) as f:
             yield f  # type: ignore
 
     @contextmanager
     def open_bytes(self, path, mode: str = 'rb') -> Generator[BinaryIO, None, None]:
-        with open(self.root / path, mode) as f:
+        with open(self.to_root(path), mode) as f:
             yield f  # type: ignore
 
     def write_file(
         self, path, source: Union[str, bytes, IO, Path], append: bool = False
     ):
-        target = self.root / path
+        target = self.to_root(path)
         target.parent.mkdir(parents=True, exist_ok=True)
 
         if isinstance(source, Path):
@@ -140,7 +147,7 @@ class LocalWorkspace(api.Workspace):
                 yield path.relative_to(self.root)
 
     def exists(self, path) -> bool:
-        return (self.root / path).exists()
+        return self.to_root(path).exists()
 
     def subspace(self, path: str, name: str = '') -> api.Workspace:
         name = name or str(path)
