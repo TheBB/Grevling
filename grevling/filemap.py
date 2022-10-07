@@ -26,6 +26,9 @@ class SingleFileMap:
         template: bool = False,
         mode: str = 'simple',
     ):
+        if Path(source).is_absolute() and target is None:
+            util.log.warning('File mappings with absolute source paths should have explicit target')
+
         if target is None:
             target = source if mode == 'simple' else '.'
         if template:
@@ -74,6 +77,10 @@ class SingleFileMap:
                 with source.open_bytes(sourcepath) as f:
                     text = f.read().decode()
                 target.write_file(targetpath, StringRenderable(text).render(context).encode())
+
+            mode = source.mode(sourcepath)
+            if mode is not None:
+                target.set_mode(targetpath, mode)
 
         return True
 
