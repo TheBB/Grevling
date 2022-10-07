@@ -142,6 +142,7 @@ class Script(CustomSchema):
                 container = _or(_null, _string),
                 container_args = _or(_string, _list(_string)),
                 allow_failure = _bool,
+                workdir = _or(_null, _string),
             )
         ))
     )

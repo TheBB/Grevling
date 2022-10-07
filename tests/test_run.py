@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import shutil
+from tempfile import TemporaryDirectory
 from time import time
 
 import pandas as pd
@@ -8,6 +9,7 @@ import pytest
 
 from grevling import Case
 from grevling.workflow.local import LocalWorkflow
+from grevling.parameters import Parameter
 
 from .common import api_run, cli_run
 
@@ -371,3 +373,31 @@ def test_sleep(suffix):
     # with 20 concurrent processes, this should take < 1 sec under normal cirumstances.
     # Use generous margin for test stability.
     assert duration < 18.0
+
+
+@pytest.mark.skipif(shutil.which('sh') is None, reason="requires sh")
+@pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
+def test_workdir(suffix):
+    with Case(DATADIR / 'run' / 'workdir' / f'grevling{suffix}') as case:
+        case.clear_cache()
+
+        # Inject three temporary paths as a new parameter
+        # We do this to avoid hardcoding directories in the test file
+        with TemporaryDirectory() as temp:
+            paths = [
+                Path(temp) / name
+                for name in ['a', 'b', 'c']
+            ]
+            for path in paths:
+                path.mkdir()
+            case.context_mgr.parameters['workdir'] = Parameter(
+                'workdir',
+                list(map(str, paths)),
+            )
+            assert case.run()
+
+            path = case.storagepath
+
+        assert str(paths[0]) in read_file(path / '0' / '.grevling' / 'pwd.stdout')
+        assert str(paths[1]) in read_file(path / '1' / '.grevling' / 'pwd.stdout')
+        assert str(paths[2]) in read_file(path / '2' / '.grevling' / 'pwd.stdout')

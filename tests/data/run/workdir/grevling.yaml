@@ -1,0 +1,6 @@
+# The workdir parameter is injected in code
+# to prevent having to hardcode paths for testing
+script:
+  - command: sh -c 'echo $PWD'
+    workdir: ${workdir}
+    name: pwd
