@@ -23,7 +23,7 @@ def read_file(path: Path) -> str:
 
 
 def check_df(left, right):
-    blacklist = {'g_started', 'g_finished', 'g_logdir'}
+    blacklist = {'g_started', 'g_finished', 'g_logdir', 'g_sourcedir'}
     to_remove = [c for c in left.columns if c.startswith('g_walltime_') or c in blacklist]
     pd.testing.assert_frame_equal(
         left.drop(columns=to_remove).sort_index(axis=1), right.sort_index(axis=1)
