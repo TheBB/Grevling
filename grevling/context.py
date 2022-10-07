@@ -87,24 +87,32 @@ class ContextProvider:
 
         return api.Context(context)
 
-    def subspace(self, *names: str, **kwargs) -> Iterable[api.Context]:
+    def _subspace(self, *names: str, context = None, **kwargs) -> Iterable[api.Context]:
+        if context is None:
+            context = {}
         for values in self.parameters.subspace(*names):
-            context = self.evaluate(values, **kwargs)
+            ctx = self.evaluate({**context, **values}, **kwargs)
             if not self.cond_func and not self.cond_dep:
-                yield context
+                yield ctx
                 continue
-            if self.cond_func and not self.cond_func(**context):
+            if self.cond_func and not self.cond_func(**ctx):
                 continue
             if not self.cond_dep:
-                yield context
+                yield ctx
                 continue
             evaluator = Interpreter()
-            evaluator.symtable.update(context)
+            evaluator.symtable.update(ctx)
             for condition in self.cond_dep:
                 if not evaluator.eval(condition):
                     break
             else:
-                yield context
+                yield ctx
+                continue
 
-    def fullspace(self, **kwargs) -> Iterable[api.Context]:
-        yield from self.subspace(*self.parameters, **kwargs)
+    def subspace(self, *args, **kwargs) -> Iterable[api.Context]:
+        for i, ctx in enumerate(self._subspace(*args, **kwargs)):
+            ctx['g_index'] = i
+            yield ctx
+
+    def fullspace(self, context = None, **kwargs) -> Iterable[api.Context]:
+        yield from self.subspace(*self.parameters, context=context, **kwargs)
