@@ -78,6 +78,7 @@ in {
         allow_failure = false,
         retry_on_fail = false,
         capture = [],
+        workdir = null,
     ) => {
         name: name,
         command: cmd,
@@ -87,6 +88,7 @@ in {
         allow-failure: allow_failure,
         retry-on-fail: retry_on_fail,
         capture: capture,
+        workdir: workdir,
     },
 
     plot: plot,

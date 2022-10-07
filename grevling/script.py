@@ -39,7 +39,7 @@ async def run(
     }
 
     if shell:
-        scommand = ' '.join(shlex.quote(c) for c in command)
+        scommand = ' '.join(shlex.quote(c) if c != '&&' else c for c in command)
         proc = await asyncio.create_subprocess_shell(scommand, **kwargs)  # type: ignore
     else:
         proc = await asyncio.create_subprocess_exec(*command, **kwargs)   # type: ignore
@@ -66,6 +66,7 @@ class Command:
     name: str
     args: Union[str, List[str]]
     env: Dict[str, str] = field(default_factory=dict)
+    workdir: Optional[str] = None
 
     container: Optional[str] = None
     container_args: List[str] = field(default_factory=list)
@@ -101,6 +102,7 @@ class Command:
         if isinstance(container_args, str):
             container_args = shlex.split(container_args)
         kwargs['container_args'] = container_args
+        kwargs['workdir'] = data.get('workdir', None)
 
         return cls(args=command, **kwargs)
 
@@ -110,6 +112,9 @@ class Command:
             'shell': self.shell,
             'env': self.env,
         }
+
+        if self.workdir:
+            kwargs['cwd'] = Path(self.workdir)
 
         command = self.args
         if self.container:
@@ -201,5 +206,5 @@ class Script:
 def ScriptTemplate(data: Any) -> api.Renderable[Script]:
     return renderable(
         data, Script.load, schema.Script.validate,
-        '[*][command,container-args]', '[*][command,container-args][*]', '[*][env][*]',
+        '[*][command,container-args,workdir]', '[*][command,container-args,workdir][*]', '[*][env][*]',
     )
