@@ -1,6 +1,6 @@
-let {linspace, cmd} = import("grevling")
+import "grevling" as {linspace, cmd}
 
-in {
+{
     parameters: {
         nothing: linspace(0.0, 1.0, npts: 20),
     },

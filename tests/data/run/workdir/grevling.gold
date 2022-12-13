@@ -1,7 +1,7 @@
-let {cmd} = import("grevling")
+import "grevling" as {cmd}
 
-in {
-    script: {workdir} => [
+{
+    script: {|workdir|} [
         cmd(
             "sh -c 'echo \$PWD'",
             workdir: workdir,
