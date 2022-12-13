@@ -1,6 +1,6 @@
-let {copy, cmd} = import("grevling")
+import "grevling" as {copy, cmd}
 
-in {
+{
     parameters: {
         alpha: [1.234, 2.345, 3.456],
         bravo: [1, 2, 3],

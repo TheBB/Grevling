@@ -260,12 +260,10 @@ def validate(data: Dict):
     jsonschema.validate(data, _schema, cls=CustomValidator)
 
 
-class LibFinder(gold.LibFinder):
-
-    def find(self, path: str):
-        if path != 'grevling':
-            return None
-        return gold.evaluate_file(str(Path(__file__).parent / 'grevling.gold'))
+def libfinder(path: str):
+    if path != 'grevling':
+        return None
+    return gold.eval_file(str(Path(__file__).parent / 'grevling.gold'))
 
 
 def load(path: Path) -> Dict:
@@ -273,9 +271,8 @@ def load(path: Path) -> Dict:
         with open(path, 'r') as f:
             data = yaml.load(f, Loader=yaml.CLoader)
     else:
-        ctx = gold.EvaluationContext()
-        libfinder = LibFinder()
-        ctx.append_libfinder(libfinder)
-        data = gold.evaluate_file(ctx, str(path))
+        with open(path, 'r') as f:
+            src = f.read()
+        data = gold.eval(src, str(path), libfinder)
     validate(data)
     return normalize(data)

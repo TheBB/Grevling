@@ -1,6 +1,6 @@
-let {linspace, gradspace} = import("grevling")
+import "grevling" as {linspace, gradspace}
 
-in {
+{
     parameters: {
         alpha: [1, 2],
         bravo: [1.0, 2.0],

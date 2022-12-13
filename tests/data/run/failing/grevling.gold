@@ -1,8 +1,8 @@
-let {cmd} = import("grevling")
+import "grevling" as {cmd}
 
-in {
+{
     parameters: { retcode: [0, 1] },
-    script: {retcode} => [
+    script: {|retcode|} [
         cmd(
             "echo before 12",
             name: "before",
