@@ -279,6 +279,7 @@ def load(path: Path) -> Dict:
     else:
         with open(path, 'r') as f:
             src = f.read()
-        data = gold.eval(src, str(path), libfinder)
+        resolver = gold.ImportConfig(root=str(path.parent), custom=libfinder)
+        data = gold.eval(src, resolver)
     validate(data)
     return normalize(data)

@@ -21,7 +21,7 @@ setup(
         'bidict',
         'click',
         'fasteners',
-        'goldpy>=2',
+        'goldpy>=2.1',
         'jsonschema>=4.4',
         'jsonpath-ng',
         'mako',
