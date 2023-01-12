@@ -7,6 +7,8 @@ import jsonschema                       # type: ignore
 import jsonschema.validators            # type: ignore
 import yaml
 
+from . import util
+
 
 is_callable = lambda _, fn: callable(fn)
 typechecker = jsonschema.Draft202012Validator.TYPE_CHECKER.redefine('callable', is_callable)
@@ -263,7 +265,11 @@ def validate(data: Dict):
 def libfinder(path: str):
     if path != 'grevling':
         return None
-    return gold.eval_file(str(Path(__file__).parent / 'grevling.gold'))
+    retval = gold.eval_file(str(Path(__file__).parent / 'grevling.gold'))
+    retval.update({
+        'legendre': util.legendre
+    })
+    return retval
 
 
 def load(path: Path) -> Dict:
@@ -273,6 +279,7 @@ def load(path: Path) -> Dict:
     else:
         with open(path, 'r') as f:
             src = f.read()
-        data = gold.eval(src, str(path), libfinder)
+        resolver = gold.ImportConfig(root=str(path.parent), custom=libfinder)
+        data = gold.eval(src, resolver)
     validate(data)
     return normalize(data)
