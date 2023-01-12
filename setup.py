@@ -15,7 +15,7 @@ setup(
     url='https://github.com/TheBB/Grevling',
     packages=find_packages(),
     package_data={'grevling': ['grevling.gold']},
-    python_requires='>=3.7',
+    python_requires='>=3.8',
     install_requires=[
         'asteval',
         'bidict',
