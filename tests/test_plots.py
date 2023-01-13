@@ -16,6 +16,7 @@ DATADIR = Path(__file__).parent / 'data'
 
 def compare_object(actual, expected, sort_xy=False):
     for k in ['mode', 'legend', 'color', 'line', 'marker']:
+        print(k)
         assert actual[k] == expected[k]
 
     x, y = actual['x'], actual['y']

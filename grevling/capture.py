@@ -3,9 +3,10 @@ from __future__ import annotations
 import json
 import re
 
-from typing import Iterable, Optional, TYPE_CHECKING
+from typing import Iterable, Optional, Union, TYPE_CHECKING
 
 from . import util, api, typing
+from .schema import RegexCapture, SimpleCapture
 
 if TYPE_CHECKING:
     from .typing import TypeManager, GType
@@ -16,6 +17,38 @@ class Capture:
     _regex: re.Pattern
     _mode: str
     _type: Optional[GType]
+
+    @staticmethod
+    def from_schema(schema: Union[RegexCapture, SimpleCapture]):
+        if isinstance(schema, RegexCapture):
+            return Capture(
+                pattern=schema.pattern,
+                mode=schema.mode,
+            )
+
+        pattern = {
+            'integer': r'[-+]?[0-9]+',
+            'float': r'[-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?',
+        }[schema.kind]
+        skip = r'(\S+\s+){' + str(schema.skip_words) + '}'
+        if schema.flexible_prefix:
+            prefix = r'\s+'.join(re.escape(p) for p in schema.prefix.split())
+        else:
+            prefix = re.escape(schema.prefix)
+        pattern = (
+            prefix
+            + r'\s*[:=]?\s*'
+            + skip
+            + '(?P<'
+            + schema.name
+            + '>'
+            + pattern
+            + ')'
+        )
+        mode = schema.mode
+        tp = typing.GType.from_string(schema.kind)
+        return Capture(pattern, mode, tp)
+
 
     @classmethod
     def load(cls, spec) -> Capture:

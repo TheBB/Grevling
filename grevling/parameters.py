@@ -5,6 +5,7 @@ from typing import Sequence, Iterable, Dict, Any, List, Tuple
 import numpy as np
 
 from . import api, util
+from .schema import ParameterSchema, UniformParameterSchema, GradedParameterSchema
 
 
 class Parameter(Sequence):
@@ -12,13 +13,14 @@ class Parameter(Sequence):
     name: str
     values: List
 
-    @classmethod
-    def load(cls, name: str, spec: Any) -> Parameter:
-        if isinstance(spec, list):
-            return cls(name, spec)
-        assert isinstance(spec, dict)
-        subcls = util.find_subclass(cls, spec.pop('type'), root=False, attr='__tag__')
-        return util.call_yaml(subcls, spec, name)
+    @staticmethod
+    def from_schema(name: str, schema: Parameter) -> Parameter:
+        if isinstance(schema, list):
+            return Parameter(name, schema)
+        if isinstance(schema, UniformParameterSchema):
+            return UniformParameter(name, schema.interval, schema.num)
+        if isinstance(schema, GradedParameterSchema):
+            return GradedParameter(name, schema.interval, schema.num, schema.grading)
 
     def __init__(self, name: str, values: List):
         self.name = name
@@ -33,15 +35,11 @@ class Parameter(Sequence):
 
 class UniformParameter(Parameter):
 
-    __tag__ = 'uniform'
-
     def __init__(self, name: str, interval: Tuple[float, float], num: int):
         super().__init__(name, list(np.linspace(*interval, num=num)))
 
 
 class GradedParameter(Parameter):
-
-    __tag__ = 'graded'
 
     def __init__(
         self, name: str, interval: Tuple[float, float], num: int, grading: float
@@ -58,8 +56,11 @@ class GradedParameter(Parameter):
 class ParameterSpace(dict):
 
     @classmethod
-    def load(cls, data: Dict) -> ParameterSpace:
-        return cls({name: Parameter.load(name, spec) for name, spec in data.items()})
+    def from_schema(cls, schema: Dict[str, ParameterSchema]):
+        return cls({
+            name: Parameter.from_schema(name, schema)
+            for name, schema in schema.items()
+        })
 
     def subspace(self, *names: str) -> Iterable[Dict]:
         params = [self[name] for name in names]

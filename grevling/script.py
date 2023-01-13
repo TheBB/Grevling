@@ -11,11 +11,11 @@ from pathlib import Path
 import shlex
 from time import time as osclock
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Callable
 
 from . import api, util, schema
 from .capture import Capture, CaptureCollection
-from .render import render, renderable
+# from .render import render, renderable
 
 
 @contextmanager
@@ -77,34 +77,34 @@ class Command:
 
     captures: List[Capture] = field(default_factory=list)
 
-    @classmethod
-    def load(cls, data: Any) -> Command:
+    @staticmethod
+    def from_schema(schema: schema.CommandSchema) -> Command:
         kwargs: Dict = {
             'shell': False
         }
 
-        command = data.get('command', '')
+        command = schema.command
         if isinstance(command, str):
             command = shlex.split(command)
             kwargs['shell'] = True
-        kwargs['name'] = data.get('name') or Path(command[0]).name
+        kwargs['name'] = schema.name or (Path(command[0]).name if command else 'TODO')
 
-        captures = data.get('capture', [])
-        if isinstance(captures, (str, dict)):
-            kwargs['captures'] = [Capture.load(captures)]
-        else:
-            kwargs['captures'] = [Capture.load(c) for c in captures]
-        kwargs['allow_failure'] = data.get('allow-failure', False)
-        kwargs['retry_on_fail'] = data.get('retry-on-fail', False)
-        kwargs['env'] = data.get('env', {})
-        kwargs['container'] = data.get('container', None)
-        container_args = data.get('container-args', [])
-        if isinstance(container_args, str):
-            container_args = shlex.split(container_args)
-        kwargs['container_args'] = container_args
-        kwargs['workdir'] = data.get('workdir', None)
+        captures = [Capture.from_schema(entry) for entry in schema.capture]
+        kwargs['captures'] = captures
 
-        return cls(args=command, **kwargs)
+        kwargs['allow_failure'] = schema.allow_failure
+        kwargs['retry_on_fail'] = schema.retry_on_fail
+        kwargs['env'] = schema.env
+        kwargs['container'] = schema.container
+
+        cargs = schema.container_args
+        if isinstance(cargs, str):
+            cargs = shlex.split(cargs)
+
+        kwargs['container_args'] = cargs
+        kwargs['workdir'] = schema.workdir
+
+        return Command(args=command, **kwargs)
 
     async def execute(self, cwd: Path, log_ws: api.Workspace) -> bool:
         kwargs = {
@@ -178,9 +178,12 @@ class Script:
 
     commands: List[Command]
 
-    @classmethod
-    def load(cls, data: List) -> Script:
-        return cls([Command.load(spec) for spec in data])
+    @staticmethod
+    def from_schema(schema: List[schema.CommandSchema]) -> Script:
+        return Script([
+            Command.from_schema(entry)
+            for entry in schema
+        ])
 
     async def run(self, cwd: Path, log_ws: api.Workspace) -> bool:
         log_ws.write_file(
@@ -203,8 +206,13 @@ class Script:
             cmd.capture(collector, workspace)
 
 
-def ScriptTemplate(data: Any) -> api.Renderable[Script]:
-    return renderable(
-        data, Script.load, schema.Script.validate,
-        '[*][command,container-args,workdir]', '[*][command,container-args,workdir][*]', '[*][env][*]',
-    )
+
+class ScriptTemplate:
+
+    func: Callable[[api.Context], List[schema.CommandSchema]]
+
+    def __init__(self, func: Callable[[api.Context], List[schema.CommandSchema]]):
+        self.func = func
+
+    def render(self, ctx: api.Context) -> Script:
+        return Script.from_schema(self.func(ctx))

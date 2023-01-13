@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from typing import Any, Optional, List, Dict, Iterable, Tuple
+from typing import Any, Optional, List, Dict, Iterable, Tuple, Callable
 
 from . import util, api, schema
-from .render import StringRenderable, JsonRenderable, renderable
+from .render import render
 
 
 class SingleFileMap:
@@ -15,9 +15,18 @@ class SingleFileMap:
     template: bool
     mode: str
 
-    @classmethod
-    def load(cls, spec: Dict, **kwargs) -> SingleFileMap:
-        return util.call_yaml(cls, spec, **kwargs)
+    @staticmethod
+    def from_schema(schema: schema.FileMapSchema) -> SingleFileMap:
+        return SingleFileMap(
+            source=schema.source,
+            target=schema.target,
+            template=schema.template,
+            mode=schema.mode,
+        )
+
+    # @classmethod
+    # def load(cls, spec: Dict, **kwargs) -> SingleFileMap:
+    #     return util.call_yaml(cls, spec, **kwargs)
 
     def __init__(
         self,
@@ -76,7 +85,7 @@ class SingleFileMap:
             else:
                 with source.open_bytes(sourcepath) as f:
                     text = f.read().decode()
-                target.write_file(targetpath, StringRenderable(text).render(context).encode())
+                target.write_file(targetpath, render(text, context).encode())
 
             mode = source.mode(sourcepath)
             if mode is not None:
@@ -89,15 +98,21 @@ class FileMap:
 
     elements: List[SingleFileMap]
 
-    @classmethod
-    def load(cls, data: List) -> FileMap:
-        return cls.create(files=data)
+    @staticmethod
+    def from_schema(schema: List[schema.FileMapSchema]) -> FileMap:
+        return FileMap([
+            SingleFileMap.from_schema(entry)
+            for entry in schema
+        ])
 
-    @classmethod
-    def create(cls, *, files: List = []) -> FileMap:
-        mapping = cls()
-        mapping.elements = [SingleFileMap.load(spec) for spec in files]
-        return mapping
+    @staticmethod
+    def everything() -> FileMap:
+        return FileMap([
+            SingleFileMap(source='*', mode='glob')
+        ])
+
+    def __init__(self, elements: List[SingleFileMap]):
+        self.elements = elements
 
     def copy(
         self,
@@ -112,5 +127,10 @@ class FileMap:
         return True
 
 
-def FileMapTemplate(data: Any) -> api.Renderable[FileMap]:
-    return renderable(data, FileMap.load, schema.FileMap.validate, '[*][source,target]')
+class FileMapTemplate:
+
+    def __init__(self, func: Callable[[api.Context], List[schema.FileMapSchema]]):
+        self.func = func
+
+    def render(self, ctx: api.Context) -> FileMap:
+        return FileMap.from_schema(self.func(ctx))

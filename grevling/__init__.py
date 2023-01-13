@@ -15,8 +15,9 @@ from grevling.typing import TypeManager
 
 from .api import Status
 from .plotting import Plot
-from .render import render
-from .schema import load, validate, normalize
+# from .render import render
+# from .schema import load, validate, normalize
+from .schema import load, CaseSchema
 from .capture import CaptureCollection
 from .context import ContextProvider
 from .parameters import ParameterSpace
@@ -48,7 +49,7 @@ class Case:
     configpath: Optional[Path]
 
     # Raw structured data used to initialize this case
-    casedata: Dict
+    schema: CaseSchema
 
     sourcepath: Path
     storagepath: Path
@@ -69,7 +70,7 @@ class Case:
         self,
         localpath: api.PathStr = '.',
         storagepath: Optional[Path] = None,
-        casedata: Optional[dict] = None,
+        casedata: Optional[CaseSchema] = None,
     ):
         configpath: Optional[Path] = None
 
@@ -102,35 +103,32 @@ class Case:
             if configpath is not None and not configpath.is_file():
                 raise FileNotFoundError("Found a grevling configuration, but it's not a file")
             casedata = load(configpath)
-        else:
-            validate(casedata)
-            casedata = normalize(casedata)
 
-        assert isinstance(casedata, Dict)
-        self.casedata = casedata
-        self.context_mgr = ContextProvider.load(casedata)
+        assert isinstance(casedata, CaseSchema)
+        self.schema = casedata
+        self.context_mgr = ContextProvider.from_schema(casedata)
 
         # Read file mappings
-        self.premap = FileMapTemplate(casedata.get('prefiles', []))
-        self.postmap = FileMapTemplate(casedata.get('postfiles', []))
+        self.premap = FileMapTemplate(casedata.prefiles)
+        self.postmap = FileMapTemplate(casedata.postfiles)
 
         # Read commands
-        self.script = ScriptTemplate(casedata.get('script', []))
+        self.script = ScriptTemplate(casedata.script)
 
         # Read types
         self.types = TypeManager()
         self.types.fill_obj(self.context_mgr.parameters)
-        self.types.fill_string(casedata.get('types', {}))
+        self.types.fill_string(casedata.types)
 
         # Read settings
-        settings = casedata.get('settings', {})
-        self._logdir = settings.get('logdir', '${g_index}')
-        self._ignore_missing = settings.get('ignore-missing-files', False)
+        settings = casedata.settings
+        self._logdir = settings.logdir
+        self._ignore_missing = settings.ignore_missing_files
 
         # Construct plot objects
         self._plots = [
-            Plot.load(spec, self.parameters)
-            for spec in casedata.get('plots', [])
+            Plot.from_schema(schema, self.parameters)
+            for schema in casedata.plots
         ]
 
         self.lock = None
@@ -199,7 +197,7 @@ class Case:
             'g_sourcedir': os.getcwd()
         }
         for i, ctx in enumerate(self.context_mgr.fullspace(context=base_ctx)):
-            ctx['g_logdir'] = render(self._logdir, ctx)
+            ctx['g_logdir'] = self._logdir(ctx)
             yield Instance.create(self, ctx)
 
     def create_instance(
@@ -393,7 +391,7 @@ class Instance:
         collector = CaptureCollection(self.types)
         collector.update(self.context)
 
-        bookmap = FileMap.create(files=[{'source': '*', 'mode': 'glob'}])
+        bookmap = FileMap.everything()
         bookmap.copy(self.context, self.remote_book, self.local_book)
         collector.collect_from_info(self.local_book)
 

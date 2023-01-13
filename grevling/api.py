@@ -8,8 +8,6 @@ from pathlib import Path
 
 from typing import IO, BinaryIO, ContextManager, Generic, Iterable, TextIO, TypeVar, Union, Optional, TYPE_CHECKING
 
-from . import util
-
 if TYPE_CHECKING:
     from .workflow import Pipe
     from . import Case
@@ -130,6 +128,7 @@ class Workflow(ABC):
 
     @staticmethod
     def get_workflow(name: str):
+        from . import util
         cls = util.find_subclass(Workflow, name, attr='name')
         if not cls:
             raise ImportError(

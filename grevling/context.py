@@ -4,6 +4,7 @@ from typing import Callable, Dict, Any, Optional, Iterable, List
 
 from asteval import Interpreter                 # type: ignore
 
+from .schema import CaseSchema, Constant
 from .parameters import ParameterSpace
 from . import util, api
 
@@ -12,38 +13,34 @@ class ContextProvider:
 
     parameters: ParameterSpace
 
-    eval_func: Optional[Callable]
-    eval_dep: Dict[str, str]
+    evaluables: Callable[[api.Context], Dict]
 
-    constants: Dict[str, Any]
+    constants: Dict[str, Constant]
     templates: Dict[str, Any]
 
     cond_func: Optional[Callable]
     cond_dep: List[str]
 
     @classmethod
-    def load(cls, spec: Dict) -> ContextProvider:
-        return cls(spec)
+    def from_schema(cls, schema: CaseSchema) -> ContextProvider:
+        return cls(schema)
 
-    def __init__(self, data: Dict):
-        self.parameters = ParameterSpace.load(data.get('parameters', {}))
-        self.constants = dict(data.get('constants', {}))
+    def __init__(self, schema: CaseSchema):
+        self.parameters = ParameterSpace.from_schema(schema.parameters)
+        self.constants = schema.constants
+        self.evaluables = schema.evaluate
+        self.cond_func = schema.where
 
-        evaluables = data.get('evaluate', {})
-        if callable(evaluables):
-            self.eval_func = evaluables
-            self.eval_dep = {}
-        else:
-            self.eval_func = None
-            self.eval_dep = evaluables
-
-        conditions = data.get('where', [])
-        if callable(conditions):
-            self.cond_func = conditions
-            self.cond_dep = []
-        else:
-            self.cond_func = None
-            self.cond_dep = conditions
+        # conditions = schema.where
+        # if callable(conditions):
+        #     self.cond_func = conditions
+        #     self.cond_dep = []
+        # elif isinstance(conditions, list):
+        #     self.cond_func = None
+        #     self.cond_dep = conditions
+        # else:
+        #     self.cond_func = None
+        #     self.cond_dep = [conditions]
 
     def evaluate_context(self, *args, **kwargs) -> api.Context:
         return self.evaluate(*args, **kwargs)
@@ -57,28 +54,9 @@ class ContextProvider:
         verbose: bool = True,
         add_constants: bool = True,
     ) -> api.Context:
-        if self.eval_func:
-            context = {**context, **self.eval_func(**context)}
 
-        evaluator = Interpreter()
-        evaluator.symtable.update({
-            'legendre': util.legendre,
-        })
-        evaluator.symtable.update(context)
-        evaluator.symtable.update(
-            {k: v for k, v in self.constants.items() if k not in context}
-        )
-
-        for name, code in self.eval_dep.items():
-            if not isinstance(code, str):
-                result = code
-            else:
-                result = evaluator.eval(code, show_errors=False)
-                if evaluator.error:
-                    raise ValueError(f"Errors occurred evaluating '{name}'")
-            if verbose:
-                util.log.debug(f'Evaluated: {name} = {repr(result)}')
-            evaluator.symtable[name] = context[name] = result
+        context = {**self.constants, **context}
+        context.update(self.evaluables(context))
 
         if add_constants:
             for k, v in self.constants.items():
@@ -95,19 +73,10 @@ class ContextProvider:
             if not self.cond_func and not self.cond_dep:
                 yield ctx
                 continue
-            if self.cond_func and not self.cond_func(**ctx):
+            if self.cond_func and not self.cond_func(ctx):
                 continue
-            if not self.cond_dep:
-                yield ctx
-                continue
-            evaluator = Interpreter()
-            evaluator.symtable.update(ctx)
-            for condition in self.cond_dep:
-                if not evaluator.eval(condition):
-                    break
-            else:
-                yield ctx
-                continue
+            yield ctx
+            continue
 
     def subspace(self, *args, **kwargs) -> Iterable[api.Context]:
         for i, ctx in enumerate(self._subspace(*args, **kwargs)):

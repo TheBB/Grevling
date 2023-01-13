@@ -13,7 +13,8 @@ import numpy as np
 import pandas as pd                         # type: ignore
 
 from .parameters import ParameterSpace
-from . import util, api
+from . import util, api, schema
+from .schema import PlotCategory, PlotIgnore
 from .render import StringRenderable, render
 
 if TYPE_CHECKING:
@@ -427,14 +428,15 @@ class PlotStyleManager:
 
 
 class PlotMode:
-    @classmethod
-    def load(cls, spec):
-        if isinstance(spec, str):
-            return cls(spec, None)
-        if spec['mode'] == 'category':
-            return cls('category', spec.get('style'))
-        if spec['mode'] == 'ignore':
-            return cls('ignore', spec.get('value'))
+
+    @staticmethod
+    def from_schema(schema: schema.PlotModeSchema) -> PlotMode:
+        if isinstance(schema, str):
+            return PlotMode(schema, None)
+        if isinstance(schema, PlotCategory):
+            return PlotMode('category', schema.style)
+        if isinstance(schema, PlotIgnore):
+            return PlotMode('ignore', schema.value)
 
     def __init__(self, kind: str, arg: Any):
         self.kind = kind
@@ -460,29 +462,44 @@ class Plot:
     _xlim: List[float]
     _ylim: List[float]
 
-    @classmethod
-    def load(cls, spec, parameters):
-        # All parameters not mentioned are assumed to be ignored
-        spec.setdefault('parameters', {})
-        for param in parameters:
-            spec['parameters'].setdefault(param, 'ignore')
+    @staticmethod
+    def from_schema(schema: schema.PlotSchema, paramspace: ParameterSpace) -> Plot:
+        parameters = dict(schema.parameters)
+        for param in paramspace:
+            parameters.setdefault(param, 'ignore')
 
         # If there is exactly one variate, and the x-axis is not given, assume that is the x-axis
         variates = [
-            param for param, kind in spec['parameters'].items() if kind == 'variate'
+            param for param, kind in parameters.items() if kind == 'variate'
         ]
         nvariate = len(variates)
-        if nvariate == 1 and 'xaxis' not in spec:
-            spec['xaxis'] = next(iter(variates))
-        elif 'xaxis' not in spec:
-            spec['xaxis'] = None
+        if nvariate == 1 and schema.xaxis is None:
+            xaxis = next(iter(variates))
+        else:
+            xaxis = schema.xaxis
 
         # Listify possible scalars
-        for k in ('format', 'yaxis'):
-            if isinstance(spec[k], str):
-                spec[k] = [spec[k]]
+        fmt = schema.fmt
+        yaxis = schema.yaxis
 
-        return util.call_yaml(cls, spec)
+        return Plot(
+            parameters=parameters,
+            filename=schema.filename,
+            format=fmt,
+            yaxis=yaxis,
+            xaxis=xaxis,
+            type=schema.kind,
+            grid=schema.grid,
+            xmode=schema.xmode,
+            ymode=schema.ymode,
+            xlim=schema.xlim,
+            ylim=schema.ylim,
+            title=schema.title,
+            xlabel=schema.xlabel,
+            ylabel=schema.ylabel,
+            legend=schema.legend,
+            style=schema.style,
+        )
 
     def __init__(
         self,
@@ -501,10 +518,10 @@ class Plot:
         ymode='linear',
         xlim=[],
         ylim=[],
-        style={},
+        style=schema.PlotStyle,
     ):
         self._parameters = {
-            name: PlotMode.load(value) for name, value in parameters.items()
+            name: PlotMode.from_schema(value) for name, value in parameters.items()
         }
         self._filename = filename
         self._format = format
@@ -522,7 +539,9 @@ class Plot:
         self._ylim = ylim
 
         self._styles = PlotStyleManager()
-        for key, value in style.items():
+        for key, value in style.dict().items():
+            if value is None:
+                continue
             if isinstance(value, list):
                 self._styles.set_values(key, value)
             else:
@@ -624,9 +643,9 @@ class Plot:
         backends.set_xmode(self._xmode)
         backends.set_ymode(self._ymode)
         backends.set_grid(self._grid)
-        if len(self._xlim) >= 2:
+        if self._xlim:
             backends.set_xlim(self._xlim)
-        if len(self._xlim) >= 2:
+        if self._ylim:
             backends.set_ylim(self._ylim)
 
         filename = case.storagepath / render(self._filename, sub_context)

@@ -45,10 +45,10 @@ class CaseType(click.Path):
             raise click.FileError(str(casefile), hint='does not exist')
         if not casefile.is_file():
             raise click.FileError(str(casefile), hint='is not a file')
-        try:
-            case = Case(path)
-        except Exception as error:
-            raise CustomClickException(str(error))
+        # try:
+        case = Case(path)
+        # except Exception as error:
+            # raise CustomClickException(str(error))
 
         case = case.__enter__()
         if ctx:

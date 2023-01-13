@@ -1,3 +1,3 @@
-let {cmd} = import("grevling")
+import "grevling" as {cmd}
 
-in {script: [cmd(name: "empty", container: "hello-world")]}
+{script: [cmd(name: "empty", container: "hello-world")]}
