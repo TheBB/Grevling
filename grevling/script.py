@@ -13,9 +13,9 @@ from time import time as osclock
 
 from typing import Any, Dict, List, Optional, Union, Callable
 
-from . import api, util, schema
+from . import api, util
 from .capture import Capture, CaptureCollection
-# from .render import render, renderable
+from .schema import CommandSchema
 
 
 @contextmanager
@@ -64,7 +64,7 @@ async def run(
 class Command:
 
     name: str
-    args: Union[str, List[str]]
+    args: Optional[Union[str, List[str]]]
     env: Dict[str, str] = field(default_factory=dict)
     workdir: Optional[str] = None
 
@@ -78,8 +78,8 @@ class Command:
     captures: List[Capture] = field(default_factory=list)
 
     @staticmethod
-    def from_schema(schema: schema.CommandSchema) -> Command:
-        kwargs: Dict = {
+    def from_schema(schema: CommandSchema) -> Command:
+        kwargs: Dict[str, Any] = {
             'shell': False
         }
 
@@ -134,6 +134,10 @@ class Command:
             kwargs['shell'] = False
             command = docker_command
 
+        if not command:
+            util.log.error('No command available')
+            return False
+
         util.log.debug(' '.join(shlex.quote(c) for c in command))
 
         # TODO: How to get good timings when we run async?
@@ -179,7 +183,7 @@ class Script:
     commands: List[Command]
 
     @staticmethod
-    def from_schema(schema: List[schema.CommandSchema]) -> Script:
+    def from_schema(schema: List[CommandSchema]) -> Script:
         return Script([
             Command.from_schema(entry)
             for entry in schema
@@ -209,9 +213,9 @@ class Script:
 
 class ScriptTemplate:
 
-    func: Callable[[api.Context], List[schema.CommandSchema]]
+    func: Callable[[api.Context], List[CommandSchema]]
 
-    def __init__(self, func: Callable[[api.Context], List[schema.CommandSchema]]):
+    def __init__(self, func: Callable[[api.Context], List[CommandSchema]]):
         self.func = func
 
     def render(self, ctx: api.Context) -> Script:

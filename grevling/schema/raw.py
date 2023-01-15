@@ -7,25 +7,34 @@ from typing import Any, List, Dict, Optional, Union, Literal, Callable, Tuple
 
 from pydantic import BaseModel, Field
 
-import goldpy as gold                   # type: ignore
-import jsonschema                       # type: ignore
-import jsonschema.validators            # type: ignore
-import yaml
-
-from . import util, api
-from .render import render
+from .. import util, api
+from ..render import render
+from . import refined
 
 
-class RegexCapture(BaseModel):
+Scalar = Union[int, float]
+
+
+Constant = Union[
+    str,
+    None,
+    Scalar,
+    bool,
+]
+
+
+class RegexCaptureSchema(BaseModel):
+    capture_type: Literal['regex'] = 'regex'
     pattern: str
     mode: Literal['first', 'last', 'all'] = 'last'
 
     @staticmethod
-    def from_str(pattern: str) -> RegexCapture:
-        return RegexCapture(pattern=pattern)
+    def from_str(pattern: str) -> RegexCaptureSchema:
+        return RegexCaptureSchema(pattern=pattern)
 
 
-class SimpleCapture(BaseModel):
+class SimpleCaptureSchema(BaseModel):
+    capture_type: Literal['simple'] = 'simple'
     kind: Literal['integer', 'float'] = Field(alias='type')
     name: str
     prefix: str
@@ -75,6 +84,9 @@ class FileMapSchema(BaseModel):
             'target': render(self.target, context) if self.target else None,
         })
 
+    def refine(self) -> refined.FileMapSchema:
+        return refined.FileMapSchema.parse_obj(self.dict())
+
 
 class CommandSchema(BaseModel):
     command: Optional[Union[str, List[str]]]
@@ -82,13 +94,13 @@ class CommandSchema(BaseModel):
 
     p_capture: Union[
         str,
-        SimpleCapture,
-        RegexCapture,
+        SimpleCaptureSchema,
+        RegexCaptureSchema,
         List[
             Union[
                 str,
-                SimpleCapture,
-                RegexCapture,
+                SimpleCaptureSchema,
+                RegexCaptureSchema,
             ]
         ],
     ] = Field(alias='capture', default=[])
@@ -122,15 +134,18 @@ class CommandSchema(BaseModel):
         })
 
     @property
-    def capture(self) -> List[Union[SimpleCapture, RegexCapture]]:
+    def capture(self) -> List[Dict]:
         raw_captures = self.p_capture if isinstance(self.p_capture, list) else [self.p_capture]
         return [
-            RegexCapture.from_str(pattern) if isinstance(pattern, str) else pattern
+            RegexCaptureSchema.from_str(pattern).dict() if isinstance(pattern, str) else pattern.dict()
             for pattern in raw_captures
         ]
 
-
-Scalar = Union[int, float]
+    def refine(self) -> refined.CommandSchema:
+        return refined.CommandSchema.parse_obj({
+            **self.dict(),
+            'capture': self.capture,
+        })
 
 
 class UniformParameterSchema(BaseModel):
@@ -140,6 +155,9 @@ class UniformParameterSchema(BaseModel):
 
     class Config:
         smart_union = True
+
+    def refine(self) -> refined.UniformParameterSchema:
+        return refined.UniformParameterSchema.parse_obj(self.dict())
 
 
 class GradedParameterSchema(BaseModel):
@@ -151,37 +169,50 @@ class GradedParameterSchema(BaseModel):
     class Config:
         smart_union = True
 
+    def refine(self) -> refined.GradedParameterSchema:
+        return refined.GradedParameterSchema.parse_obj(self.dict())
 
-class PlotCategory(BaseModel):
+
+ParameterSchema = Union[
+    List[Scalar],
+    List[str],
+    UniformParameterSchema,
+    GradedParameterSchema,
+]
+
+
+class PlotCategorySchema(BaseModel):
     mode: Literal['category']
-    style: Literal['color', 'line', 'marker']
+    argument: Optional[Literal['color', 'line', 'marker']] = Field(alias='style')
 
 
-class PlotIgnore(BaseModel):
+class PlotIgnoreSchema(BaseModel):
     mode: Literal['ignore']
-    value: Union[Scalar, str]
+    argument: Optional[Union[Scalar, str]] = Field(alias='value')
 
     class Config:
         smart_union = True
 
 
-class PlotStyle(BaseModel):
-    color: Optional[Union[str, List[str]]]
-    line: Optional[Union[str, List[str]]]
-    marker: Optional[Union[str, List[str]]]
-
-
 PlotModeSchema = Union[
     Literal['fixed', 'variate', 'category', 'ignore', 'mean'],
-    PlotCategory,
-    PlotIgnore,
+    PlotCategorySchema,
+    PlotIgnoreSchema,
 ]
 
 
-class PlotStyle(BaseModel):
-    color: Optional[Union[str, List[str]]]
-    line: Optional[Union[str, List[str]]]
-    marker: Optional[Union[str, List[str]]]
+class PlotStyleSchema(BaseModel):
+    color: Optional[Union[str, List[str]]] = None
+    line: Optional[Union[str, List[str]]] = None
+    marker: Optional[Union[str, List[str]]] = None
+
+    def refine(self) -> refined.PlotStyleSchema:
+        fix = lambda x: [x] if isinstance(x, str) else x
+        return refined.PlotStyleSchema.parse_obj({
+            'color': fix(self.color),
+            'line': fix(self.line),
+            'marker': fix(self.marker),
+        })
 
 
 class PlotSchema(BaseModel):
@@ -208,7 +239,7 @@ class PlotSchema(BaseModel):
 
     parameters: Dict[str, PlotModeSchema] = {}
 
-    style: PlotStyle = PlotStyle()
+    style: PlotStyleSchema = PlotStyleSchema()
 
     @property
     def fmt(self) -> List[str]:
@@ -218,6 +249,19 @@ class PlotSchema(BaseModel):
     def yaxis(self) -> List[str]:
         return self.p_yaxis if isinstance(self.p_yaxis, list) else [self.p_yaxis]
 
+    def refine(self) -> refined.PlotSchema:
+        parameters = {
+            name: {'mode': value} if isinstance(value, str) else value
+            for name, value in self.parameters.items()
+        }
+        return refined.PlotSchema.parse_obj({
+            **self.dict(),
+            'fmt': self.fmt,
+            'yaxis': self.yaxis,
+            'parameters': parameters,
+            'style': self.style.refine(),
+        })
+
 
 class Settings(BaseModel):
     p_logdir: Union[Callable, str] = Field(alias='logdir', default='${g_index}')
@@ -226,24 +270,17 @@ class Settings(BaseModel):
     @property
     def logdir(self) -> Callable[[api.Context], str]:
         if isinstance(self.p_logdir, str):
-            return lambda ctx: render(self.p_logdir, ctx)
-        return lambda ctx: self.p_logdir(**ctx)
+            def renderer(ctx: api.Context) -> str:
+                return render(self.p_logdir, ctx)
+            return renderer
+        elif callable(self.p_logdir):
+            return lambda ctx: self.p_logdir(**ctx)
 
-
-ParameterSchema = Union[
-    List[Scalar],
-    List[str],
-    UniformParameterSchema,
-    GradedParameterSchema,
-]
-
-
-Constant = Union[
-    str,
-    None,
-    Scalar,
-    bool,
-]
+    def refine(self) -> refined.SettingsSchema:
+        return refined.SettingsSchema.parse_obj({
+            **self.dict(),
+            'logdir': self.logdir,
+        })
 
 
 class CaseSchema(BaseModel):
@@ -278,20 +315,45 @@ class CaseSchema(BaseModel):
 
     settings: Settings = Settings()
 
+    def refine(self) -> refined.CaseSchema:
+        parameters = {}
+        for name, schema in self.parameters.items():
+            if isinstance(schema, list):
+                parameters[name] = {
+                    'kind': 'listed',
+                    'values': schema,
+                }
+            else:
+                parameters[name] = schema.refine()
+
+        obj = self.dict()
+        obj.update({
+            'parameters': parameters,
+            'script': self.script,
+            'evaluate': self.evaluate,
+            'where': self.where,
+            'prefiles': self.prefiles,
+            'postfiles': self.postfiles,
+            'settings': self.settings.refine(),
+            'plots': [plot.refine() for plot in self.plots],
+        })
+
+        return refined.CaseSchema.parse_obj(obj)
+
     @property
-    def script(self) -> Callable[[api.Context], List[CommandSchema]]:
+    def script(self) -> Callable[[api.Context], List[refined.CommandSchema]]:
         if isinstance(self.p_script, list):
             return lambda ctx: [
-                CommandSchema.from_any(schema).render(ctx)
+                CommandSchema.from_any(schema).render(ctx).refine()
                 for schema in self.p_script
             ]
         return lambda ctx: [
-            CommandSchema.from_any(schema)
+            CommandSchema.from_any(schema).refine()
             for schema in self.p_script(**ctx)
         ]
 
     @property
-    def evaluate(self) -> Callable[[api.Context], Dict]:
+    def evaluate(self) -> Callable[[api.Context], Dict[str, Any]]:
         if isinstance(self.p_evaluate, dict):
             return partial(util.evaluate, evaluables=self.p_evaluate)
         return lambda ctx: self.p_evaluate(**ctx)
@@ -304,27 +366,27 @@ class CaseSchema(BaseModel):
             return partial(util.all_truthy, conditions=self.p_where)
         return lambda ctx: self.p_where(**ctx)
 
-    def _templates_callable(self) -> Callable[[api.Context], List[FileMapSchema]]:
-        if isinstance(self.p_templates, list):
+    @staticmethod
+    def _filemap(schemas, schema_converter):
+        if isinstance(schemas, list):
             return lambda ctx: [
-                TemplateSchema.from_any(schema).to_filemap().render(ctx)
-                for schema in self.p_templates
+                schema_converter(schema).render(ctx).refine() for schema in schemas
             ]
         return lambda ctx: [
-            TemplateSchema.from_any(schema).to_filemap()
-            for schema in self.p_templates(**ctx)
+            schema_converter(schema).refine() for schema in schemas(**ctx)
         ]
 
+    def _templates_callable(self) -> Callable[[api.Context], List[FileMapSchema]]:
+        return CaseSchema._filemap(
+            self.p_templates,
+            lambda schema: TemplateSchema.from_any(schema).to_filemap()
+        )
+
     def _prefiles_callable(self) -> Callable[[api.Context], List[FileMapSchema]]:
-        if isinstance(self.p_prefiles, list):
-            return lambda ctx: [
-                FileMapSchema.from_any(schema).render(ctx)
-                for schema in self.p_prefiles
-            ]
-        return lambda ctx: [
-            FileMapSchema.from_any(schema)
-            for schema in self.p_prefiles(**ctx)
-        ]
+        return CaseSchema._filemap(
+            self.p_prefiles,
+            lambda schema: FileMapSchema.from_any(schema)
+        )
 
     @property
     def prefiles(self) -> Callable[[api.Context], List[FileMapSchema]]:
@@ -334,37 +396,7 @@ class CaseSchema(BaseModel):
 
     @property
     def postfiles(self) -> Callable[[api.Context], List[FileMapSchema]]:
-        if isinstance(self.p_postfiles, list):
-            return lambda ctx: [
-                FileMapSchema.from_any(schema).render(ctx)
-                for schema in self.p_postfiles
-            ]
-        return lambda ctx: [
-            FileMapSchema.from_any(schema)
-            for schema in self.p_postfiles(**ctx)
-        ]
-
-
-def libfinder(path: str):
-    if path != 'grevling':
-        return None
-    retval = gold.eval_file(str(Path(__file__).parent / 'grevling.gold'))
-    retval.update({
-        'legendre': util.legendre
-    })
-    return retval
-
-
-def load(path: Path) -> CaseSchema:
-    if path.suffix == '.yaml':
-        with open(path, 'r') as f:
-            data = yaml.load(f, Loader=yaml.CLoader)
-    else:
-        with open(path, 'r') as f:
-            src = f.read()
-        resolver = gold.ImportConfig(root=str(path.parent), custom=libfinder)
-        data = gold.eval(src, resolver)
-    l = CaseSchema.parse_obj(data)
-    return l
-    # validate(data)
-    # return normalize(data)
+        return CaseSchema._filemap(
+            self.p_postfiles,
+            lambda schema: FileMapSchema.from_any(schema)
+        )

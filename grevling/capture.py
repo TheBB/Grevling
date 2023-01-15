@@ -6,7 +6,7 @@ import re
 from typing import Iterable, Optional, Union, TYPE_CHECKING
 
 from . import util, api, typing
-from .schema import RegexCapture, SimpleCapture
+from .schema import RegexCaptureSchema, SimpleCaptureSchema
 
 if TYPE_CHECKING:
     from .typing import TypeManager, GType
@@ -19,8 +19,8 @@ class Capture:
     _type: Optional[GType]
 
     @staticmethod
-    def from_schema(schema: Union[RegexCapture, SimpleCapture]):
-        if isinstance(schema, RegexCapture):
+    def from_schema(schema: Union[RegexCaptureSchema, SimpleCaptureSchema]):
+        if isinstance(schema, RegexCaptureSchema):
             return Capture(
                 pattern=schema.pattern,
                 mode=schema.mode,

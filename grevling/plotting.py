@@ -6,16 +6,21 @@ import csv
 import math
 import operator
 
-from typing import List, Dict, Optional, Iterable, Any, Tuple, TYPE_CHECKING
+from typing import List, Dict, Optional, Iterable, Any, Tuple, Literal, TYPE_CHECKING
 
-from bidict import bidict
+from bidict._bidict import bidict
 import numpy as np
 import pandas as pd                         # type: ignore
 
+from . import util, api
 from .parameters import ParameterSpace
-from . import util, api, schema
-from .schema import PlotCategory, PlotIgnore
-from .render import StringRenderable, render
+from .render import render
+from .schema import (
+    PlotSchema,
+    PlotModeSchema,
+    PlotModeIgnoreSchema,
+    PlotStyleSchema,
+)
 
 if TYPE_CHECKING:
     from . import Case
@@ -430,13 +435,11 @@ class PlotStyleManager:
 class PlotMode:
 
     @staticmethod
-    def from_schema(schema: schema.PlotModeSchema) -> PlotMode:
-        if isinstance(schema, str):
-            return PlotMode(schema, None)
-        if isinstance(schema, PlotCategory):
-            return PlotMode('category', schema.style)
-        if isinstance(schema, PlotIgnore):
-            return PlotMode('ignore', schema.value)
+    def from_schema(schema: PlotModeSchema) -> PlotMode:
+        return PlotMode(
+            schema.mode,
+            getattr(schema, 'argument', None)
+        )
 
     def __init__(self, kind: str, arg: Any):
         self.kind = kind
@@ -450,7 +453,7 @@ class Plot:
     _format: List[str]
     _yaxis: List[str]
     _xaxis: str
-    _type: str
+    _type: Optional[Literal['scatter', 'line']]
     _legend: Optional[str]
     _xlabel: Optional[str]
     _ylabel: Optional[str]
@@ -463,42 +466,42 @@ class Plot:
     _ylim: List[float]
 
     @staticmethod
-    def from_schema(schema: schema.PlotSchema, paramspace: ParameterSpace) -> Plot:
-        parameters = dict(schema.parameters)
+    def from_schema(spec: PlotSchema, paramspace: ParameterSpace) -> Plot:
+        parameters = dict(spec.parameters)
         for param in paramspace:
-            parameters.setdefault(param, 'ignore')
+            parameters.setdefault(param, PlotModeIgnoreSchema())
 
         # If there is exactly one variate, and the x-axis is not given, assume that is the x-axis
         variates = [
             param for param, kind in parameters.items() if kind == 'variate'
         ]
         nvariate = len(variates)
-        if nvariate == 1 and schema.xaxis is None:
+        if nvariate == 1 and spec.xaxis is None:
             xaxis = next(iter(variates))
         else:
-            xaxis = schema.xaxis
+            xaxis = spec.xaxis
 
         # Listify possible scalars
-        fmt = schema.fmt
-        yaxis = schema.yaxis
+        fmt = spec.fmt
+        yaxis = spec.yaxis
 
         return Plot(
             parameters=parameters,
-            filename=schema.filename,
+            filename=spec.filename,
             format=fmt,
             yaxis=yaxis,
             xaxis=xaxis,
-            type=schema.kind,
-            grid=schema.grid,
-            xmode=schema.xmode,
-            ymode=schema.ymode,
-            xlim=schema.xlim,
-            ylim=schema.ylim,
-            title=schema.title,
-            xlabel=schema.xlabel,
-            ylabel=schema.ylabel,
-            legend=schema.legend,
-            style=schema.style,
+            type=spec.kind,
+            grid=spec.grid,
+            xmode=spec.xmode,
+            ymode=spec.ymode,
+            xlim=spec.xlim,
+            ylim=spec.ylim,
+            title=spec.title,
+            xlabel=spec.xlabel,
+            ylabel=spec.ylabel,
+            legend=spec.legend,
+            style=spec.style,
         )
 
     def __init__(
@@ -508,7 +511,7 @@ class Plot:
         format,
         yaxis,
         xaxis,
-        type=None,
+        type: Optional[Literal['scatter', 'line']] = None,
         legend=None,
         xlabel=None,
         ylabel=None,
@@ -518,8 +521,9 @@ class Plot:
         ymode='linear',
         xlim=[],
         ylim=[],
-        style=schema.PlotStyle,
+        style: PlotStyleSchema = PlotStyleSchema(),
     ):
+        print('!!!', parameters)
         self._parameters = {
             name: PlotMode.from_schema(value) for name, value in parameters.items()
         }
@@ -614,7 +618,7 @@ class Plot:
             context = {**background, **index, **constants}
             self.generate_single(case, context, index)
 
-    def generate_single(self, case, context, index):
+    def generate_single(self, case: Case, context, index):
         # Collect all the categorized parameters and iterate over all those combinations
         categories = self._parameters_of_kind('category')
         backends = Backends(*self._format)
@@ -622,7 +626,7 @@ class Plot:
 
         sub_indices = case.parameters.subspace(*categories)
         styles = self._styles.styles(case.parameters, *categories)
-        sub_context = {}
+        sub_context = api.Context()
         for sub_index, basestyle in zip(sub_indices, styles):
             sub_context = case.context_mgr.evaluate_context({**context, **sub_index})
             sub_index = {**index, **sub_index}
@@ -697,9 +701,7 @@ class Plot:
 
     def generate_legend(self, context: dict, yaxis: str) -> str:
         if self._legend is not None:
-            return StringRenderable(self._legend).render(
-                api.Context(**context, yaxis=yaxis)
-            )
+            return render(self._legend, api.Context(**context, yaxis=yaxis))
         if any(self._parameters_of_kind('category')):
             name = ', '.join(
                 f'{k}={repr(context[k])}' for k in self._parameters_of_kind('category')

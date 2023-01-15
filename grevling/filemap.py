@@ -4,7 +4,8 @@ from pathlib import Path
 
 from typing import Any, Optional, List, Dict, Iterable, Tuple, Callable
 
-from . import util, api, schema
+from . import util, api
+from .schema import FileMapSchema
 from .render import render
 
 
@@ -16,17 +17,13 @@ class SingleFileMap:
     mode: str
 
     @staticmethod
-    def from_schema(schema: schema.FileMapSchema) -> SingleFileMap:
+    def from_schema(schema: FileMapSchema) -> SingleFileMap:
         return SingleFileMap(
             source=schema.source,
             target=schema.target,
             template=schema.template,
             mode=schema.mode,
         )
-
-    # @classmethod
-    # def load(cls, spec: Dict, **kwargs) -> SingleFileMap:
-    #     return util.call_yaml(cls, spec, **kwargs)
 
     def __init__(
         self,
@@ -99,7 +96,7 @@ class FileMap:
     elements: List[SingleFileMap]
 
     @staticmethod
-    def from_schema(schema: List[schema.FileMapSchema]) -> FileMap:
+    def from_schema(schema: List[FileMapSchema]) -> FileMap:
         return FileMap([
             SingleFileMap.from_schema(entry)
             for entry in schema
@@ -129,7 +126,7 @@ class FileMap:
 
 class FileMapTemplate:
 
-    def __init__(self, func: Callable[[api.Context], List[schema.FileMapSchema]]):
+    def __init__(self, func: Callable[[api.Context], List[FileMapSchema]]):
         self.func = func
 
     def render(self, ctx: api.Context) -> FileMap:

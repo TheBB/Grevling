@@ -13,7 +13,7 @@ class ContextProvider:
 
     parameters: ParameterSpace
 
-    evaluables: Callable[[api.Context], Dict]
+    evaluables: Callable[[api.Context], Dict[str, Any]]
 
     constants: Dict[str, Constant]
     templates: Dict[str, Any]
@@ -31,17 +31,6 @@ class ContextProvider:
         self.evaluables = schema.evaluate
         self.cond_func = schema.where
 
-        # conditions = schema.where
-        # if callable(conditions):
-        #     self.cond_func = conditions
-        #     self.cond_dep = []
-        # elif isinstance(conditions, list):
-        #     self.cond_func = None
-        #     self.cond_dep = conditions
-        # else:
-        #     self.cond_func = None
-        #     self.cond_dep = [conditions]
-
     def evaluate_context(self, *args, **kwargs) -> api.Context:
         return self.evaluate(*args, **kwargs)
 
@@ -55,7 +44,7 @@ class ContextProvider:
         add_constants: bool = True,
     ) -> api.Context:
 
-        context = {**self.constants, **context}
+        context = api.Context({**self.constants, **context})
         context.update(self.evaluables(context))
 
         if add_constants:

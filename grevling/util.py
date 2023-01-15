@@ -62,17 +62,17 @@ def with_context(fmt: str):
 
         if asyncio.iscoroutinefunction(func):
 
-            async def inner(*args, **kwargs):
+            async def async_inner(*args, **kwargs):
                 with log.with_context(calculate_context(*args, **kwargs)):
                     return await func(*args, **kwargs)
+            return wraps(func)(async_inner)
 
         else:
 
-            def inner(*args, **kwargs):
+            def sync_inner(*args, **kwargs):
                 with log.with_context(calculate_context(*args, **kwargs)):
                     return func(*args, **kwargs)
-
-        return wraps(func)(inner)
+            return wraps(func)(sync_inner)
 
     return decorator
 

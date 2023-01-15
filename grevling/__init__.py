@@ -15,8 +15,6 @@ from grevling.typing import TypeManager
 
 from .api import Status
 from .plotting import Plot
-# from .render import render
-# from .schema import load, validate, normalize
 from .schema import load, CaseSchema
 from .capture import CaptureCollection
 from .context import ContextProvider
@@ -57,10 +55,10 @@ class Case:
 
     context_mgr: ContextProvider
 
-    premap: api.Renderable[FileMap]
-    postmap: api.Renderable[FileMap]
-    script: api.Renderable[Script]
-    _plots: List[Plot]
+    premap: FileMapTemplate
+    postmap: FileMapTemplate
+    script: ScriptTemplate
+    plots: List[Plot]
 
     _ignore_missing: bool
 
@@ -126,7 +124,7 @@ class Case:
         self._ignore_missing = settings.ignore_missing_files
 
         # Construct plot objects
-        self._plots = [
+        self.plots = [
             Plot.from_schema(schema, self.parameters)
             for schema in casedata.plots
         ]
@@ -144,7 +142,7 @@ class Case:
 
     def __enter__(self) -> Case:
         self.acquire_lock()
-        self.state = CaseState(self.storagepath / 'state.json').__enter__()
+        self.state = CaseState.from_path(self.storagepath / 'state.json').__enter__()
         return self
 
     def __exit__(self, *args, **kwargs):
@@ -215,7 +213,7 @@ class Case:
             'g_sourcedir': sourcedir,
         })
         if logdir is None:
-            logdir = Path(render(self._logdir, ctx))
+            logdir = Path(self._logdir(ctx))
         ctx['g_logdir'] = str(logdir)
         workspace = LocalWorkspace(Path(ctx['g_logdir']), name='LOG')
         return Instance.create(self, ctx, local=workspace)
@@ -246,7 +244,7 @@ class Case:
         self.state.has_collected = True
 
     def plot(self):
-        for plot in self._plots:
+        for plot in self.plots:
             plot.generate_all(self)
         self.state.has_plotted = True
 
@@ -272,7 +270,7 @@ class Case:
     @property  # type: ignore
     @util.deprecated("will be removed", name='Case.shape')
     def shape(self):
-        return tuple(map(len, self._parameters.values()))
+        return tuple(map(len, self.parameters.values()))
 
 
 class Instance:
@@ -299,7 +297,7 @@ class Instance:
     def __init__(
         self,
         case: Case,
-        context: api.Context = None,
+        context: Optional[api.Context] = None,
         logdir: Optional[str] = None,
         local: Optional[api.Workspace] = None,
     ):

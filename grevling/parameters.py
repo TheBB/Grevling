@@ -5,7 +5,12 @@ from typing import Sequence, Iterable, Dict, Any, List, Tuple
 import numpy as np
 
 from . import api, util
-from .schema import ParameterSchema, UniformParameterSchema, GradedParameterSchema
+from .schema import (
+    ParameterSchema,
+    ListedParameterSchema,
+    UniformParameterSchema,
+    GradedParameterSchema,
+)
 
 
 class Parameter(Sequence):
@@ -14,9 +19,9 @@ class Parameter(Sequence):
     values: List
 
     @staticmethod
-    def from_schema(name: str, schema: Parameter) -> Parameter:
-        if isinstance(schema, list):
-            return Parameter(name, schema)
+    def from_schema(name: str, schema: ParameterSchema) -> Parameter:
+        if isinstance(schema, ListedParameterSchema):
+            return Parameter(name, schema.values)
         if isinstance(schema, UniformParameterSchema):
             return UniformParameter(name, schema.interval, schema.num)
         if isinstance(schema, GradedParameterSchema):
@@ -58,8 +63,8 @@ class ParameterSpace(dict):
     @classmethod
     def from_schema(cls, schema: Dict[str, ParameterSchema]):
         return cls({
-            name: Parameter.from_schema(name, schema)
-            for name, schema in schema.items()
+            name: Parameter.from_schema(name, spec)
+            for name, spec in schema.items()
         })
 
     def subspace(self, *names: str) -> Iterable[Dict]:
