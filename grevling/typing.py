@@ -198,7 +198,6 @@ class TypeManager(Dict[str, GType]):
 
 Self = TypeVar('Self', bound='PersistentObject')
 
-
 class PersistentObject(BaseModel):
 
     _path: Path = PrivateAttr()
