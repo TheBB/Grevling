@@ -140,7 +140,7 @@ class PlotSchema(BaseModel):
     parameters: Dict[str, PlotModeSchema]
     xaxis: Optional[str]
     yaxis: List[str]
-    kind: Literal['scatter', 'line']
+    kind: Optional[Literal['scatter', 'line']]
     grid: bool
     xmode: Literal['linear', 'log']
     ymode: Literal['linear', 'log']

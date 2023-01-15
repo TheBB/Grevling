@@ -291,7 +291,7 @@ class PlotSchema(BaseModel):
     yaxis: Union[str, List[str]] = Field(alias='yaxis')
     ylim: Optional[Tuple[Scalar, Scalar]]
     xlim: Optional[Tuple[Scalar, Scalar]]
-    kind: Literal['scatter', 'line'] = Field(alias='type', default='line')
+    kind: Optional[Literal['scatter', 'line']] = Field(alias='type')
     legend: Optional[str]
     xlabel: Optional[str]
     ylabel: Optional[str]
