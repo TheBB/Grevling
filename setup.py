@@ -22,8 +22,6 @@ setup(
         'click',
         'fasteners',
         'goldpy>=2.1',
-        'jsonschema>=4.4',
-        'jsonpath-ng',
         'mako',
         'numpy',
         'pandas',
@@ -31,7 +29,6 @@ setup(
         'pydantic',
         'pyyaml',
         'rich',
-        'typing-inspect',
     ],
     extras_require={
         'testing': ['pytest'],
