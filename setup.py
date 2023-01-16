@@ -22,7 +22,7 @@ setup(
         'click',
         'fasteners',
         'goldpy>=2.1',
-        'mako',
+        'mako>=1.2',
         'numpy',
         'pandas',
         'pyarrow',
