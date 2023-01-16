@@ -39,8 +39,8 @@ async def run(
     }
 
     if shell:
-        scommand = ' '.join(shlex.quote(c) if c != '&&' else c for c in command)
-        proc = await asyncio.create_subprocess_shell(scommand, **kwargs)  # type: ignore
+        command_str = ' '.join(shlex.quote(c) if c != '&&' else c for c in command)
+        proc = await asyncio.create_subprocess_shell(command_str, **kwargs)  # type: ignore
     else:
         proc = await asyncio.create_subprocess_exec(*command, **kwargs)   # type: ignore
 
@@ -60,51 +60,49 @@ async def run(
     return Result(stdout, stderr, proc.returncode)
 
 
-@dataclass()
+@dataclass(frozen=True)
 class Command:
 
     name: str
-    args: Optional[Union[str, List[str]]]
-    env: Dict[str, str] = field(default_factory=dict)
-    workdir: Optional[str] = None
+    command: Optional[List[str]]
+    env: Dict[str, str]
+    workdir: Optional[str]
 
-    container: Optional[str] = None
-    container_args: List[str] = field(default_factory=list)
+    container: Optional[str]
+    container_args: List[str]
 
-    shell: bool = False
-    retry_on_fail: bool = False
-    allow_failure: bool = False
+    shell: bool
+    retry_on_fail: bool
+    allow_failure: bool
 
-    captures: List[Capture] = field(default_factory=list)
+    captures: List[Capture]
 
     @staticmethod
     def from_schema(schema: CommandSchema) -> Command:
-        kwargs: Dict[str, Any] = {
-            'shell': False
-        }
+        args = schema.dict(exclude={
+            'command', 'name', 'capture', 'container_args'
+        })
 
-        command = schema.command
-        if isinstance(command, str):
-            command = shlex.split(command)
-            kwargs['shell'] = True
-        kwargs['name'] = schema.name or (Path(command[0]).name if command else 'TODO')
+        if isinstance(schema.command, str):
+            args['command'] = shlex.split(schema.command)
+            args['shell'] = True
+        else:
+            args['command'] = schema.command
+            args['shell'] = False
 
-        captures = [Capture.from_schema(entry) for entry in schema.capture]
-        kwargs['captures'] = captures
+        if not schema.name:
+            args['name'] = Path(args['command'][0]).name if args['command'] else 'TODO'
+        else:
+            args['name'] = schema.name
 
-        kwargs['allow_failure'] = schema.allow_failure
-        kwargs['retry_on_fail'] = schema.retry_on_fail
-        kwargs['env'] = schema.env
-        kwargs['container'] = schema.container
+        args['captures'] = [Capture.from_schema(entry) for entry in schema.capture]
 
-        cargs = schema.container_args
-        if isinstance(cargs, str):
-            cargs = shlex.split(cargs)
+        if isinstance(schema.container_args, str):
+            args['container_args'] = shlex.split(schema.container_args)
+        else:
+            args['container_args'] = schema.container_args
 
-        kwargs['container_args'] = cargs
-        kwargs['workdir'] = schema.workdir
-
-        return Command(args=command, **kwargs)
+        return Command(**args)
 
     async def execute(self, cwd: Path, log_ws: api.Workspace) -> bool:
         kwargs = {
@@ -116,7 +114,7 @@ class Command:
         if self.workdir:
             kwargs['cwd'] = Path(self.workdir)
 
-        command = self.args
+        command = self.command
         if self.container:
             docker_command = [
                 'docker',
@@ -177,7 +175,7 @@ class Command:
             capture.find_in(collector, stdout)
 
 
-@dataclass
+@dataclass(frozen=True)
 class Script:
 
     commands: List[Command]
@@ -211,12 +209,10 @@ class Script:
 
 
 
+@dataclass(frozen=True)
 class ScriptTemplate:
 
     func: Callable[[api.Context], List[CommandSchema]]
-
-    def __init__(self, func: Callable[[api.Context], List[CommandSchema]]):
-        self.func = func
 
     def render(self, ctx: api.Context) -> Script:
         return Script.from_schema(self.func(ctx))
