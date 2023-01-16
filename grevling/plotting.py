@@ -1,20 +1,28 @@
 from __future__ import annotations
 
 from abc import abstractclassmethod, ABC, abstractmethod
+from dataclasses import dataclass, InitVar, field
+from functools import cached_property
 from pathlib import Path
 import csv
 import math
 import operator
 
-from typing import List, Dict, Optional, Iterable, Any, Tuple, TYPE_CHECKING
+from typing import List, Dict, Optional, Iterable, Any, Tuple, Literal, TYPE_CHECKING
 
-from bidict import bidict
+from bidict._bidict import bidict
 import numpy as np
 import pandas as pd                         # type: ignore
 
-from .parameters import ParameterSpace
 from . import util, api
-from .render import StringRenderable, render
+from .parameters import ParameterSpace
+from .render import render
+from .schema import (
+    PlotSchema,
+    PlotModeSchema,
+    PlotModeIgnoreSchema,
+    PlotStyleSchema,
+)
 
 if TYPE_CHECKING:
     from . import Case
@@ -22,14 +30,14 @@ if TYPE_CHECKING:
 
 class Backends:
 
-    _backends: List[PlotBackend]
+    backends: List[PlotBackend]
 
     def __init__(self, *names: str):
-        self._backends = [PlotBackend.get_backend(name)() for name in names]
+        self.backends = [PlotBackend.get_backend(name)() for name in names]
 
     def __getattr__(self, attr: str):
         def inner(*args, **kwargs):
-            for backend in self._backends:
+            for backend in self.backends:
                 getattr(backend, attr)(*args, **kwargs)
 
         return inner
@@ -332,7 +340,7 @@ class PlotStyleManager:
 
     _category_to_style: bidict
     _custom_styles: Dict[str, List[str]]
-    _mode: str
+    _mode: Literal['line', 'scatter']
     _defaults = {
         'color': {
             'category': {
@@ -426,141 +434,103 @@ class PlotStyleManager:
             yield basestyle
 
 
+@dataclass(frozen=True)
 class PlotMode:
-    @classmethod
-    def load(cls, spec):
-        if isinstance(spec, str):
-            return cls(spec, None)
-        if spec['mode'] == 'category':
-            return cls('category', spec.get('style'))
-        if spec['mode'] == 'ignore':
-            return cls('ignore', spec.get('value'))
 
-    def __init__(self, kind: str, arg: Any):
-        self.kind = kind
-        self.arg = arg
+    kind: str
+    arg: Any
+
+    @staticmethod
+    def from_schema(schema: PlotModeSchema) -> PlotMode:
+        return PlotMode(schema.mode, getattr(schema, 'argument', None))
 
 
+@dataclass
 class Plot:
 
-    _parameters: Dict[str, PlotMode]
-    _filename: str
-    _format: List[str]
-    _yaxis: List[str]
-    _xaxis: str
-    _type: str
-    _legend: Optional[str]
-    _xlabel: Optional[str]
-    _ylabel: Optional[str]
-    _xmode: str
-    _ymode: str
-    _title: Optional[str]
-    _grid: bool
-    _styles: PlotStyleManager
-    _xlim: List[float]
-    _ylim: List[float]
+    parameters: Dict[str, PlotMode]
+    filename: str
+    fmt: List[str]
+    yaxis: List[str]
+    xaxis: str
+    kind: Optional[Literal['scatter', 'line']]
+    legend: Optional[str]
+    xlabel: Optional[str]
+    ylabel: Optional[str]
+    title: Optional[str]
+    xmode: Literal['linear', 'log']
+    ymode: str
+    grid: bool
+    xlim: Optional[Tuple[float, float]]
+    ylim: Optional[Tuple[float, float]]
 
-    @classmethod
-    def load(cls, spec, parameters):
-        # All parameters not mentioned are assumed to be ignored
-        spec.setdefault('parameters', {})
-        for param in parameters:
-            spec['parameters'].setdefault(param, 'ignore')
+    schema: PlotSchema
+
+    @staticmethod
+    def from_schema(schema: PlotSchema, paramspace: ParameterSpace) -> Plot:
+        default = PlotModeIgnoreSchema()
+        parameters = {
+            name: PlotMode.from_schema(schema.parameters.get(name, default))
+            for name in paramspace
+        }
 
         # If there is exactly one variate, and the x-axis is not given, assume that is the x-axis
         variates = [
-            param for param, kind in spec['parameters'].items() if kind == 'variate'
+            param for param, kind in parameters.items() if kind == 'variate'
         ]
         nvariate = len(variates)
-        if nvariate == 1 and 'xaxis' not in spec:
-            spec['xaxis'] = next(iter(variates))
-        elif 'xaxis' not in spec:
-            spec['xaxis'] = None
+        if nvariate == 1 and schema.xaxis is None:
+            xaxis = next(iter(variates))
+        else:
+            xaxis = schema.xaxis
 
-        # Listify possible scalars
-        for k in ('format', 'yaxis'):
-            if isinstance(spec[k], str):
-                spec[k] = [spec[k]]
+        return Plot(
+            **schema.dict(exclude={'style', 'parameters', 'xaxis'}),
+            parameters=parameters,
+            xaxis=xaxis,
+            schema=schema,
+        )
 
-        return util.call_yaml(cls, spec)
-
-    def __init__(
-        self,
-        parameters,
-        filename,
-        format,
-        yaxis,
-        xaxis,
-        type=None,
-        legend=None,
-        xlabel=None,
-        ylabel=None,
-        title=None,
-        grid=True,
-        xmode='linear',
-        ymode='linear',
-        xlim=[],
-        ylim=[],
-        style={},
-    ):
-        self._parameters = {
-            name: PlotMode.load(value) for name, value in parameters.items()
-        }
-        self._filename = filename
-        self._format = format
-        self._yaxis = yaxis
-        self._xaxis = xaxis
-        self._type = type
-        self._legend = legend
-        self._xlabel = xlabel
-        self._ylabel = ylabel
-        self._xmode = xmode
-        self._ymode = ymode
-        self._title = title
-        self._grid = grid
-        self._xlim = xlim
-        self._ylim = ylim
-
-        self._styles = PlotStyleManager()
-        for key, value in style.items():
-            if isinstance(value, list):
-                self._styles.set_values(key, value)
-            else:
-                self._styles.set_values(key, [value])
+    @cached_property
+    def styles(self) -> PlotStyleManager:
+        styles = PlotStyleManager()
+        for key, value in self.schema.style.dict().items():
+            if value is None:
+                continue
+            styles.set_values(key, value)
         for param in self._parameters_of_kind('category', req_arg=True):
-            self._styles.assign(param, self._parameters[param].arg)
+            styles.assign(param, self.parameters[param].arg)
         for param in self._parameters_of_kind('category', req_arg=False):
-            self._styles.assign(param)
-        if len(self._yaxis) > 1 and not self._styles.assigned('yaxis'):
-            self._styles.assign('yaxis')
+            styles.assign(param)
+        if len(self.yaxis) > 1 and not styles.assigned('yaxis'):
+            styles.assign('yaxis')
+        return styles
 
     def _parameters_of_kind(self, *kinds: str, req_arg: Optional[bool] = None):
         return [
             param
-            for param, mode in self._parameters.items()
+            for param, mode in self.parameters.items()
             if mode.kind in kinds
             and (
                 req_arg is None
-                or req_arg is True
-                and mode.arg is not None
-                or req_arg is False
-                and mode.arg is None
+                or (req_arg is True and mode.arg is not None)
+                or (req_arg is False and mode.arg is None)
             )
         ]
 
     def _parameters_not_of_kind(self, *kinds: str):
         return [
-            param for param, mode in self._parameters.items() if mode.kind not in kinds
+            param for param, mode in self.parameters.items() if mode.kind not in kinds
         ]
 
-    def generate_all(self, case: Case):
+    def _validate_kind(self, case: Case):
         types = case.type_guess()
 
         # Either all the axes are list type or none of them are
-        list_type = types[self._yaxis[0]].is_list
-        assert all(types[k].is_list == list_type for k in self._yaxis[1:])
-        if self._xaxis is not None:
-            assert types[self._xaxis].is_list == list_type
+        list_type = types[self.yaxis[0]].is_list
+        assert all(types[k].is_list == list_type for k in self.yaxis[1:])
+        if self.xaxis is not None:
+            assert types[self.xaxis].is_list == list_type
 
         # If the x-axis has list type, the effective number of variates is one higher
         nvariate = len(self._parameters_of_kind('variate'))
@@ -568,15 +538,23 @@ class Plot:
 
         # If there are more than one effective variate, the plot must be scatter
         if eff_variates > 1:
-            if self._type != 'scatter' and self._type is not None:
+            if self.kind != 'scatter' and self.kind is not None:
                 util.log.warning("Line plots can have at most one variate dimension")
-            self._type = 'scatter'
+            self.kind = 'scatter'
         elif eff_variates == 0:
             util.log.error("Plot has no effective variate dimensions")
-            return
+            return False
         else:
-            self._type = 'line'
-        self._styles._mode = self._type
+            self.kind = 'line'
+        self.styles._mode = self.kind
+
+        return True
+
+    def generate_all(self, case: Case):
+        if not self._validate_kind(case):
+            return
+
+        assert self.kind is not None
 
         # Pick a parameter context with 'default' values
         background = {
@@ -587,7 +565,7 @@ class Plot:
         fixed = self._parameters_of_kind('fixed')
 
         constants = {
-            param: self._parameters[param].arg
+            param: self.parameters[param].arg
             for param in self._parameters_of_kind('ignore', req_arg=True)
         }
 
@@ -595,41 +573,41 @@ class Plot:
             context = {**background, **index, **constants}
             self.generate_single(case, context, index)
 
-    def generate_single(self, case, context, index):
+    def generate_single(self, case: Case, context, index):
         # Collect all the categorized parameters and iterate over all those combinations
         categories = self._parameters_of_kind('category')
-        backends = Backends(*self._format)
-        plotter = operator.attrgetter(f'add_{self._type}')
+        backends = Backends(*self.fmt)
+        plotter = operator.attrgetter(f'add_{self.kind}')
 
         sub_indices = case.parameters.subspace(*categories)
-        styles = self._styles.styles(case.parameters, *categories)
-        sub_context = {}
+        styles = self.styles.styles(case.parameters, *categories)
+        sub_context = api.Context()
         for sub_index, basestyle in zip(sub_indices, styles):
             sub_context = case.context_mgr.evaluate_context({**context, **sub_index})
             sub_index = {**index, **sub_index}
 
             cat_name, xaxis, yaxes = self.generate_category(case, sub_context, sub_index)
 
-            final_styles = self._styles.supplement(basestyle)
-            for ax_name, data, style in zip(self._yaxis, yaxes, final_styles):
+            final_styles = self.styles.supplement(basestyle)
+            for ax_name, data, style in zip(self.yaxis, yaxes, final_styles):
                 legend = self.generate_legend(sub_context, ax_name)
                 plotter(backends)(legend, xpoints=xaxis, ypoints=data, style=style)
 
         for attr in ['title', 'xlabel', 'ylabel']:
-            template = getattr(self, f'_{attr}')
+            template = getattr(self, attr)
             if template is None:
                 continue
             text = render(template, sub_context)
             getattr(backends, f'set_{attr}')(text)
-        backends.set_xmode(self._xmode)
-        backends.set_ymode(self._ymode)
-        backends.set_grid(self._grid)
-        if len(self._xlim) >= 2:
-            backends.set_xlim(self._xlim)
-        if len(self._xlim) >= 2:
-            backends.set_ylim(self._ylim)
+        backends.set_xmode(self.xmode)
+        backends.set_ymode(self.ymode)
+        backends.set_grid(self.grid)
+        if self.xlim:
+            backends.set_xlim(self.xlim)
+        if self.ylim:
+            backends.set_ylim(self.ylim)
 
-        filename = case.storagepath / render(self._filename, sub_context)
+        filename = case.storagepath / render(self.filename, sub_context)
         backends.generate(filename)
 
     def generate_category(self, case, context: dict, index):
@@ -646,9 +624,9 @@ class Plot:
             data = data.groupby(by=others).first().reset_index()
 
         # Remove unnecessary columns
-        to_keep = set(self._parameters) | set(self._yaxis)
-        if self._xaxis is not None:
-            to_keep.add(self._xaxis)
+        to_keep = set(self.parameters) | set(self.yaxis)
+        if self.xaxis is not None:
+            to_keep.add(self.xaxis)
         to_remove = [c for c in data.columns if c not in to_keep]
         data = data.drop(columns=to_remove)
 
@@ -660,9 +638,9 @@ class Plot:
             data = data.reset_index()
 
         # Extract data
-        ydata = [util.flatten(data[f].to_numpy()) for f in self._yaxis]
-        if self._xaxis:
-            xdata = util.flatten(data[self._xaxis].to_numpy())
+        ydata = [util.flatten(data[f].to_numpy()) for f in self.yaxis]
+        if self.xaxis:
+            xdata = util.flatten(data[self.xaxis].to_numpy())
         else:
             length = max(len(f) for f in ydata)
             xdata = np.arange(1, length + 1)
@@ -677,10 +655,8 @@ class Plot:
         return name, xdata, ydata
 
     def generate_legend(self, context: dict, yaxis: str) -> str:
-        if self._legend is not None:
-            return StringRenderable(self._legend).render(
-                api.Context(**context, yaxis=yaxis)
-            )
+        if self.legend is not None:
+            return render(self.legend, api.Context(**context, yaxis=yaxis))
         if any(self._parameters_of_kind('category')):
             name = ', '.join(
                 f'{k}={repr(context[k])}' for k in self._parameters_of_kind('category')

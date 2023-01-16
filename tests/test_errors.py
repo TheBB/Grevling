@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from pytest import raises, mark
-from jsonschema.exceptions import ValidationError
+from pydantic import ValidationError
 
 from grevling import Case
 

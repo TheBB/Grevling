@@ -70,7 +70,7 @@ in {
     },
 
     cmd: |
-        cmd;
+        cmd = null;
         name = null,
         env = {},
         container = null,

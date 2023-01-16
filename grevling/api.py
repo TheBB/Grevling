@@ -6,9 +6,9 @@ from fnmatch import fnmatch
 import json
 from pathlib import Path
 
-from typing import IO, BinaryIO, ContextManager, Generic, Iterable, TextIO, TypeVar, Union, Optional, TYPE_CHECKING
-
-from . import util
+from typing import (
+    IO, BinaryIO, ContextManager, Iterable, TextIO, TypeVar, Union, Optional, TYPE_CHECKING
+)
 
 if TYPE_CHECKING:
     from .workflow import Pipe
@@ -18,20 +18,7 @@ if TYPE_CHECKING:
 PathStr = Union[Path, str]
 
 
-class SpecConstructible(ABC):
-
-    @abstractclassmethod
-    def load(cls, data, **kwargs):
-        ...
-
-
-U = TypeVar('U')
-
-class Renderable(ABC, Generic[U]):
-
-    @abstractmethod
-    def render(self, ctx: Context) -> U:
-        ...
+T = TypeVar('T')
 
 
 class Status(Enum):
@@ -130,6 +117,7 @@ class Workflow(ABC):
 
     @staticmethod
     def get_workflow(name: str):
+        from . import util
         cls = util.find_subclass(Workflow, name, attr='name')
         if not cls:
             raise ImportError(

@@ -6,7 +6,7 @@ from datetime import datetime
 import json
 from pathlib import Path
 
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, Optional, Type, TypeVar
 
 import pandas as pd                 # type: ignore
 from pydantic import PrivateAttr
@@ -196,19 +196,23 @@ class TypeManager(Dict[str, GType]):
             self[name] = GType.from_obj(typename)
 
 
+Self = TypeVar('Self', bound='PersistentObject')
+
 class PersistentObject(BaseModel):
 
     _path: Path = PrivateAttr()
 
-    def __init__(self, path: api.PathStr):
+    @classmethod
+    def from_path(cls: Type[Self], path: api.PathStr) -> Self:
         path = Path(path)
         if path.exists():
             with open(path, 'r') as f:
                 data = json.load(f)
-            super().__init__(**data)
+            self = cls(**data)
         else:
-            super().__init__()
+            self = cls()
         self._path = path
+        return self
 
     def __enter__(self):
         return self

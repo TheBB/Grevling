@@ -6,12 +6,15 @@ from itertools import product, chain
 import json
 import logging
 
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict, Any, List
 
+from asteval import Interpreter             # type: ignore
 import numpy as np
 from numpy.polynomial import Legendre
 import pandas as pd                         # type: ignore
 import rich.logging
+
+from . import api
 
 
 class LoggerAdapter(logging.LoggerAdapter):
@@ -59,17 +62,17 @@ def with_context(fmt: str):
 
         if asyncio.iscoroutinefunction(func):
 
-            async def inner(*args, **kwargs):
+            async def async_inner(*args, **kwargs):
                 with log.with_context(calculate_context(*args, **kwargs)):
                     return await func(*args, **kwargs)
+            return wraps(func)(async_inner)
 
         else:
 
-            def inner(*args, **kwargs):
+            def sync_inner(*args, **kwargs):
                 with log.with_context(calculate_context(*args, **kwargs)):
                     return func(*args, **kwargs)
-
-        return wraps(func)(inner)
+            return wraps(func)(sync_inner)
 
     return decorator
 
@@ -214,3 +217,35 @@ def unitvec(n: int, length: Optional[int] = None) -> np.ndarray:
 
 def legendre(n: int, a: float, b: float, x: float):
     return Legendre(unitvec(n), [a, b])(x)
+
+
+def evaluate(context: api.Context, evaluables: Dict[str, str]) -> Dict[str, Any]:
+    evaluator = Interpreter()
+    evaluator.symtable.update({
+        'legendre': legendre,
+    })
+    evaluator.symtable.update(context)
+
+    retval = {}
+
+    for name, code in evaluables.items():
+        if not isinstance(code, str):
+            result = code
+        else:
+            result = evaluator.eval(code, show_errors=False)
+            if evaluator.error:
+                raise ValueError(f"Errors occurred evaluating '{name}'")
+        evaluator.symtable[name] = retval[name] = result
+
+    return retval
+
+
+def all_truthy(context: api.Context, conditions: List[str]) -> bool:
+    evaluator = Interpreter()
+    evaluator.symtable.update(context)
+
+    for condition in conditions:
+        if not evaluator.eval(condition):
+            return False
+
+    return True

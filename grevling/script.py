@@ -11,11 +11,11 @@ from pathlib import Path
 import shlex
 from time import time as osclock
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Callable
 
-from . import api, util, schema
+from . import api, util
 from .capture import Capture, CaptureCollection
-from .render import render, renderable
+from .schema import CommandSchema
 
 
 @contextmanager
@@ -39,8 +39,8 @@ async def run(
     }
 
     if shell:
-        scommand = ' '.join(shlex.quote(c) if c != '&&' else c for c in command)
-        proc = await asyncio.create_subprocess_shell(scommand, **kwargs)  # type: ignore
+        command_str = ' '.join(shlex.quote(c) if c != '&&' else c for c in command)
+        proc = await asyncio.create_subprocess_shell(command_str, **kwargs)  # type: ignore
     else:
         proc = await asyncio.create_subprocess_exec(*command, **kwargs)   # type: ignore
 
@@ -60,51 +60,49 @@ async def run(
     return Result(stdout, stderr, proc.returncode)
 
 
-@dataclass()
+@dataclass(frozen=True)
 class Command:
 
     name: str
-    args: Union[str, List[str]]
-    env: Dict[str, str] = field(default_factory=dict)
-    workdir: Optional[str] = None
+    command: Optional[List[str]]
+    env: Dict[str, str]
+    workdir: Optional[str]
 
-    container: Optional[str] = None
-    container_args: List[str] = field(default_factory=list)
+    container: Optional[str]
+    container_args: List[str]
 
-    shell: bool = False
-    retry_on_fail: bool = False
-    allow_failure: bool = False
+    shell: bool
+    retry_on_fail: bool
+    allow_failure: bool
 
-    captures: List[Capture] = field(default_factory=list)
+    captures: List[Capture]
 
-    @classmethod
-    def load(cls, data: Any) -> Command:
-        kwargs: Dict = {
-            'shell': False
-        }
+    @staticmethod
+    def from_schema(schema: CommandSchema) -> Command:
+        args = schema.dict(exclude={
+            'command', 'name', 'capture', 'container_args'
+        })
 
-        command = data.get('command', '')
-        if isinstance(command, str):
-            command = shlex.split(command)
-            kwargs['shell'] = True
-        kwargs['name'] = data.get('name') or Path(command[0]).name
-
-        captures = data.get('capture', [])
-        if isinstance(captures, (str, dict)):
-            kwargs['captures'] = [Capture.load(captures)]
+        if isinstance(schema.command, str):
+            args['command'] = shlex.split(schema.command)
+            args['shell'] = True
         else:
-            kwargs['captures'] = [Capture.load(c) for c in captures]
-        kwargs['allow_failure'] = data.get('allow-failure', False)
-        kwargs['retry_on_fail'] = data.get('retry-on-fail', False)
-        kwargs['env'] = data.get('env', {})
-        kwargs['container'] = data.get('container', None)
-        container_args = data.get('container-args', [])
-        if isinstance(container_args, str):
-            container_args = shlex.split(container_args)
-        kwargs['container_args'] = container_args
-        kwargs['workdir'] = data.get('workdir', None)
+            args['command'] = schema.command
+            args['shell'] = False
 
-        return cls(args=command, **kwargs)
+        if not schema.name:
+            args['name'] = Path(args['command'][0]).name if args['command'] else 'TODO'
+        else:
+            args['name'] = schema.name
+
+        args['captures'] = [Capture.from_schema(entry) for entry in schema.capture]
+
+        if isinstance(schema.container_args, str):
+            args['container_args'] = shlex.split(schema.container_args)
+        else:
+            args['container_args'] = schema.container_args
+
+        return Command(**args)
 
     async def execute(self, cwd: Path, log_ws: api.Workspace) -> bool:
         kwargs = {
@@ -116,7 +114,7 @@ class Command:
         if self.workdir:
             kwargs['cwd'] = Path(self.workdir)
 
-        command = self.args
+        command = self.command
         if self.container:
             docker_command = [
                 'docker',
@@ -133,6 +131,10 @@ class Command:
                 )
             kwargs['shell'] = False
             command = docker_command
+
+        if not command:
+            util.log.error('No command available')
+            return False
 
         util.log.debug(' '.join(shlex.quote(c) for c in command))
 
@@ -173,14 +175,17 @@ class Command:
             capture.find_in(collector, stdout)
 
 
-@dataclass
+@dataclass(frozen=True)
 class Script:
 
     commands: List[Command]
 
-    @classmethod
-    def load(cls, data: List) -> Script:
-        return cls([Command.load(spec) for spec in data])
+    @staticmethod
+    def from_schema(schema: List[CommandSchema]) -> Script:
+        return Script([
+            Command.from_schema(entry)
+            for entry in schema
+        ])
 
     async def run(self, cwd: Path, log_ws: api.Workspace) -> bool:
         log_ws.write_file(
@@ -203,8 +208,11 @@ class Script:
             cmd.capture(collector, workspace)
 
 
-def ScriptTemplate(data: Any) -> api.Renderable[Script]:
-    return renderable(
-        data, Script.load, schema.Script.validate,
-        '[*][command,container-args,workdir]', '[*][command,container-args,workdir][*]', '[*][env][*]',
-    )
+
+@dataclass(frozen=True)
+class ScriptTemplate:
+
+    func: Callable[[api.Context], List[CommandSchema]]
+
+    def render(self, ctx: api.Context) -> Script:
+        return Script.from_schema(self.func(ctx))
