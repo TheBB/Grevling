@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from pytest import raises, mark
-from jsonschema.exceptions import ValidationError
+from pydantic import ValidationError
 
 from grevling import Case
 
@@ -28,6 +28,5 @@ ERRORFILES = [
     'filename', [DATADIR / 'erroring' / f'{fn}.yaml' for fn in ERRORFILES]
 )
 def test_raises(filename):
-    # with raises(ValidationError):
-    #     Case(filename)
-    pass
+    with raises(ValidationError):
+        Case(filename)
