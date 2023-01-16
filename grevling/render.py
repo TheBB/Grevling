@@ -1,9 +1,8 @@
 from copy import deepcopy
 import shlex
 
-from typing import Any, Dict, Optional, Callable, Tuple, Type, TypeVar, Union, List
+from typing import Dict, Optional, TypeVar, Union, List
 
-from jsonpath_ng import parse, JSONPath     # type: ignore
 from mako.template import Template          # type: ignore
 
 from . import api
