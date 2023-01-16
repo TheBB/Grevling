@@ -36,7 +36,7 @@ Constant = Union[
 ]
 
 
-class RegexCaptureSchema(BaseModel):
+class RegexCaptureSchema(BaseModel, allow_mutation=False):
     """A capture pattern defined using regular expressions."""
 
     capture_type: Literal['regex'] = 'regex'
@@ -52,7 +52,7 @@ class RegexCaptureSchema(BaseModel):
         return RegexCaptureSchema(pattern=pattern)
 
 
-class SimpleCaptureSchema(BaseModel):
+class SimpleCaptureSchema(BaseModel, allow_mutation=False):
     """'Simple' captures are easier to configure than regular expressions,
     which are easy to get wrong. They support only a subset of features, and are
     compiled to a regex when used.
@@ -84,7 +84,7 @@ CaptureSchema = Union[
 
 Self = TypeVar('Self', bound='FileMapBaseSchema')
 
-class FileMapBaseSchema(BaseModel):
+class FileMapBaseSchema(BaseModel, allow_mutation=False):
     """Superclass for all filemap schemas (normal pre and post, as well as
     templates). The only difference is whether the *template* attribute defaults
     to true or not. Recommended usage today is to just use prefiles and
@@ -121,15 +121,15 @@ class FileMapBaseSchema(BaseModel):
         })
 
 
-class TemplateSchema(FileMapBaseSchema):
+class TemplateSchema(FileMapBaseSchema, allow_mutation=False):
     template: bool = True
 
 
-class FileMapSchema(FileMapBaseSchema):
+class FileMapSchema(FileMapBaseSchema, allow_mutation=False):
     template: bool = False
 
 
-class CommandSchema(BaseModel):
+class CommandSchema(BaseModel, allow_mutation=False):
     """Model schema for commands: anything that can be an element of the
     'script' list in a Grevling config file. This represents any command
     that can be run as part of a Grevling case.
@@ -197,21 +197,18 @@ class CommandSchema(BaseModel):
         })
 
 
-class UniformParameterSchema(BaseModel):
+class UniformParameterSchema(BaseModel, allow_mutation=False, smart_union=True):
     """Model for uniformly sampled parameters"""
 
     kind: Literal['uniform'] = Field(alias='type')
     interval: Tuple[Scalar, Scalar]
     num: int
 
-    class Config:
-        smart_union = True
-
     def refine(self) -> refined.UniformParameterSchema:
         return refined.UniformParameterSchema.parse_obj(self.dict())
 
 
-class GradedParameterSchema(BaseModel):
+class GradedParameterSchema(BaseModel, allow_mutation=False, smart_union=True):
     """Model for geometrically sampled parameters (parameter spaces that are
     denser on one side than another).
     """
@@ -220,9 +217,6 @@ class GradedParameterSchema(BaseModel):
     interval: Tuple[Scalar, Scalar]
     num: int
     grading: Scalar
-
-    class Config:
-        smart_union = True
 
     def refine(self) -> refined.GradedParameterSchema:
         return refined.GradedParameterSchema.parse_obj(self.dict())
@@ -237,7 +231,7 @@ ParameterSchema = Union[
 ]
 
 
-class PlotCategorySchema(BaseModel):
+class PlotCategorySchema(BaseModel, allow_mutation=False):
     """Model for specifying that a parameter should behave as a category in
     plots.
     """
@@ -246,14 +240,11 @@ class PlotCategorySchema(BaseModel):
     argument: Optional[Literal['color', 'line', 'marker']] = Field(alias='style')
 
 
-class PlotIgnoreSchema(BaseModel):
+class PlotIgnoreSchema(BaseModel, allow_mutation=False, smart_union=True):
     """Model for specifying that a parameter should be ignored in plots."""
 
     mode: Literal['ignore']
     argument: Optional[Union[Scalar, str]] = Field(alias='value')
-
-    class Config:
-        smart_union = True
 
 
 # Parameter plot modes in the config file should conform to this type
@@ -264,7 +255,7 @@ PlotModeSchema = Union[
 ]
 
 
-class PlotStyleSchema(BaseModel):
+class PlotStyleSchema(BaseModel, allow_mutation=False):
     """Model for specifying plot styles (lists of colors, lines and marker
     options.)
     """
@@ -282,7 +273,7 @@ class PlotStyleSchema(BaseModel):
         })
 
 
-class PlotSchema(BaseModel):
+class PlotSchema(BaseModel, allow_mutation=False, smart_union=True):
     """Model for specifying a plot."""
 
     filename: str
@@ -301,9 +292,6 @@ class PlotSchema(BaseModel):
     grid: bool = True
     parameters: Dict[str, PlotModeSchema] = {}
     style: PlotStyleSchema = PlotStyleSchema()
-
-    class Config:
-        smart_union = True
 
     def refine_fmt(self) -> List[str]:
         return self.fmt if isinstance(self.fmt, list) else [self.fmt]
@@ -330,7 +318,7 @@ class PlotSchema(BaseModel):
         })
 
 
-class SettingsSchema(BaseModel):
+class SettingsSchema(BaseModel, allow_mutation=False):
     """Model for specifying case settings."""
 
     logdir: Union[Callable, str] = '${g_index}'
@@ -362,7 +350,7 @@ ScriptSchema = Union[
     ]
 ]
 
-class CaseSchema(BaseModel):
+class CaseSchema(BaseModel, allow_mutation=False, smart_union=True):
     """Root model for specifying a Grevling case."""
 
     parameters: Dict[str, ParameterSchema] = {}
@@ -382,9 +370,6 @@ class CaseSchema(BaseModel):
     plots: List[PlotSchema] = []
 
     settings: SettingsSchema = SettingsSchema()
-
-    class Config:
-        smart_union = True
 
     def refine_parameters(self) -> Dict[str, Union[Dict, refined.ParameterSchema]]:
         """Convert the *parameters* attribute so that raw lists are converted to
