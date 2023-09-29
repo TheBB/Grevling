@@ -5,6 +5,7 @@ import io
 import json
 from pathlib import Path
 import sys
+import traceback
 
 from typing import List
 
@@ -81,14 +82,20 @@ def main(verbosity: str):
 @click.option('-j', 'nprocs', default=1, type=int)
 @workflows
 def run_all(case: Case, workflow: str, nprocs: int):
-    case.clear_cache()
-    with api.Workflow.get_workflow(workflow)(nprocs) as w:
-        success = w.pipeline(case).run(case.create_instances())
-    if not success:
-        util.log.error("An error happened, aborting")
+    try:
+        case.clear_cache()
+        with api.Workflow.get_workflow(workflow)(nprocs) as w:
+            success = w.pipeline(case).run(case.create_instances())
+        if not success:
+            util.log.error("An error happened, aborting")
+            sys.exit(1)
+        case.collect()
+        case.plot()
+    except Exception as ex:
+        util.log.critical(str(ex))
+        util.log.debug('Backtrace:')
+        util.log.debug(''.join(traceback.format_tb(ex.__traceback__)))
         sys.exit(1)
-    case.collect()
-    case.plot()
 
 
 @main.command('run')
@@ -96,10 +103,16 @@ def run_all(case: Case, workflow: str, nprocs: int):
 @click.option('-j', 'nprocs', default=1, type=int)
 @workflows
 def run(case: Case, workflow: str, nprocs: int):
-    case.clear_cache()
-    with api.Workflow.get_workflow(workflow)(nprocs) as w:
-        if not w.pipeline(case).run(case.create_instances()):
-            sys.exit(1)
+    try:
+        case.clear_cache()
+        with api.Workflow.get_workflow(workflow)(nprocs) as w:
+            if not w.pipeline(case).run(case.create_instances()):
+                sys.exit(1)
+    except Exception as ex:
+        util.log.critical(str(ex))
+        util.log.debug('Backtrace:')
+        util.log.debug(''.join(traceback.format_tb(ex.__traceback__)))
+        sys.exit(1)
 
 
 @main.command('run-with')

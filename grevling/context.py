@@ -43,7 +43,6 @@ class ContextProvider:
         verbose: bool = True,
         add_constants: bool = True,
     ) -> api.Context:
-
         context = api.Context({**self.constants, **context})
         context.update(self.evaluables(context))
 
