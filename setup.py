@@ -2,13 +2,19 @@
 
 import site, sys
 from setuptools import setup, find_packages
+from pathlib import Path
 
 site.ENABLE_USER_SITE = '--user' in sys.argv[1:]
+
+with open(Path(__file__).parent / 'README.md') as f:
+    desc = f.read()
 
 setup(
     name='Grevling',
     version='2.0.2',
     description='A batch runner tool',
+    long_description=desc,
+    long_description_content_type='text/markdown',
     author='Eivind Fonn',
     author_email='eivind.fonn@sintef.no',
     license='AGPL3',
