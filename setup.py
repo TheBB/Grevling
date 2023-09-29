@@ -7,7 +7,7 @@ site.ENABLE_USER_SITE = '--user' in sys.argv[1:]
 
 setup(
     name='Grevling',
-    version='2.0.1',
+    version='2.0.2',
     description='A batch runner tool',
     author='Eivind Fonn',
     author_email='eivind.fonn@sintef.no',
