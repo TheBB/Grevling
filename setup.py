@@ -11,7 +11,7 @@ with open(Path(__file__).parent / 'README.md') as f:
 
 setup(
     name='Grevling',
-    version='2.0.2',
+    version='2.0.3',
     description='A batch runner tool',
     long_description=desc,
     long_description_content_type='text/markdown',
