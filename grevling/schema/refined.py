@@ -145,6 +145,7 @@ class PlotSchema(BaseModel, allow_mutation=False, smart_union=True):
 
 
 class SettingsSchema(BaseModel, allow_mutation=False):
+    storagedir: str
     logdir: Callable[[api.Context], str]
     ignore_missing_files: bool
 
