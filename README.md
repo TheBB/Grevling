@@ -206,10 +206,13 @@ types:
 # Finally, various settings
 settings:
 
+  # The root folder in which all captured data is stored. Default is ".grevlingdata".
+  storagedir: ".grevlingdata"
+
   # To store captured stdout, stderr and files, Grevling needs to know the name
   # template of a directory to store them. For uniqueness, this template should
   # use all the parameters, or the single 'magic' parameter '_index' which is
-  # guaranteed to be unique.
+  # guaranteed to be unique. This will be a subfolder of storagedir (above).
   logdir: ${parameter}-and-so-on
 
 # Grevling can generate some rudimentary plots based on the generated data.

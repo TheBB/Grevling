@@ -321,6 +321,7 @@ class PlotSchema(BaseModel, allow_mutation=False, smart_union=True):
 class SettingsSchema(BaseModel, allow_mutation=False):
     """Model for specifying case settings."""
 
+    storagedir: str = ".grevlingdata"
     logdir: Union[Callable, str] = '${g_index}'
     ignore_missing_files: bool = Field(alias='ignore-missing-files', default=False)
 

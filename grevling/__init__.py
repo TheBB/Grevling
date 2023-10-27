@@ -87,20 +87,21 @@ class Case:
         self.sourcepath = localpath
         self.local_space = LocalWorkspace(self.sourcepath, 'SRC')
 
-        if storagepath is None:
-            storagepath = self.sourcepath / '.grevlingdata'
-        storagepath.mkdir(parents=True, exist_ok=True)
-        self.storagepath = storagepath
-        self.storage_spaces = LocalWorkspaceCollection(self.storagepath)
-
-        self.dataframepath = storagepath / 'dataframe.parquet'
-
         if casedata is None:
             if configpath is None:
                 raise ValueError("Could not find a valid grevling configuration")
             if configpath is not None and not configpath.is_file():
                 raise FileNotFoundError("Found a grevling configuration, but it's not a file")
             casedata = load(configpath)
+
+        if storagepath is None:
+            storagepath = self.sourcepath / casedata.settings.storagedir
+        assert storagepath is not None
+        storagepath.mkdir(parents=True, exist_ok=True)
+        self.storagepath = storagepath
+        self.storage_spaces = LocalWorkspaceCollection(self.storagepath)
+
+        self.dataframepath = storagepath / 'dataframe.parquet'
 
         assert isinstance(casedata, CaseSchema)
         self.schema = casedata
