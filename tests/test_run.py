@@ -349,7 +349,7 @@ def test_docker(runner, suffix):
 )
 @pytest.mark.parametrize('runner', [api_run(post=[]), cli_run(commands=['run'])])
 @pytest.mark.parametrize('suffix', ['.yaml'])
-def test_docker(runner, suffix):
+def test_docker_args(runner, suffix):
     path = DATADIR / 'run' / 'docker-args' / f'grevling{suffix}'
     runner(path)
 

@@ -134,7 +134,7 @@ class CommandSchema(BaseModel):
     that can be run as part of a Grevling case.
     """
 
-    command: Optional[Union[str, List[str]]]
+    command: Optional[Union[str, List[str]]] = None
     name: Optional[str] = None
     capture: CaptureSchema = []
     capture_output: bool = True
