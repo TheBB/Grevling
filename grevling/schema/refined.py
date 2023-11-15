@@ -156,8 +156,8 @@ class CaseSchema(BaseModel):
     constants: Dict[str, Constant]
     evaluate: Callable[[api.Context], Dict[str, Any]]
     where: Callable[[api.Context], bool]
-    prefiles: Callable[[api.Context], FileMapSchema]
-    postfiles: Callable[[api.Context], FileMapSchema]
+    prefiles: Callable[[api.Context], list[FileMapSchema]]
+    postfiles: Callable[[api.Context], list[FileMapSchema]]
     types: Dict[str, str]
     settings: SettingsSchema
     plots: List[PlotSchema]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from abc import abstractclassmethod, ABC, abstractmethod
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -54,7 +54,8 @@ class PlotBackend(ABC):
             raise ImportError(f"Additional dependencies required for {name} backend")
         return cls
 
-    @abstractclassmethod
+    @classmethod
+    @abstractmethod
     def available(cls) -> bool:
         ...
 

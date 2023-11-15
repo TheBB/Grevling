@@ -9,5 +9,10 @@ lint:
 format:
 	ruff format $(package)
 
-test:
+pytest:
 	pytest
+
+mypy:
+	mypy $(package)
+
+test: mypy lint pytest

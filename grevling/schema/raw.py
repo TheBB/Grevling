@@ -12,7 +12,8 @@ from __future__ import annotations
 
 from functools import partial
 
-from typing import Any, List, Dict, Optional, Union, Literal, Callable, Tuple, TypeVar, Type
+from typing import Any, List, Dict, Optional, Union, Literal, Callable, Tuple, Type
+from typing_extensions import Self
 
 from pydantic import BaseModel, Field
 
@@ -81,9 +82,6 @@ CaptureSchema = Union[
 ]
 
 
-Self = TypeVar("Self", bound="FileMapBaseSchema")
-
-
 class FileMapBaseSchema(BaseModel):
     """Superclass for all filemap schemas (normal pre and post, as well as
     templates). The only difference is whether the *template* attribute defaults
@@ -95,23 +93,22 @@ class FileMapBaseSchema(BaseModel):
     source: str
     target: Optional[str] = None
     mode: Literal["simple", "glob"] = "simple"
+    template: bool
 
     @classmethod
-    def from_any(cls: Type[Self], source: Union[str, Dict, FileMapSchema]) -> Self:
+    def from_any(cls: Type[Self], source: Union[str, Dict]) -> Self:
         """Convert an object with 'any' type to a filemap schema. Most
         importantly, convert strings by interpreting them as source
         filenames.
         """
         if isinstance(source, str):
             return cls.model_validate({"source": source})
-        if isinstance(source, dict):
-            return cls.model_validate(source)
-        return source
+        return cls.model_validate(source)
 
     def refine(self) -> refined.FileMapSchema:
         return refined.FileMapSchema.model_validate(self.model_dump())
 
-    def render(self, context: api.Context) -> FileMapSchema:
+    def render(self, context: api.Context) -> Self:
         """Perform template substitution in the *source* and *target*
         attributes.
         """
@@ -124,7 +121,7 @@ class FileMapBaseSchema(BaseModel):
 
 
 class TemplateSchema(FileMapBaseSchema):
-    template: bool = True
+    template: Literal[True] = True
 
 
 class FileMapSchema(FileMapBaseSchema):
@@ -188,7 +185,9 @@ class CommandSchema(BaseModel):
 
         # Strings should be interpreted as regex capture patterns
         return [
-            RegexCaptureSchema.from_str(pattern).model_dump() if isinstance(pattern, str) else pattern.model_dump()
+            RegexCaptureSchema.from_str(pattern).model_dump()
+            if isinstance(pattern, str)
+            else pattern.model_dump()
             for pattern in raw_captures
         ]
 
@@ -339,9 +338,10 @@ class SettingsSchema(BaseModel):
         """Convert the *logdir* attribute to a callable so that it can be loaded
         by refined models.
         """
-        if isinstance(self.logdir, str):
-            return lambda ctx: render(self.logdir, ctx)
-        return lambda ctx: self.logdir(**ctx)
+        logdir = self.logdir
+        if isinstance(logdir, str):
+            return lambda ctx: render(logdir, ctx)
+        return lambda ctx: logdir(**ctx)
 
     def refine(self) -> refined.SettingsSchema:
         return refined.SettingsSchema.model_validate(
@@ -389,7 +389,7 @@ class CaseSchema(BaseModel):
         """Convert the *parameters* attribute so that raw lists are converted to
         objects when refining.
         """
-        parameters = {}
+        parameters: dict[str, Union[dict, refined.ParameterSchema]] = {}
         for name, schema in self.parameters.items():
             if isinstance(schema, list):
                 parameters[name] = {
@@ -404,28 +404,29 @@ class CaseSchema(BaseModel):
         """Convert the *script* attribute to a callable so that it is accepted
         by the refined model.
         """
-        if isinstance(self.p_script, list):
-            return lambda ctx: [
-                CommandSchema.from_any(schema).render(ctx).refine() for schema in self.p_script
-            ]
-        return lambda ctx: [CommandSchema.from_any(schema).refine() for schema in self.p_script(**ctx)]
+        p_script = self.p_script
+        if isinstance(p_script, list):
+            return lambda ctx: [CommandSchema.from_any(schema).render(ctx).refine() for schema in p_script]
+        return lambda ctx: [CommandSchema.from_any(schema).refine() for schema in p_script(**ctx)]
 
     def refine_evaluate(self) -> Callable[[api.Context], Dict[str, Any]]:
         """Convert the *evaluate* attribute to a callable so that it is accepted
         by the refined model.
         """
-        if isinstance(self.p_evaluate, dict):
-            return partial(util.evaluate, evaluables=self.p_evaluate)
-        return lambda ctx: self.p_evaluate(**ctx)
+        p_evaluate = self.p_evaluate
+        if isinstance(p_evaluate, dict):
+            return partial(util.evaluate, evaluables=p_evaluate)
+        return lambda ctx: p_evaluate(**ctx)
 
     def refine_where(self) -> Callable[[api.Context], bool]:
         """Convert the *where* attribute to a callable so that it is accepted
         by the refined model."""
-        if isinstance(self.p_where, str):
-            return partial(util.all_truthy, conditions=[self.p_where])
-        if isinstance(self.p_where, list):
-            return partial(util.all_truthy, conditions=self.p_where)
-        return lambda ctx: self.p_where(**ctx)
+        p_where = self.p_where
+        if isinstance(p_where, str):
+            return partial(util.all_truthy, conditions=[p_where])
+        if isinstance(p_where, list):
+            return partial(util.all_truthy, conditions=p_where)
+        return lambda ctx: p_where(**ctx)
 
     @staticmethod
     def refine_filemap(schemas, schema_converter):
