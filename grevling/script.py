@@ -75,7 +75,7 @@ class Command:
 
     @staticmethod
     def from_schema(schema: CommandSchema) -> Command:
-        args = schema.dict(exclude={"command", "name", "capture", "container_args"})
+        args = schema.model_dump(exclude={"command", "name", "capture", "container_args"})
 
         if isinstance(schema.command, str):
             args["command"] = shlex.split(schema.command)

@@ -210,4 +210,4 @@ class PersistentObject(BaseModel):
 
     def __exit__(self, *args, **kwargs):
         with open(self._path, "w") as f:
-            f.write(self.json())
+            f.write(self.model_dump_json())

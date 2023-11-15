@@ -35,7 +35,7 @@ Constant = Union[
 ]
 
 
-class RegexCaptureSchema(BaseModel, allow_mutation=False):
+class RegexCaptureSchema(BaseModel):
     """A capture pattern defined using regular expressions."""
 
     capture_type: Literal["regex"] = "regex"
@@ -51,7 +51,7 @@ class RegexCaptureSchema(BaseModel, allow_mutation=False):
         return RegexCaptureSchema(pattern=pattern)
 
 
-class SimpleCaptureSchema(BaseModel, allow_mutation=False):
+class SimpleCaptureSchema(BaseModel):
     """'Simple' captures are easier to configure than regular expressions,
     which are easy to get wrong. They support only a subset of features, and are
     compiled to a regex when used.
@@ -84,7 +84,7 @@ CaptureSchema = Union[
 Self = TypeVar("Self", bound="FileMapBaseSchema")
 
 
-class FileMapBaseSchema(BaseModel, allow_mutation=False):
+class FileMapBaseSchema(BaseModel):
     """Superclass for all filemap schemas (normal pre and post, as well as
     templates). The only difference is whether the *template* attribute defaults
     to true or not. Recommended usage today is to just use prefiles and
@@ -93,7 +93,7 @@ class FileMapBaseSchema(BaseModel, allow_mutation=False):
     """
 
     source: str
-    target: Optional[str]
+    target: Optional[str] = None
     mode: Literal["simple", "glob"] = "simple"
 
     @classmethod
@@ -103,19 +103,19 @@ class FileMapBaseSchema(BaseModel, allow_mutation=False):
         filenames.
         """
         if isinstance(source, str):
-            return cls.parse_obj({"source": source})
+            return cls.model_validate({"source": source})
         if isinstance(source, dict):
-            return cls.parse_obj(source)
+            return cls.model_validate(source)
         return source
 
     def refine(self) -> refined.FileMapSchema:
-        return refined.FileMapSchema.parse_obj(self.dict())
+        return refined.FileMapSchema.model_validate(self.model_dump())
 
     def render(self, context: api.Context) -> FileMapSchema:
         """Perform template substitution in the *source* and *target*
         attributes.
         """
-        return self.copy(
+        return self.model_copy(
             update={
                 "source": render(self.source, context),
                 "target": render(self.target, context) if self.target else None,
@@ -123,31 +123,31 @@ class FileMapBaseSchema(BaseModel, allow_mutation=False):
         )
 
 
-class TemplateSchema(FileMapBaseSchema, allow_mutation=False):
+class TemplateSchema(FileMapBaseSchema):
     template: bool = True
 
 
-class FileMapSchema(FileMapBaseSchema, allow_mutation=False):
+class FileMapSchema(FileMapBaseSchema):
     template: bool = False
 
 
-class CommandSchema(BaseModel, allow_mutation=False):
+class CommandSchema(BaseModel):
     """Model schema for commands: anything that can be an element of the
     'script' list in a Grevling config file. This represents any command
     that can be run as part of a Grevling case.
     """
 
     command: Optional[Union[str, List[str]]]
-    name: Optional[str]
+    name: Optional[str] = None
     capture: CaptureSchema = []
     capture_output: bool = True
     capture_walltime: bool = True
     retry_on_fail: bool = False
     env: Dict[str, str] = {}
-    container: Optional[str]
+    container: Optional[str] = None
     container_args: Union[str, List[str]] = []
     allow_failure: bool = False
-    workdir: Optional[str]
+    workdir: Optional[str] = None
 
     @staticmethod
     def from_any(source: Union[str, List[str], CommandSchema, Dict]) -> CommandSchema:
@@ -158,8 +158,8 @@ class CommandSchema(BaseModel, allow_mutation=False):
         if isinstance(source, CommandSchema):
             return source
         if isinstance(source, Dict):
-            return CommandSchema.parse_obj(source)
-        return CommandSchema.parse_obj({"command": source})
+            return CommandSchema.model_validate(source)
+        return CommandSchema.model_validate({"command": source})
 
     def render(self, context: api.Context):
         """Perform template substitution in the attributes that require it."""
@@ -169,7 +169,7 @@ class CommandSchema(BaseModel, allow_mutation=False):
         cmd_render_mode = "shell" if isinstance(self.command, str) else None
         cargs_render_mode = "shell" if isinstance(self.container_args, str) else None
 
-        return self.copy(
+        return self.model_copy(
             update={
                 "command": render(self.command, context, mode=cmd_render_mode),
                 "container_args": render(self.container_args, context, mode=cargs_render_mode),
@@ -188,20 +188,20 @@ class CommandSchema(BaseModel, allow_mutation=False):
 
         # Strings should be interpreted as regex capture patterns
         return [
-            RegexCaptureSchema.from_str(pattern).dict() if isinstance(pattern, str) else pattern.dict()
+            RegexCaptureSchema.from_str(pattern).model_dump() if isinstance(pattern, str) else pattern.model_dump()
             for pattern in raw_captures
         ]
 
     def refine(self) -> refined.CommandSchema:
-        return refined.CommandSchema.parse_obj(
+        return refined.CommandSchema.model_validate(
             {
-                **self.dict(),
+                **self.model_dump(),
                 "capture": self.refine_capture(),
             }
         )
 
 
-class UniformParameterSchema(BaseModel, allow_mutation=False, smart_union=True):
+class UniformParameterSchema(BaseModel):
     """Model for uniformly sampled parameters"""
 
     kind: Literal["uniform"] = Field(alias="type")
@@ -209,10 +209,10 @@ class UniformParameterSchema(BaseModel, allow_mutation=False, smart_union=True):
     num: int
 
     def refine(self) -> refined.UniformParameterSchema:
-        return refined.UniformParameterSchema.parse_obj(self.dict())
+        return refined.UniformParameterSchema.model_validate(self.model_dump())
 
 
-class GradedParameterSchema(BaseModel, allow_mutation=False, smart_union=True):
+class GradedParameterSchema(BaseModel):
     """Model for geometrically sampled parameters (parameter spaces that are
     denser on one side than another).
     """
@@ -223,7 +223,7 @@ class GradedParameterSchema(BaseModel, allow_mutation=False, smart_union=True):
     grading: Scalar
 
     def refine(self) -> refined.GradedParameterSchema:
-        return refined.GradedParameterSchema.parse_obj(self.dict())
+        return refined.GradedParameterSchema.model_validate(self.model_dump())
 
 
 # Parameter specifications in the config file should conform to this type
@@ -235,20 +235,20 @@ ParameterSchema = Union[
 ]
 
 
-class PlotCategorySchema(BaseModel, allow_mutation=False):
+class PlotCategorySchema(BaseModel):
     """Model for specifying that a parameter should behave as a category in
     plots.
     """
 
     mode: Literal["category"]
-    argument: Optional[Literal["color", "line", "marker"]] = Field(alias="style")
+    argument: Optional[Literal["color", "line", "marker"]] = Field(alias="style", default=None)
 
 
-class PlotIgnoreSchema(BaseModel, allow_mutation=False, smart_union=True):
+class PlotIgnoreSchema(BaseModel):
     """Model for specifying that a parameter should be ignored in plots."""
 
     mode: Literal["ignore"]
-    argument: Optional[Union[Scalar, str]] = Field(alias="value")
+    argument: Optional[Union[Scalar, str]] = Field(alias="value", default=None)
 
 
 # Parameter plot modes in the config file should conform to this type
@@ -259,7 +259,7 @@ PlotModeSchema = Union[
 ]
 
 
-class PlotStyleSchema(BaseModel, allow_mutation=False):
+class PlotStyleSchema(BaseModel):
     """Model for specifying plot styles (lists of colors, lines and marker
     options.)
     """
@@ -272,7 +272,7 @@ class PlotStyleSchema(BaseModel, allow_mutation=False):
         def fix(x):
             return [x] if isinstance(x, str) else x
 
-        return refined.PlotStyleSchema.parse_obj(
+        return refined.PlotStyleSchema.model_validate(
             {
                 "color": fix(self.color),
                 "line": fix(self.line),
@@ -281,22 +281,22 @@ class PlotStyleSchema(BaseModel, allow_mutation=False):
         )
 
 
-class PlotSchema(BaseModel, allow_mutation=False, smart_union=True):
+class PlotSchema(BaseModel):
     """Model for specifying a plot."""
 
     filename: str
     fmt: Union[str, List[str]] = Field(alias="format")
-    xaxis: Optional[str]
+    xaxis: Optional[str] = None
     yaxis: Union[str, List[str]] = Field(alias="yaxis")
-    ylim: Optional[Tuple[Scalar, Scalar]]
-    xlim: Optional[Tuple[Scalar, Scalar]]
-    kind: Optional[Literal["scatter", "line"]] = Field(alias="type")
-    legend: Optional[str]
-    xlabel: Optional[str]
-    ylabel: Optional[str]
+    ylim: Optional[Tuple[Scalar, Scalar]] = None
+    xlim: Optional[Tuple[Scalar, Scalar]] = None
+    kind: Optional[Literal["scatter", "line"]] = Field(alias="type", default=None)
+    legend: Optional[str] = None
+    xlabel: Optional[str] = None
+    ylabel: Optional[str] = None
     xmode: Literal["linear", "log"] = "linear"
     ymode: Literal["linear", "log"] = "linear"
-    title: Optional[str]
+    title: Optional[str] = None
     grid: bool = True
     parameters: Dict[str, PlotModeSchema] = {}
     style: PlotStyleSchema = PlotStyleSchema()
@@ -312,14 +312,14 @@ class PlotSchema(BaseModel, allow_mutation=False, smart_union=True):
         refined models.
         """
         return {
-            name: {"mode": value} if isinstance(value, str) else value
+            name: {"mode": value} if isinstance(value, str) else value.model_dump()
             for name, value in self.parameters.items()
         }
 
     def refine(self) -> refined.PlotSchema:
-        return refined.PlotSchema.parse_obj(
+        return refined.PlotSchema.model_validate(
             {
-                **self.dict(),
+                **self.model_dump(),
                 "fmt": self.refine_fmt(),
                 "yaxis": self.refine_yaxis(),
                 "style": self.style.refine(),
@@ -328,7 +328,7 @@ class PlotSchema(BaseModel, allow_mutation=False, smart_union=True):
         )
 
 
-class SettingsSchema(BaseModel, allow_mutation=False):
+class SettingsSchema(BaseModel):
     """Model for specifying case settings."""
 
     storagedir: str = ".grevlingdata"
@@ -344,9 +344,9 @@ class SettingsSchema(BaseModel, allow_mutation=False):
         return lambda ctx: self.logdir(**ctx)
 
     def refine(self) -> refined.SettingsSchema:
-        return refined.SettingsSchema.parse_obj(
+        return refined.SettingsSchema.model_validate(
             {
-                **self.dict(),
+                **self.model_dump(),
                 "logdir": self.refine_logdir(),
             }
         )
@@ -364,7 +364,7 @@ ScriptSchema = Union[
 ]
 
 
-class CaseSchema(BaseModel, allow_mutation=False, smart_union=True):
+class CaseSchema(BaseModel):
     """Root model for specifying a Grevling case."""
 
     parameters: Dict[str, ParameterSchema] = {}
@@ -461,9 +461,9 @@ class CaseSchema(BaseModel, allow_mutation=False, smart_union=True):
         return [plot.refine() for plot in self.plots]
 
     def refine(self) -> refined.CaseSchema:
-        return refined.CaseSchema.parse_obj(
+        return refined.CaseSchema.model_validate(
             {
-                **self.dict(),
+                **self.model_dump(),
                 "parameters": self.refine_parameters(),
                 "script": self.refine_script(),
                 "evaluate": self.refine_evaluate(),

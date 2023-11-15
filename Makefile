@@ -1,4 +1,4 @@
-.PHONY: lint
+.PHONY: lint format test
 
 package := grevling
 
@@ -8,3 +8,6 @@ lint:
 
 format:
 	ruff format $(package)
+
+test:
+	pytest

@@ -460,7 +460,7 @@ class Plot:
             xaxis = schema.xaxis
 
         return Plot(
-            **schema.dict(exclude={"style", "parameters", "xaxis"}),
+            **schema.model_dump(exclude={"style", "parameters", "xaxis"}),
             parameters=parameters,
             xaxis=xaxis,
             schema=schema,
@@ -469,7 +469,7 @@ class Plot:
     @cached_property
     def styles(self) -> PlotStyleManager:
         styles = PlotStyleManager()
-        for key, value in self.schema.style.dict().items():
+        for key, value in self.schema.style.model_dump().items():
             if value is None:
                 continue
             styles.set_values(key, value)

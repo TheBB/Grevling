@@ -61,4 +61,6 @@ def load(path: Path) -> refined.CaseSchema:
         resolver = gold.ImportConfig(root=str(path.parent), custom=libfinder)
         data = gold.eval(src, resolver)
 
-    return raw.CaseSchema.parse_obj(data).refine()
+    # return raw.CaseSchema.model_validate(data).refine()
+    obj = raw.CaseSchema.model_validate(data)
+    return obj.refine()

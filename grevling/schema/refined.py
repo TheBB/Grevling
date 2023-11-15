@@ -10,7 +10,7 @@ Scalar = Union[int, float]
 Constant = Union[str, None, Scalar, bool]
 
 
-class ListedParameterSchema(BaseModel, allow_mutation=False, smart_union=True):
+class ListedParameterSchema(BaseModel):
     kind: Literal["listed"]
     values: Union[
         List[Scalar],
@@ -18,13 +18,13 @@ class ListedParameterSchema(BaseModel, allow_mutation=False, smart_union=True):
     ]
 
 
-class UniformParameterSchema(BaseModel, allow_mutation=False, smart_union=True):
+class UniformParameterSchema(BaseModel):
     kind: Literal["uniform"]
     interval: Tuple[Scalar, Scalar]
     num: int
 
 
-class GradedParameterSchema(BaseModel, allow_mutation=False, smart_union=True):
+class GradedParameterSchema(BaseModel):
     kind: Literal["graded"]
     interval: Tuple[Scalar, Scalar]
     num: int
@@ -41,14 +41,14 @@ ParameterSchema = Annotated[
 ]
 
 
-class FileMapSchema(BaseModel, allow_mutation=False):
+class FileMapSchema(BaseModel):
     source: str
     target: Optional[str]
     mode: Literal["simple", "glob"]
     template: bool
 
 
-class SimpleCaptureSchema(BaseModel, allow_mutation=False):
+class SimpleCaptureSchema(BaseModel):
     capture_type: Literal["simple"]
     kind: Literal["integer", "float"]
     name: str
@@ -58,7 +58,7 @@ class SimpleCaptureSchema(BaseModel, allow_mutation=False):
     mode: Literal["first", "last", "all"]
 
 
-class RegexCaptureSchema(BaseModel, allow_mutation=False):
+class RegexCaptureSchema(BaseModel):
     capture_type: Literal["regex"]
     pattern: str
     mode: Literal["first", "last", "all"]
@@ -73,7 +73,7 @@ CaptureSchema = Annotated[
 ]
 
 
-class CommandSchema(BaseModel, allow_mutation=False):
+class CommandSchema(BaseModel):
     command: Optional[Union[str, List[str]]]
     name: Optional[str]
     capture: List[CaptureSchema]
@@ -85,25 +85,25 @@ class CommandSchema(BaseModel, allow_mutation=False):
     workdir: Optional[str]
 
 
-class PlotModeFixedSchema(BaseModel, allow_mutation=False):
+class PlotModeFixedSchema(BaseModel):
     mode: Literal["fixed"] = "fixed"
 
 
-class PlotModeVariateSchema(BaseModel, allow_mutation=False):
+class PlotModeVariateSchema(BaseModel):
     mode: Literal["variate"] = "variate"
 
 
-class PlotModeCategorySchema(BaseModel, allow_mutation=False):
+class PlotModeCategorySchema(BaseModel):
     mode: Literal["category"] = "category"
-    argument: Optional[Literal["color", "line", "marker"]]
+    argument: Optional[Literal["color", "line", "marker"]] = None
 
 
-class PlotModeIgnoreSchema(BaseModel, allow_mutation=False):
+class PlotModeIgnoreSchema(BaseModel):
     mode: Literal["ignore"] = "ignore"
-    argument: Optional[Union[Scalar, str]]
+    argument: Optional[Union[Scalar, str]] = None
 
 
-class PlotModeMeanSchema(BaseModel, allow_mutation=False):
+class PlotModeMeanSchema(BaseModel):
     mode: Literal["mean"] = "mean"
 
 
@@ -119,13 +119,13 @@ PlotModeSchema = Annotated[
 ]
 
 
-class PlotStyleSchema(BaseModel, allow_mutation=False):
+class PlotStyleSchema(BaseModel):
     color: Optional[List[str]]
     line: Optional[List[str]]
     marker: Optional[List[str]]
 
 
-class PlotSchema(BaseModel, allow_mutation=False, smart_union=True):
+class PlotSchema(BaseModel):
     filename: str
     fmt: List[str]
     parameters: Dict[str, PlotModeSchema]
@@ -144,13 +144,13 @@ class PlotSchema(BaseModel, allow_mutation=False, smart_union=True):
     style: PlotStyleSchema
 
 
-class SettingsSchema(BaseModel, allow_mutation=False):
+class SettingsSchema(BaseModel):
     storagedir: str
     logdir: Callable[[api.Context], str]
     ignore_missing_files: bool
 
 
-class CaseSchema(BaseModel, allow_mutation=False, smart_union=True):
+class CaseSchema(BaseModel):
     parameters: Dict[str, ParameterSchema]
     script: Callable[[api.Context], List[CommandSchema]]
     constants: Dict[str, Constant]
