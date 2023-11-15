@@ -42,7 +42,7 @@ def test_echo(runner, suffix):
     check_df(
         data,
         pd.DataFrame(
-            index=pd.Index(range(9)),
+            index=pd.Index(range(9), dtype=int),
             data={
                 'alpha': pd.array([1, 1, 1, 2, 2, 2, 3, 3, 3], dtype=pd.Int64Dtype()),
                 'bravo': ['a', 'b', 'c', 'a', 'b', 'c', 'a', 'b', 'c'],
@@ -68,7 +68,7 @@ def test_cat(runner, suffix):
     check_df(
         data,
         pd.DataFrame(
-            index=pd.Index(range(9)),
+            index=pd.Index(range(9), dtype=int),
             data={
                 'alpha': pd.array([1, 1, 1, 2, 2, 2, 3, 3, 3], dtype=pd.Int64Dtype()),
                 'bravo': ['a', 'b', 'c', 'a', 'b', 'c', 'a', 'b', 'c'],
@@ -133,7 +133,7 @@ def test_capture(runner, suffix):
     check_df(
         data,
         pd.DataFrame(
-            index=pd.Index(range(9)),
+            index=pd.Index(range(9), dtype=int),
             data={
                 'alpha': [
                     1.234,
@@ -215,7 +215,7 @@ def test_double_capture(runner, suffix):
     check_df(
         data,
         pd.DataFrame(
-            index=pd.Index(range(9)),
+            index=pd.Index(range(9), dtype=int),
             data={
                 'alpha': [
                     1.234,
@@ -297,7 +297,7 @@ def test_failing(runner, suffix):
     check_df(
         data,
         pd.DataFrame(
-            index=pd.Index([0, 1]),
+            index=pd.Index([0, 1], dtype=int),
             data={
                 'retcode': pd.array([0, 1], dtype=pd.Int64Dtype()),
                 'before': pd.array([12, 12], dtype=pd.Int64Dtype()),
@@ -349,7 +349,7 @@ def test_docker(runner, suffix):
 )
 @pytest.mark.parametrize('runner', [api_run(post=[]), cli_run(commands=['run'])])
 @pytest.mark.parametrize('suffix', ['.yaml'])
-def test_docker(runner, suffix):
+def test_docker_args(runner, suffix):
     path = DATADIR / 'run' / 'docker-args' / f'grevling{suffix}'
     runner(path)
 
