@@ -1,18 +1,29 @@
-.PHONY: lint format test
+.PHONY: lint format pytest myypy test install wheel sdist build
 
 package := grevling
 
 lint:
-	ruff check $(package)
-	ruff format --check $(package)
+	poetry run ruff check $(package)
+	poetry run ruff format --check $(package)
 
 format:
-	ruff format $(package)
+	poetry run ruff format $(package)
 
 pytest:
-	pytest
+	poetry run pytest
 
 mypy:
-	mypy $(package)
+	poetry run mypy $(package)
 
 test: mypy lint pytest
+
+install:
+	poetry install --with matplotlib,plotly,dev
+
+wheel:
+	poetry build -f wheel
+
+sdist:
+	poetry build -f sdict
+
+build: wheel sdist
