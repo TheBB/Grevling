@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from grevling import Case, CaseState, Instance
+from grevling import Case, Instance
 from grevling.api import Status
 from grevling.workflow import PipeSegment
 from grevling.workflow.local import LocalWorkflow

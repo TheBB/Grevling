@@ -6,9 +6,9 @@ from datetime import datetime
 import json
 from pathlib import Path
 
-from typing import Any, Dict, Optional, Type, TypeVar
+from typing import Any, Dict, Type, TypeVar
 
-import pandas as pd                 # type: ignore
+import pandas as pd  # type: ignore
 from pydantic import PrivateAttr
 from pydantic.main import BaseModel
 
@@ -16,7 +16,6 @@ from . import api
 
 
 class GType(ABC):
-
     pandas_type: object
     is_list: bool = False
 
@@ -54,7 +53,6 @@ class GType(ABC):
 
 
 class AnyType(GType):
-
     pandas_type = object
 
     def merge(self, other: GType) -> GType:
@@ -62,7 +60,6 @@ class AnyType(GType):
 
 
 class String(GType):
-
     pandas_type = object
 
     def merge(self, other: GType) -> GType:
@@ -76,7 +73,6 @@ class String(GType):
 
 
 class Integer(GType):
-
     pandas_type = pd.Int64Dtype()
 
     def merge(self, other: GType) -> GType:
@@ -93,7 +89,6 @@ class Integer(GType):
 
 
 class Floating(GType):
-
     pandas_type = float
 
     def merge(self, other: GType) -> GType:
@@ -108,7 +103,6 @@ class Floating(GType):
 
 
 class Boolean(GType):
-
     pandas_type = pd.BooleanDtype()
 
     def merge(self, other: GType) -> GType:
@@ -125,8 +119,7 @@ class Boolean(GType):
 
 
 class Datetime(GType):
-
-    pandas_type = 'datetime64[us]'
+    pandas_type = "datetime64[us]"
 
     def merge(self, other: GType) -> GType:
         if isinstance(other, (Datetime, String, AnyType)):
@@ -135,7 +128,6 @@ class Datetime(GType):
 
 
 class List(GType):
-
     eltype: GType
 
     pandas_type = object
@@ -154,29 +146,28 @@ class List(GType):
 
 
 TYPES: Dict[str, GType] = {
-    'int': Integer(),
-    'integer': Integer(),
-    'float': Floating(),
-    'floating': Floating(),
-    'double': Floating(),
-    'str': String(),
-    'string': String(),
+    "int": Integer(),
+    "integer": Integer(),
+    "float": Floating(),
+    "floating": Floating(),
+    "double": Floating(),
+    "str": String(),
+    "string": String(),
 }
 
 
 class TypeManager(Dict[str, GType]):
-
     def __init__(self, *args, **kwargs):
         dict.__init__(self, *args, **kwargs)
-        self['g_index'] = Integer()
-        self['g_logdir'] = String()
-        self['g_sourcedir'] = String()
-        self['g_started'] = Datetime()
-        self['g_finished'] = Datetime()
-        self['g_success'] = Boolean()
+        self["g_index"] = Integer()
+        self["g_logdir"] = String()
+        self["g_sourcedir"] = String()
+        self["g_started"] = Datetime()
+        self["g_finished"] = Datetime()
+        self["g_success"] = Boolean()
 
     def __getitem__(self, key: str) -> GType:
-        if key.startswith('g_walltime'):
+        if key.startswith("g_walltime"):
             return Floating()
         return super().__getitem__(key)
 
@@ -196,17 +187,17 @@ class TypeManager(Dict[str, GType]):
             self[name] = GType.from_obj(typename)
 
 
-Self = TypeVar('Self', bound='PersistentObject')
+Self = TypeVar("Self", bound="PersistentObject")
+
 
 class PersistentObject(BaseModel):
-
     _path: Path = PrivateAttr()
 
     @classmethod
     def from_path(cls: Type[Self], path: api.PathStr) -> Self:
         path = Path(path)
         if path.exists():
-            with open(path, 'r') as f:
+            with open(path, "r") as f:
                 data = json.load(f)
             self = cls(**data)
         else:
@@ -218,5 +209,5 @@ class PersistentObject(BaseModel):
         return self
 
     def __exit__(self, *args, **kwargs):
-        with open(self._path, 'w') as f:
+        with open(self._path, "w") as f:
             f.write(self.json())

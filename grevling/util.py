@@ -8,10 +8,10 @@ import logging
 
 from typing import Callable, Optional, Dict, Any, List
 
-from asteval import Interpreter             # type: ignore
+from asteval import Interpreter  # type: ignore
 import numpy as np
 from numpy.polynomial import Legendre
-import pandas as pd                         # type: ignore
+import pandas as pd  # type: ignore
 import rich.logging
 
 from . import api
@@ -25,30 +25,32 @@ class LoggerAdapter(logging.LoggerAdapter):
         frame = inspect.currentframe()
         while frame:
             bindings = frame.f_locals
-            if '__grevling_log_context__' in bindings:
-                return bindings['__grevling_log_context__']
+            if "__grevling_log_context__" in bindings:
+                return bindings["__grevling_log_context__"]
             frame = frame.f_back
         return []
 
     def process(self, msg, kwargs):
         context = self.find_context()
-        msg = ' · '.join(chain(context, [msg]))
-        kwargs.setdefault('extra', {}).update({'markup': True})
+        msg = " · ".join(chain(context, [msg]))
+        kwargs.setdefault("extra", {}).update({"markup": True})
         return msg, kwargs
 
     @contextmanager
     def with_context(self, ctx: str):
         context = self.find_context()
         frame = inspect.currentframe()
-        assert frame; assert frame.f_back; assert frame.f_back.f_back
+        assert frame
+        assert frame.f_back
+        assert frame.f_back.f_back
         frame = frame.f_back.f_back
         bindings = frame.f_locals
 
-        bindings['__grevling_log_context__'] = [*context, ctx]
+        bindings["__grevling_log_context__"] = [*context, ctx]
         try:
             yield
         finally:
-            bindings['__grevling_log_context__'] = context
+            bindings["__grevling_log_context__"] = context
 
 
 def with_context(fmt: str):
@@ -65,6 +67,7 @@ def with_context(fmt: str):
             async def async_inner(*args, **kwargs):
                 with log.with_context(calculate_context(*args, **kwargs)):
                     return await func(*args, **kwargs)
+
             return wraps(func)(async_inner)
 
         else:
@@ -72,20 +75,21 @@ def with_context(fmt: str):
             def sync_inner(*args, **kwargs):
                 with log.with_context(calculate_context(*args, **kwargs)):
                     return func(*args, **kwargs)
+
             return wraps(func)(sync_inner)
 
     return decorator
 
 
-logging.basicConfig(level='INFO')
+logging.basicConfig(level="INFO")
 log: LoggerAdapter = LoggerAdapter(logging.getLogger(), {})
 
 
-def initialize_logging(level='INFO', show_time=False):
+def initialize_logging(level="INFO", show_time=False):
     logging.basicConfig(
         level=level.upper(),
-        format='%(message)s',
-        datefmt='[%X]',
+        format="%(message)s",
+        datefmt="[%X]",
         handlers=[rich.logging.RichHandler(show_path=False, show_time=show_time)],
         force=True,
     )
@@ -145,7 +149,7 @@ def subclasses(cls, root=False):
         yield from subclasses(sub, root=False)
 
 
-def find_subclass(cls, name, root=False, attr='__tag__', predicate=(lambda a, b: a == b)):
+def find_subclass(cls, name, root=False, attr="__tag__", predicate=(lambda a, b: a == b)):
     for sub in subclasses(cls, root=root):
         if hasattr(sub, attr) and predicate(name, getattr(sub, attr)):
             return sub
@@ -166,22 +170,22 @@ def completer(options):
 
 def format_seconds(secs: float):
     if secs < 0.1:
-        return '< 0.1 s'
+        return "< 0.1 s"
     if secs < 60:
-        return f'{secs:.1f} s'
+        return f"{secs:.1f} s"
     mins, secs = divmod(secs, 60)
     if mins < 60:
-        return f'{mins:.0f} m {secs:.0f}s'
+        return f"{mins:.0f} m {secs:.0f}s"
     hours, mins = divmod(mins, 60)
     if hours < 24:
-        return f'{hours:.0f} h {mins:.0f} m {secs:.0f} s'
+        return f"{hours:.0f} h {mins:.0f} m {secs:.0f} s"
     days, hours = divmod(hours, 24)
-    return f'{days:.0f} d {hours:.0f} h {mins:.0f} m {secs:.0f} s'
+    return f"{days:.0f} d {hours:.0f} h {mins:.0f} m {secs:.0f} s"
 
 
 def call_yaml(func, mapping, *args, **kwargs):
     signature = inspect.signature(func)
-    mapping = {key.replace('-', '_'): value for key, value in mapping.items()}
+    mapping = {key.replace("-", "_"): value for key, value in mapping.items()}
     binding = signature.bind(*args, **kwargs, **mapping)
     return func(*binding.args, **binding.kwargs)
 
@@ -199,7 +203,7 @@ def deprecated(info, name=None):
 
         @wraps(func)
         def inner(*args, **kwargs):
-            log.warn(f'{iname} is deprecated: {info}')
+            log.warn(f"{iname} is deprecated: {info}")
             return func(*args, **kwargs)
 
         return inner
@@ -221,9 +225,11 @@ def legendre(n: int, a: float, b: float, x: float):
 
 def evaluate(context: api.Context, evaluables: Dict[str, str]) -> Dict[str, Any]:
     evaluator = Interpreter()
-    evaluator.symtable.update({
-        'legendre': legendre,
-    })
+    evaluator.symtable.update(
+        {
+            "legendre": legendre,
+        }
+    )
     evaluator.symtable.update(context)
 
     retval = {}

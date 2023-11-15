@@ -2,15 +2,13 @@ from __future__ import annotations
 
 from typing import Callable, Dict, Any, Optional, Iterable, List
 
-from asteval import Interpreter                 # type: ignore
 
 from .schema import CaseSchema, Constant
 from .parameters import ParameterSpace
-from . import util, api
+from . import api
 
 
 class ContextProvider:
-
     parameters: ParameterSpace
 
     evaluables: Callable[[api.Context], Dict[str, Any]]
@@ -53,7 +51,7 @@ class ContextProvider:
 
         return api.Context(context)
 
-    def _subspace(self, *names: str, context = None, **kwargs) -> Iterable[api.Context]:
+    def _subspace(self, *names: str, context=None, **kwargs) -> Iterable[api.Context]:
         if context is None:
             context = {}
         for values in self.parameters.subspace(*names):
@@ -68,8 +66,8 @@ class ContextProvider:
 
     def subspace(self, *args, **kwargs) -> Iterable[api.Context]:
         for i, ctx in enumerate(self._subspace(*args, **kwargs)):
-            ctx['g_index'] = i
+            ctx["g_index"] = i
             yield ctx
 
-    def fullspace(self, context = None, **kwargs) -> Iterable[api.Context]:
+    def fullspace(self, context=None, **kwargs) -> Iterable[api.Context]:
         yield from self.subspace(*self.parameters, context=context, **kwargs)

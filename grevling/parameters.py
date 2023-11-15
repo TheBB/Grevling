@@ -4,7 +4,7 @@ from typing import Sequence, Iterable, Dict, Any, List, Tuple
 
 import numpy as np
 
-from . import api, util
+from . import util
 from .schema import (
     ParameterSchema,
     ListedParameterSchema,
@@ -14,7 +14,6 @@ from .schema import (
 
 
 class Parameter(Sequence):
-
     name: str
     values: List
 
@@ -39,16 +38,12 @@ class Parameter(Sequence):
 
 
 class UniformParameter(Parameter):
-
     def __init__(self, name: str, interval: Tuple[float, float], num: int):
         super().__init__(name, list(np.linspace(*interval, num=num)))
 
 
 class GradedParameter(Parameter):
-
-    def __init__(
-        self, name: str, interval: Tuple[float, float], num: int, grading: float
-    ):
+    def __init__(self, name: str, interval: Tuple[float, float], num: int, grading: float):
         lo, hi = interval
         step = (hi - lo) * (1 - grading) / (1 - grading ** (num - 1))
         values = [lo]
@@ -59,13 +54,9 @@ class GradedParameter(Parameter):
 
 
 class ParameterSpace(dict):
-
     @classmethod
     def from_schema(cls, schema: Dict[str, ParameterSchema]):
-        return cls({
-            name: Parameter.from_schema(name, spec)
-            for name, spec in schema.items()
-        })
+        return cls({name: Parameter.from_schema(name, spec) for name, spec in schema.items()})
 
     def subspace(self, *names: str) -> Iterable[Dict]:
         params = [self[name] for name in names]

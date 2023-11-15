@@ -41,6 +41,9 @@ plotly = "^5.18.0"
 badger = "grevling.__main__:main"
 grevling = "grevling.__main__:main"
 
+[tool.ruff]
+line-length = 110
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

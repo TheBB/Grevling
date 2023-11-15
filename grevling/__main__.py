@@ -9,7 +9,7 @@ import traceback
 
 from typing import List
 
-from asteval import Interpreter                 # type: ignore
+from asteval import Interpreter  # type: ignore
 import click
 
 import grevling
@@ -19,10 +19,8 @@ import grevling.workflow.local
 
 
 def workflows(func):
-    func = click.option(
-        '--local', 'workflow', is_flag=True, flag_value='local', default=True
-    )(func)
-    func = click.option('--azure', 'workflow', is_flag=True, flag_value='azure')(func)
+    func = click.option("--local", "workflow", is_flag=True, flag_value="local", default=True)(func)
+    func = click.option("--azure", "workflow", is_flag=True, flag_value="azure")(func)
     return func
 
 
@@ -38,18 +36,18 @@ class CaseType(click.Path):
         path = Path(super().convert(value, param, ctx))
         casefile = path
         if path.is_dir():
-            for candidate in ['grevling.gold', 'grevling.yaml', 'badger.yaml']:
+            for candidate in ["grevling.gold", "grevling.yaml", "badger.yaml"]:
                 if (path / candidate).exists():
                     casefile = path / candidate
                     break
         if not casefile.exists():
-            raise click.FileError(str(casefile), hint='does not exist')
+            raise click.FileError(str(casefile), hint="does not exist")
         if not casefile.is_file():
-            raise click.FileError(str(casefile), hint='is not a file')
+            raise click.FileError(str(casefile), hint="is not a file")
         # try:
         case = Case(path)
         # except Exception as error:
-            # raise CustomClickException(str(error))
+        # raise CustomClickException(str(error))
 
         case = case.__enter__()
         if ctx:
@@ -65,21 +63,19 @@ def print_version(ctx, param, value):
 
 
 @click.group()
-@click.option(
-    '--version', is_flag=True, callback=print_version, expose_value=False, is_eager=True
-)
-@click.option('--debug', 'verbosity', flag_value='DEBUG')
-@click.option('--info', 'verbosity', flag_value='INFO', default=True)
-@click.option('--warning', 'verbosity', flag_value='WARNING')
-@click.option('--error', 'verbosity', flag_value='ERROR')
-@click.option('--critical', 'verbosity', flag_value='CRITICAL')
+@click.option("--version", is_flag=True, callback=print_version, expose_value=False, is_eager=True)
+@click.option("--debug", "verbosity", flag_value="DEBUG")
+@click.option("--info", "verbosity", flag_value="INFO", default=True)
+@click.option("--warning", "verbosity", flag_value="WARNING")
+@click.option("--error", "verbosity", flag_value="ERROR")
+@click.option("--critical", "verbosity", flag_value="CRITICAL")
 def main(verbosity: str):
     util.initialize_logging(level=verbosity, show_time=False)
 
 
-@main.command('run-all')
-@click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
-@click.option('-j', 'nprocs', default=1, type=int)
+@main.command("run-all")
+@click.option("--case", "-c", default=".", type=CaseType(file_okay=True, dir_okay=True))
+@click.option("-j", "nprocs", default=1, type=int)
 @workflows
 def run_all(case: Case, workflow: str, nprocs: int):
     try:
@@ -93,14 +89,14 @@ def run_all(case: Case, workflow: str, nprocs: int):
         case.plot()
     except Exception as ex:
         util.log.critical(str(ex))
-        util.log.debug('Backtrace:')
-        util.log.debug(''.join(traceback.format_tb(ex.__traceback__)))
+        util.log.debug("Backtrace:")
+        util.log.debug("".join(traceback.format_tb(ex.__traceback__)))
         sys.exit(1)
 
 
-@main.command('run')
-@click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
-@click.option('-j', 'nprocs', default=1, type=int)
+@main.command("run")
+@click.option("--case", "-c", default=".", type=CaseType(file_okay=True, dir_okay=True))
+@click.option("-j", "nprocs", default=1, type=int)
 @workflows
 def run(case: Case, workflow: str, nprocs: int):
     try:
@@ -110,21 +106,21 @@ def run(case: Case, workflow: str, nprocs: int):
                 sys.exit(1)
     except Exception as ex:
         util.log.critical(str(ex))
-        util.log.debug('Backtrace:')
-        util.log.debug(''.join(traceback.format_tb(ex.__traceback__)))
+        util.log.debug("Backtrace:")
+        util.log.debug("".join(traceback.format_tb(ex.__traceback__)))
         sys.exit(1)
 
 
-@main.command('run-with')
-@click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
-@click.option('--target', '-t', default='.', type=click.Path(path_type=Path))
+@main.command("run-with")
+@click.option("--case", "-c", default=".", type=CaseType(file_okay=True, dir_okay=True))
+@click.option("--target", "-t", default=".", type=click.Path(path_type=Path))
 @workflows
-@click.argument('context', nargs=-1, type=str)
+@click.argument("context", nargs=-1, type=str)
 def run_with(case: Case, target: Path, workflow: str, context: List[str]):
     evaluator = Interpreter()
     parsed_context = {}
     for s in context:
-        k, v = s.split('=', 1)
+        k, v = s.split("=", 1)
         parsed_context[k] = evaluator.eval(v)
     instance = case.create_instance(api.Context(parsed_context), logdir=target)
     with api.Workflow.get_workflow(workflow)() as w:
@@ -132,34 +128,34 @@ def run_with(case: Case, target: Path, workflow: str, context: List[str]):
             sys.exit(1)
 
 
-@main.command('capture')
-@click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
+@main.command("capture")
+@click.option("--case", "-c", default=".", type=CaseType(file_okay=True, dir_okay=True))
 def capture(case: Case):
     case.capture()
 
 
-@main.command('collect')
-@click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
+@main.command("collect")
+@click.option("--case", "-c", default=".", type=CaseType(file_okay=True, dir_okay=True))
 def collect(case: Case):
     case.clear_dataframe()
     case.collect()
 
 
-@main.command('plot')
-@click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
+@main.command("plot")
+@click.option("--case", "-c", default=".", type=CaseType(file_okay=True, dir_okay=True))
 def plot(case: Case):
     case.plot()
 
 
 @main.command()
-@click.option('--fmt', '-f', default='json', type=click.Choice(['json']))
-@click.option('--case', '-c', default='.', type=CaseType(file_okay=True, dir_okay=True))
-@click.argument('output', type=click.File('w'))
+@click.option("--fmt", "-f", default="json", type=click.Choice(["json"]))
+@click.option("--case", "-c", default=".", type=CaseType(file_okay=True, dir_okay=True))
+@click.argument("output", type=click.File("w"))
 def dump(case: Case, fmt: str, output: io.StringIO):
     data = case.load_dataframe()
-    if fmt == 'json':
+    if fmt == "json":
         json.dump(
-            data.to_dict('records'),
+            data.to_dict("records"),
             output,
             sort_keys=True,
             indent=4,

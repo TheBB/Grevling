@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from abc import ABC, abstractclassmethod, abstractmethod
+from abc import ABC, abstractmethod
 from enum import Enum
 from fnmatch import fnmatch
 import json
 from pathlib import Path
 
-from typing import (
-    IO, BinaryIO, ContextManager, Iterable, TextIO, TypeVar, Union, Optional, TYPE_CHECKING
-)
+from typing import IO, BinaryIO, ContextManager, Iterable, TextIO, TypeVar, Union, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .workflow import Pipe
@@ -18,20 +16,18 @@ if TYPE_CHECKING:
 PathStr = Union[Path, str]
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class Status(Enum):
-
-    Created = 'created'
-    Prepared = 'prepared'
-    Started = 'started'
-    Finished = 'finished'
-    Downloaded = 'downloaded'
+    Created = "created"
+    Prepared = "prepared"
+    Started = "started"
+    Finished = "finished"
+    Downloaded = "downloaded"
 
 
 class Workspace(ABC):
-
     name: str
 
     @abstractmethod
@@ -43,7 +39,7 @@ class Workspace(ABC):
         ...
 
     @abstractmethod
-    def open_str(self, path: PathStr, mode: str = 'w') -> ContextManager[TextIO]:
+    def open_str(self, path: PathStr, mode: str = "w") -> ContextManager[TextIO]:
         ...
 
     @abstractmethod
@@ -71,7 +67,7 @@ class Workspace(ABC):
         ...
 
     @abstractmethod
-    def subspace(self, path: str, name: str = '') -> Workspace:
+    def subspace(self, path: str, name: str = "") -> Workspace:
         ...
 
     @abstractmethod
@@ -98,7 +94,7 @@ class WorkspaceCollection(ABC):
         ...
 
     @abstractmethod
-    def open_workspace(self, path: str, name: str = '') -> Workspace:
+    def open_workspace(self, path: str, name: str = "") -> Workspace:
         ...
 
     @abstractmethod
@@ -118,11 +114,10 @@ class Workflow(ABC):
     @staticmethod
     def get_workflow(name: str):
         from . import util
-        cls = util.find_subclass(Workflow, name, attr='name')
+
+        cls = util.find_subclass(Workflow, name, attr="name")
         if not cls:
-            raise ImportError(
-                f"Unknown workflow, or additional dependencies required: {name}"
-            )
+            raise ImportError(f"Unknown workflow, or additional dependencies required: {name}")
         return cls
 
     @abstractmethod
@@ -131,7 +126,6 @@ class Workflow(ABC):
 
 
 class Context(dict):
-
     def __call__(self, fn):
         return fn(**self)
 

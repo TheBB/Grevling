@@ -11,7 +11,7 @@ Constant = Union[str, None, Scalar, bool]
 
 
 class ListedParameterSchema(BaseModel, allow_mutation=False, smart_union=True):
-    kind: Literal['listed']
+    kind: Literal["listed"]
     values: Union[
         List[Scalar],
         List[str],
@@ -19,13 +19,13 @@ class ListedParameterSchema(BaseModel, allow_mutation=False, smart_union=True):
 
 
 class UniformParameterSchema(BaseModel, allow_mutation=False, smart_union=True):
-    kind: Literal['uniform']
+    kind: Literal["uniform"]
     interval: Tuple[Scalar, Scalar]
     num: int
 
 
 class GradedParameterSchema(BaseModel, allow_mutation=False, smart_union=True):
-    kind: Literal['graded']
+    kind: Literal["graded"]
     interval: Tuple[Scalar, Scalar]
     num: int
     grading: Scalar
@@ -37,31 +37,31 @@ ParameterSchema = Annotated[
         UniformParameterSchema,
         GradedParameterSchema,
     ],
-    Field(discriminator='kind'),
+    Field(discriminator="kind"),
 ]
 
 
 class FileMapSchema(BaseModel, allow_mutation=False):
     source: str
     target: Optional[str]
-    mode: Literal['simple', 'glob']
+    mode: Literal["simple", "glob"]
     template: bool
 
 
 class SimpleCaptureSchema(BaseModel, allow_mutation=False):
-    capture_type: Literal['simple']
-    kind: Literal['integer', 'float']
+    capture_type: Literal["simple"]
+    kind: Literal["integer", "float"]
     name: str
     prefix: str
     skip_words: int
     flexible_prefix: bool
-    mode: Literal['first', 'last', 'all']
+    mode: Literal["first", "last", "all"]
 
 
 class RegexCaptureSchema(BaseModel, allow_mutation=False):
-    capture_type: Literal['regex']
+    capture_type: Literal["regex"]
     pattern: str
-    mode: Literal['first', 'last', 'all']
+    mode: Literal["first", "last", "all"]
 
 
 CaptureSchema = Annotated[
@@ -69,7 +69,7 @@ CaptureSchema = Annotated[
         SimpleCaptureSchema,
         RegexCaptureSchema,
     ],
-    Field(discriminator='capture_type'),
+    Field(discriminator="capture_type"),
 ]
 
 
@@ -86,25 +86,25 @@ class CommandSchema(BaseModel, allow_mutation=False):
 
 
 class PlotModeFixedSchema(BaseModel, allow_mutation=False):
-    mode: Literal['fixed'] = 'fixed'
+    mode: Literal["fixed"] = "fixed"
 
 
 class PlotModeVariateSchema(BaseModel, allow_mutation=False):
-    mode: Literal['variate'] = 'variate'
+    mode: Literal["variate"] = "variate"
 
 
 class PlotModeCategorySchema(BaseModel, allow_mutation=False):
-    mode: Literal['category'] = 'category'
-    argument: Optional[Literal['color', 'line', 'marker']]
+    mode: Literal["category"] = "category"
+    argument: Optional[Literal["color", "line", "marker"]]
 
 
 class PlotModeIgnoreSchema(BaseModel, allow_mutation=False):
-    mode: Literal['ignore'] = 'ignore'
+    mode: Literal["ignore"] = "ignore"
     argument: Optional[Union[Scalar, str]]
 
 
 class PlotModeMeanSchema(BaseModel, allow_mutation=False):
-    mode: Literal['mean'] = 'mean'
+    mode: Literal["mean"] = "mean"
 
 
 PlotModeSchema = Annotated[
@@ -115,7 +115,7 @@ PlotModeSchema = Annotated[
         PlotModeIgnoreSchema,
         PlotModeMeanSchema,
     ],
-    Field(discriminator='mode'),
+    Field(discriminator="mode"),
 ]
 
 
@@ -131,10 +131,10 @@ class PlotSchema(BaseModel, allow_mutation=False, smart_union=True):
     parameters: Dict[str, PlotModeSchema]
     xaxis: Optional[str]
     yaxis: List[str]
-    kind: Optional[Literal['scatter', 'line']]
+    kind: Optional[Literal["scatter", "line"]]
     grid: bool
-    xmode: Literal['linear', 'log']
-    ymode: Literal['linear', 'log']
+    xmode: Literal["linear", "log"]
+    ymode: Literal["linear", "log"]
     xlim: Optional[Tuple[Scalar, Scalar]]
     ylim: Optional[Tuple[Scalar, Scalar]]
     title: Optional[str]

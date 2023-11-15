@@ -1,11 +1,9 @@
-import csv
 from operator import itemgetter
 from pathlib import Path
 
 import numpy as np
 import pytest
 
-from grevling import Case
 from grevling.plotting import MockBackend
 
 from .common import api_run, cli_run

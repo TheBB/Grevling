@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from typing import Any, Optional, List, Dict, Iterable, Tuple, Callable
+from typing import Optional, List, Iterable, Tuple, Callable
 
 from . import util, api
 from .schema import FileMapSchema
@@ -10,7 +10,6 @@ from .render import render
 
 
 class SingleFileMap:
-
     source: str
     target: str
     template: bool
@@ -30,28 +29,26 @@ class SingleFileMap:
         source: str,
         target: Optional[str] = None,
         template: bool = False,
-        mode: str = 'simple',
+        mode: str = "simple",
     ):
         if Path(source).is_absolute() and target is None:
-            util.log.warning('File mappings with absolute source paths should have explicit target')
+            util.log.warning("File mappings with absolute source paths should have explicit target")
 
         if target is None:
-            target = source if mode == 'simple' else '.'
+            target = source if mode == "simple" else "."
         if template:
-            mode = 'simple'
+            mode = "simple"
 
         self.source = source
         self.target = target
         self.template = template
         self.mode = mode
 
-    def iter_paths(
-        self, context: api.Context, source: api.Workspace
-    ) -> Iterable[Tuple[Path, Path]]:
-        if self.mode == 'simple':
+    def iter_paths(self, context: api.Context, source: api.Workspace) -> Iterable[Tuple[Path, Path]]:
+        if self.mode == "simple":
             yield (Path(self.source), Path(self.target))
 
-        elif self.mode == 'glob':
+        elif self.mode == "glob":
             for path in source.glob(self.source):
                 yield (path, Path(self.target) / path)
 
@@ -63,7 +60,6 @@ class SingleFileMap:
         ignore_missing: bool = False,
     ) -> bool:
         for sourcepath, targetpath in self.iter_paths(context, source):
-
             if not source.exists(sourcepath):
                 level = util.log.warning if ignore_missing else util.log.error
                 level(f"Missing file: {source.name}/{sourcepath}")
@@ -71,9 +67,7 @@ class SingleFileMap:
                     continue
                 return False
             else:
-                util.log.debug(
-                    f'{source.name}/{sourcepath} -> {target.name}/{targetpath}'
-                )
+                util.log.debug(f"{source.name}/{sourcepath} -> {target.name}/{targetpath}")
 
             if not self.template:
                 with source.open_bytes(sourcepath) as f:
@@ -92,21 +86,15 @@ class SingleFileMap:
 
 
 class FileMap:
-
     elements: List[SingleFileMap]
 
     @staticmethod
     def from_schema(schema: List[FileMapSchema]) -> FileMap:
-        return FileMap([
-            SingleFileMap.from_schema(entry)
-            for entry in schema
-        ])
+        return FileMap([SingleFileMap.from_schema(entry) for entry in schema])
 
     @staticmethod
     def everything() -> FileMap:
-        return FileMap([
-            SingleFileMap(source='*', mode='glob')
-        ])
+        return FileMap([SingleFileMap(source="*", mode="glob")])
 
     def __init__(self, elements: List[SingleFileMap]):
         self.elements = elements
@@ -125,7 +113,6 @@ class FileMap:
 
 
 class FileMapTemplate:
-
     def __init__(self, func: Callable[[api.Context], List[FileMapSchema]]):
         self.func = func
 

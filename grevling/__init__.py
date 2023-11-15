@@ -6,10 +6,10 @@ import os
 from pathlib import Path
 import shutil
 
-from typing import List, Iterable, Optional, Any, Dict
+from typing import List, Iterable, Optional
 
-from fasteners import InterProcessLock              # type: ignore
-import pandas as pd                                 # type: ignore
+from fasteners import InterProcessLock  # type: ignore
+import pandas as pd  # type: ignore
 
 from grevling.typing import TypeManager
 
@@ -26,11 +26,10 @@ from .workflow.local import LocalWorkspaceCollection, LocalWorkspace, LocalWorkf
 from . import util, api
 
 
-__version__ = '2.0.0'
+__version__ = "2.0.0"
 
 
 class CaseState(PersistentObject):
-
     running: bool = False  # True if instances are currently running
     has_data: bool = False  # True if any instances have been run and downloaded
     has_captured: bool = False  # True if all finished instances have had data captured
@@ -39,7 +38,6 @@ class CaseState(PersistentObject):
 
 
 class Case:
-
     lock: Optional[InterProcessLock]
     state: CaseState
 
@@ -66,7 +64,7 @@ class Case:
 
     def __init__(
         self,
-        localpath: api.PathStr = '.',
+        localpath: api.PathStr = ".",
         storagepath: Optional[Path] = None,
         casedata: Optional[CaseSchema] = None,
     ):
@@ -78,14 +76,14 @@ class Case:
             configpath = localpath
             localpath = configpath.parent
         elif localpath.is_dir() and casedata is None:
-            for candidate in ['grevling.gold', 'grevling.yaml', 'badger.yaml']:
+            for candidate in ["grevling.gold", "grevling.yaml", "badger.yaml"]:
                 if (localpath / candidate).exists():
                     configpath = localpath / candidate
                     break
         self.configpath = configpath
 
         self.sourcepath = localpath
-        self.local_space = LocalWorkspace(self.sourcepath, 'SRC')
+        self.local_space = LocalWorkspace(self.sourcepath, "SRC")
 
         if casedata is None:
             if configpath is None:
@@ -101,7 +99,7 @@ class Case:
         self.storagepath = storagepath
         self.storage_spaces = LocalWorkspaceCollection(self.storagepath)
 
-        self.dataframepath = storagepath / 'dataframe.parquet'
+        self.dataframepath = storagepath / "dataframe.parquet"
 
         assert isinstance(casedata, CaseSchema)
         self.schema = casedata
@@ -125,16 +123,13 @@ class Case:
         self._ignore_missing = settings.ignore_missing_files
 
         # Construct plot objects
-        self.plots = [
-            Plot.from_schema(schema, self.parameters)
-            for schema in casedata.plots
-        ]
+        self.plots = [Plot.from_schema(schema, self.parameters) for schema in casedata.plots]
 
         self.lock = None
 
     def acquire_lock(self):
         assert not self.lock
-        self.lock = InterProcessLock(self.storagepath / 'lockfile').__enter__()
+        self.lock = InterProcessLock(self.storagepath / "lockfile").__enter__()
 
     def release_lock(self, *args, **kwargs):
         assert self.lock
@@ -143,7 +138,7 @@ class Case:
 
     def __enter__(self) -> Case:
         self.acquire_lock()
-        self.state = CaseState.from_path(self.storagepath / 'state.json').__enter__()
+        self.state = CaseState.from_path(self.storagepath / "state.json").__enter__()
         return self
 
     def __exit__(self, *args, **kwargs):
@@ -173,17 +168,13 @@ class Case:
 
     def load_dataframe(self) -> pd.DataFram:
         if self.state.has_collected:
-            return pd.read_parquet(self.dataframepath, engine='pyarrow')
+            return pd.read_parquet(self.dataframepath, engine="pyarrow")
         types = self.type_guess()
-        data = {
-            k: pd.Series([], dtype=v)
-            for k, v in types.pandas().items()
-            if k != 'g_index'
-        }
+        data = {k: pd.Series([], dtype=v) for k, v in types.pandas().items() if k != "g_index"}
         return pd.DataFrame(index=pd.Index([], dtype=int), data=data)
 
     def save_dataframe(self, df: pd.DataFrame):
-        df.to_parquet(self.dataframepath, engine='pyarrow', index=True)
+        df.to_parquet(self.dataframepath, engine="pyarrow", index=True)
 
     def type_guess(self) -> TypeManager:
         manager = TypeManager()
@@ -192,11 +183,9 @@ class Case:
         return manager
 
     def create_instances(self) -> Iterable[Instance]:
-        base_ctx = {
-            'g_sourcedir': os.getcwd()
-        }
+        base_ctx = {"g_sourcedir": os.getcwd()}
         for i, ctx in enumerate(self.context_mgr.fullspace(context=base_ctx)):
-            ctx['g_logdir'] = self._logdir(ctx)
+            ctx["g_logdir"] = self._logdir(ctx)
             yield Instance.create(self, ctx)
 
     def create_instance(
@@ -208,22 +197,22 @@ class Case:
         if index is None:
             index = 0
         sourcedir = os.getcwd()
-        ctx = self.context_mgr.evaluate_context({
-            **ctx,
-            'g_index': index,
-            'g_sourcedir': sourcedir,
-        })
+        ctx = self.context_mgr.evaluate_context(
+            {
+                **ctx,
+                "g_index": index,
+                "g_sourcedir": sourcedir,
+            }
+        )
         if logdir is None:
             logdir = Path(self._logdir(ctx))
-        ctx['g_logdir'] = str(logdir)
-        workspace = LocalWorkspace(Path(ctx['g_logdir']), name='LOG')
+        ctx["g_logdir"] = str(logdir)
+        workspace = LocalWorkspace(Path(ctx["g_logdir"]), name="LOG")
         return Instance.create(self, ctx, local=workspace)
 
     def instances(self, *statuses: api.Status) -> Iterable[Instance]:
         for name in self.storage_spaces.workspace_names():
-            if not self.storage_spaces.open_workspace(name).exists(
-                '.grevling/status.txt'
-            ):
+            if not self.storage_spaces.open_workspace(name).exists(".grevling/status.txt"):
                 continue
             instance = Instance(self, logdir=name)
             if statuses and instance.status not in statuses:
@@ -261,21 +250,20 @@ class Case:
 
     # Deprecated methods
 
-    @util.deprecated("use Case.instances() instead", name='Case.iter_instancedirs')
+    @util.deprecated("use Case.instances() instead", name="Case.iter_instancedirs")
     def iter_instancedirs(self) -> Iterable[api.Workspace]:
         for path in self.storagepath.iterdir():
-            if not (path / '.grevling' / 'context.json').exists():
+            if not (path / ".grevling" / "context.json").exists():
                 continue
             yield LocalWorkspace(path)
 
     @property  # type: ignore
-    @util.deprecated("will be removed", name='Case.shape')
+    @util.deprecated("will be removed", name="Case.shape")
     def shape(self):
         return tuple(map(len, self.parameters.values()))
 
 
 class Instance:
-
     local: api.Workspace
     local_book: api.Workspace
 
@@ -306,7 +294,7 @@ class Instance:
         self._context = context
 
         if context:
-            self.logdir = context['g_logdir']
+            self.logdir = context["g_logdir"]
         else:
             assert logdir is not None
             self.logdir = logdir
@@ -316,28 +304,28 @@ class Instance:
         else:
             self.local = local
 
-        self.local_book = self.local.subspace('.grevling')
+        self.local_book = self.local.subspace(".grevling")
         self.remote = self.remote_book = None
         self._status = None
 
     @property
     def status(self) -> api.Status:
         if not self._status:
-            with self.local_book.open_str('status.txt', 'r') as f:
+            with self.local_book.open_str("status.txt", "r") as f:
                 status = f.read()
             self._status = Status(status)
         return self._status
 
     @status.setter
     def status(self, value: api.Status):
-        with self.local_book.open_str('status.txt', 'w') as f:
+        with self.local_book.open_str("status.txt", "w") as f:
             f.write(value.value)
         self._status = value
 
     @property
     def context(self) -> api.Context:
         if self._context is None:
-            with self.local_book.open_str('context.json', 'r') as f:
+            with self.local_book.open_str("context.json", "r") as f:
                 self._context = api.Context(json.load(f))
         return self._context
 
@@ -347,8 +335,8 @@ class Instance:
 
     @contextmanager
     def bind_remote(self, spaces: api.WorkspaceCollection):
-        self.remote = self.open_workspace(spaces, 'WRK')
-        self.remote_book = self.remote.subspace('.grevling')
+        self.remote = self.open_workspace(spaces, "WRK")
+        self.remote_book = self.remote.subspace(".grevling")
         try:
             yield
         finally:
@@ -356,17 +344,17 @@ class Instance:
 
     @property
     def index(self) -> int:
-        return self.context['g_index']
+        return self.context["g_index"]
 
     @property
     def script(self) -> Script:
         return self._case.script.render(self.context)
 
     def write_context(self):
-        with self.local_book.open_str('context.json', 'w') as f:
+        with self.local_book.open_str("context.json", "w") as f:
             f.write(self.context.json(sort_keys=True, indent=4))
 
-    def open_workspace(self, workspaces, name='') -> api.Workspace:
+    def open_workspace(self, workspaces, name="") -> api.Workspace:
         return workspaces.open_workspace(self.logdir, name)
 
     def prepare(self):
@@ -394,7 +382,7 @@ class Instance:
         bookmap.copy(self.context, self.remote_book, self.local_book)
         collector.collect_from_info(self.local_book)
 
-        ignore_missing = self._case._ignore_missing or not collector['g_success']
+        ignore_missing = self._case._ignore_missing or not collector["g_success"]
         postmap = self._case.postmap.render(self.context)
         postmap.copy(self.context, self.remote, self.local, ignore_missing=ignore_missing)
 

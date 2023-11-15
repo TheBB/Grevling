@@ -16,12 +16,11 @@ from .. import util, api
 
 
 class Pipe(ABC):
-
     ncopies: int = 1
 
     def run(self, inputs: Iterable[Any]) -> bool:
         # TODO: As far as I can tell, this is only needed on Python 3.7
-        if os.name == 'nt':
+        if os.name == "nt":
             asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())  # type: ignore
         return asyncio.run(self._run(inputs))
 
@@ -30,14 +29,11 @@ class Pipe(ABC):
         ...
 
     @abstractmethod
-    async def work(
-        self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None
-    ):
+    async def work(self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None):
         ...
 
 
 class PipeSegment(Pipe):
-
     name: str
     npiped: int
     ncopies: int
@@ -62,9 +58,7 @@ class PipeSegment(Pipe):
         await queue.join()
         return self.npiped == ninputs
 
-    async def work(
-        self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None
-    ):
+    async def work(self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None):
         try:
             while True:
                 arg = await in_queue.get()
@@ -93,7 +87,6 @@ class PipeSegment(Pipe):
 
 
 class Pipeline(Pipe):
-
     pipes: List[PipeSegment]
 
     def __init__(self, *pipes: PipeSegment):
@@ -108,9 +101,7 @@ class Pipeline(Pipe):
             pipe.finalize(success)
         return success
 
-    async def work(
-        self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None
-    ):
+    async def work(self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None):
         ntasks = len(self.pipes)
         queues: List[asyncio.Queue] = [asyncio.Queue(maxsize=1) for _ in range(ntasks - 1)]
         in_queues = chain([in_queue], queues)
@@ -128,15 +119,14 @@ class Pipeline(Pipe):
 
 
 class PrepareInstance(PipeSegment):
-
-    name = 'Prepare'
+    name = "Prepare"
 
     def __init__(self, workspaces: api.WorkspaceCollection):
         super().__init__()
         self.workspaces = workspaces
 
-    @util.with_context('I {instance.index}')
-    @util.with_context('Pre')
+    @util.with_context("I {instance.index}")
+    @util.with_context("Pre")
     async def apply(self, instance: Instance) -> Instance:
         with instance.bind_remote(self.workspaces):
             instance.prepare()
@@ -144,8 +134,7 @@ class PrepareInstance(PipeSegment):
 
 
 class DownloadResults(PipeSegment):
-
-    name = 'Download'
+    name = "Download"
 
     workspaces: api.WorkspaceCollection
     case: Case
@@ -155,8 +144,8 @@ class DownloadResults(PipeSegment):
         self.workspaces = workspaces
         self.case = case
 
-    @util.with_context('I {instance.index}')
-    @util.with_context('Down')
+    @util.with_context("I {instance.index}")
+    @util.with_context("Down")
     async def apply(self, instance: Instance) -> Instance:
         with instance.bind_remote(self.workspaces):
             instance.download()

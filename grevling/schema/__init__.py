@@ -22,13 +22,13 @@ which return validated models when called with a context as argument.
 
 from pathlib import Path
 
-import goldpy as gold                   # type: ignore
+import goldpy as gold  # type: ignore
 import yaml
 
 from .. import util
 from . import raw, refined
 
-from .refined import *
+from .refined import *  # noqa: F403
 
 
 def libfinder(path: str):
@@ -36,14 +36,14 @@ def libfinder(path: str):
     Gold doesn't know about. We provide this to allow user scripts to import
     the 'grevling.gold' helper file.
     """
-    if path != 'grevling':
+    if path != "grevling":
         return None
-    retval = gold.eval_file(str(Path(__file__).parent.parent / 'grevling.gold'))
+    retval = gold.eval_file(str(Path(__file__).parent.parent / "grevling.gold"))
 
     # Additional utility functions implemented in Python
     return {
         **retval,
-        'legendre': util.legendre,
+        "legendre": util.legendre,
     }
 
 
@@ -52,11 +52,11 @@ def load(path: Path) -> refined.CaseSchema:
 
     # We recommend new cases are written in Gold, thus we require that YAML
     # files are explicitly named as such
-    if path.suffix.lower() in ('.yaml', '.yml'):
-        with open(path, 'r') as f:
+    if path.suffix.lower() in (".yaml", ".yml"):
+        with open(path, "r") as f:
             data = yaml.load(f, Loader=yaml.CLoader)
     else:
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             src = f.read()
         resolver = gold.ImportConfig(root=str(path.parent), custom=libfinder)
         data = gold.eval(src, resolver)
