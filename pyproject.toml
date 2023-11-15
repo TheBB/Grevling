@@ -12,15 +12,15 @@ license = "AGPL3"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.8"
 asteval = "^0.9.31"
 bidict = "^0.22.1"
 click = "^8.1.7"
 fasteners = "^0.19"
 goldpy = ">=2.1"
 Mako = ">=1.2"
-numpy = "^1.26.2"
-pandas = "^2.1.3"
+numpy = "^1.24"
+pandas = "^2.0"
 pyarrow = "^14.0.1"
 pydantic = ">=2"
 PyYAML = "^6.0.1"
@@ -33,7 +33,7 @@ mypy = "^1.7.0"
 types-pyyaml = "^6.0.12.12"
 
 [tool.poetry.group.matplotlib.dependencies]
-matplotlib = "^3.8.1"
+matplotlib = "^3.7"
 
 [tool.poetry.group.plotly.dependencies]
 plotly = "^5.18.0"
