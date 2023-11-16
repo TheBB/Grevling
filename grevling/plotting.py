@@ -1,27 +1,26 @@
 from __future__ import annotations
 
+import csv
+import importlib.util
+import math
+import operator
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
-import csv
-import math
-import operator
-import importlib.util
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Literal, Optional, Tuple
 
-from typing import List, Dict, Optional, Iterable, Any, Tuple, Literal, TYPE_CHECKING
-
-from bidict._bidict import bidict
 import numpy as np
 import pandas as pd  # type: ignore
+from bidict._bidict import bidict
 
-from . import util, api
+from . import api, util
 from .parameters import ParameterSpace
 from .render import render
 from .schema import (
-    PlotSchema,
-    PlotModeSchema,
     PlotModeIgnoreSchema,
+    PlotModeSchema,
+    PlotSchema,
 )
 
 if TYPE_CHECKING:

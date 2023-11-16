@@ -1,31 +1,38 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
 import json
 import os
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Callable, Iterable, Iterator, List, Optional
 
-from typing import List, Iterable, Optional
-
-from fasteners import InterProcessLock  # type: ignore
 import pandas as pd  # type: ignore
+import sqlalchemy as sql
+from alembic import command as alembic_command
+from alembic.config import Config as AlembicCfg
+from fasteners import InterProcessLock  # type: ignore
+from sqlalchemy.orm import Session
 
 from grevling.typing import TypeManager
 
+from . import api, db, util
 from .api import Status
-from .plotting import Plot
-from .schema import load, CaseSchema
 from .capture import CaptureCollection
 from .context import ContextProvider
+from .filemap import FileMap, FileMapTemplate
 from .parameters import ParameterSpace
-from .filemap import FileMapTemplate, FileMap
+from .plotting import Plot
+from .schema import CaseSchema, load
 from .script import Script, ScriptTemplate
 from .typing import PersistentObject
-from .workflow.local import LocalWorkspaceCollection, LocalWorkspace, LocalWorkflow
-from . import util, api
-
+from .workflow.local import LocalWorkflow, LocalWorkspace, LocalWorkspaceCollection
 
 __version__ = "2.0.0"
+
+Migrator = Callable[["Case"], None]
+
+DB_MAJOR_VERSION = 0
+MIGRATORS: dict[int, Migrator] = {}
 
 
 class CaseState(PersistentObject):
@@ -38,6 +45,7 @@ class CaseState(PersistentObject):
 
 class Case:
     lock: Optional[InterProcessLock]
+    engine: Optional[sql.Engine]
     state: CaseState
 
     # Configs may be provided in pure data, in which case they don't correspond to a file
@@ -49,6 +57,7 @@ class Case:
     sourcepath: Path
     storagepath: Path
     dataframepath: Path
+    dbpath: Path
 
     context_mgr: ContextProvider
 
@@ -99,6 +108,7 @@ class Case:
         self.storage_spaces = LocalWorkspaceCollection(self.storagepath)
 
         self.dataframepath = storagepath / "dataframe.parquet"
+        self.dbpath = storagepath / "grevling.db"
 
         assert isinstance(casedata, CaseSchema)
         self.schema = casedata
@@ -125,6 +135,7 @@ class Case:
         self.plots = [Plot.from_schema(schema, self.parameters) for schema in casedata.plots]
 
         self.lock = None
+        self.engine = None
 
     def acquire_lock(self):
         assert not self.lock
@@ -138,11 +149,53 @@ class Case:
     def __enter__(self) -> Case:
         self.acquire_lock()
         self.state = CaseState.from_path(self.storagepath / "state.json").__enter__()
+        self.engine = sql.create_engine(f"sqlite:///{self.dbpath}")
+        self.auto_migrate()
         return self
 
     def __exit__(self, *args, **kwargs):
         self.state.__exit__(*args, **kwargs)
+        self.engine = None
         self.release_lock(*args, **kwargs)
+
+    def auto_migrate(self) -> None:
+        inspector = sql.inspect(self.engine)
+        assert inspector is not None
+        if not inspector.has_table("dbinfo"):
+            current_version = -1
+        else:
+            with self.session() as session:
+                db_info = session.scalar(sql.select(db.DbInfo))
+                assert db_info is not None
+                current_version = db_info.version
+
+        migrations_path = Path(__file__).parent / "migrations"
+        config = AlembicCfg()
+        config.set_main_option("script_location", str(migrations_path))
+        config.set_main_option("sqlalchemy.url", f"sqlite:///{self.dbpath}")
+
+        if current_version >= DB_MAJOR_VERSION:
+            self.migrate_to_head(config)
+            return
+
+        for version in range(current_version + 1, DB_MAJOR_VERSION + 1):
+            self.migrate_to_major(config, version)
+        self.migrate_to_head(config)
+
+    def migrate_to_major(self, config: AlembicCfg, version: int) -> None:
+        alembic_command.upgrade(config, f"v{version}")
+        migrator = MIGRATORS.get(version)
+        if migrator:
+            migrator(self)
+
+    def migrate_to_head(self, config: AlembicCfg) -> None:
+        alembic_command.upgrade(config, "head")
+
+    @contextmanager
+    def session(self) -> Iterator[Session]:
+        assert self.engine is not None
+        with Session(self.engine) as session:
+            yield session
 
     @property
     def parameters(self) -> ParameterSpace:

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from typing import Sequence, Iterable, Dict, Any, List, Tuple
+from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 import numpy as np
 
 from . import util
 from .schema import (
-    ParameterSchema,
-    ListedParameterSchema,
-    UniformParameterSchema,
     GradedParameterSchema,
+    ListedParameterSchema,
+    ParameterSchema,
+    UniformParameterSchema,
 )
 
 

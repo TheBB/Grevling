@@ -18,7 +18,7 @@ To resolve this jungle of possibilities, the schemas in the `raw` module are
 possible. In the cases of delayed evaluables, they are converted into functions
 which return validated models when called with a context as argument.
 """
-
+from __future__ import annotations
 
 from pathlib import Path
 
@@ -27,7 +27,6 @@ import yaml
 
 from .. import util
 from . import raw, refined
-
 from .refined import *  # noqa: F403
 
 

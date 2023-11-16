@@ -11,16 +11,14 @@ their outputs must necessarily be delayed.
 from __future__ import annotations
 
 from functools import partial
-
-from typing import Any, List, Dict, Optional, Union, Literal, Callable, Tuple, Type
-from typing_extensions import Self
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Union
 
 from pydantic import BaseModel, Field
+from typing_extensions import Self
 
-from .. import util, api
+from .. import api, util
 from ..render import render
 from . import refined
-
 
 # Numbers can usually be either ints or floats. Note that Pydantic will coerce
 # floats to ints or vice-versa depending on which type is listed first in this
