@@ -4,3 +4,4 @@ build/
 .grevlingdata
 .vscode/settings.json
 .hypothesis
+/test.db

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import Callable, Dict, Any, Optional, Iterable, List
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
-
-from .schema import CaseSchema, Constant
-from .parameters import ParameterSpace
 from . import api
+from .parameters import ParameterSpace
+from .schema import CaseSchema, Constant
 
 
 class ContextProvider:

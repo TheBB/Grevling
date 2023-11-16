@@ -1,18 +1,19 @@
+from __future__ import annotations
+
 import asyncio
-from contextlib import contextmanager
-from functools import wraps
 import inspect
-from itertools import product, chain
 import json
 import logging
+from contextlib import contextmanager
+from functools import wraps
+from itertools import chain, product
+from typing import Any, Callable, Dict, List, Optional
 
-from typing import Callable, Optional, Dict, Any, List
-
-from asteval import Interpreter  # type: ignore
 import numpy as np
-from numpy.polynomial import Legendre
 import pandas as pd  # type: ignore
 import rich.logging
+from asteval import Interpreter  # type: ignore
+from numpy.polynomial import Legendre
 
 from . import api
 
@@ -88,7 +89,7 @@ log: LoggerAdapter = LoggerAdapter(logging.getLogger(), {})
 def initialize_logging(level="INFO", show_time=False):
     logging.basicConfig(
         level=level.upper(),
-        format="%(message)s",
+        format="%(name)s - %(message)s",
         datefmt="[%X]",
         handlers=[rich.logging.RichHandler(show_path=False, show_time=show_time)],
         force=True,
@@ -96,6 +97,9 @@ def initialize_logging(level="INFO", show_time=False):
 
     global log
     log = LoggerAdapter(logging.getLogger(), {})
+
+    if level != "DEBUG":
+        logging.getLogger("alembic").setLevel(logging.WARN)
 
 
 def initialize_process():

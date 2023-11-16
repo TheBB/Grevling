@@ -1,10 +1,11 @@
-from typing import Union, List, Literal, Tuple, Dict, Callable, Optional, Any
-from typing_extensions import Annotated
+from __future__ import annotations
+
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, Field
+from typing_extensions import Annotated
 
 from .. import api
-
 
 Scalar = Union[int, float]
 Constant = Union[str, None, Scalar, bool]

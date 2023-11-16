@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 import asyncio
-from io import StringIO
-from itertools import chain
 import os
 import traceback
-
-from typing import Iterable, Any, Optional, List, TYPE_CHECKING
+from abc import ABC, abstractmethod
+from io import StringIO
+from itertools import chain
+from typing import TYPE_CHECKING, Any, Iterable, List, Optional
 
 if TYPE_CHECKING:
-    from .. import Instance, Case
+    from .. import Case, Instance
 
-from .. import util, api
+from .. import api, util
 
 
 class Pipe(ABC):

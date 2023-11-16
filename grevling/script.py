@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import datetime
+import os
+import shlex
 from collections import namedtuple
 from contextlib import contextmanager
 from dataclasses import dataclass
-import datetime
-import os
 from pathlib import Path
-import shlex
 from time import time as osclock
-
-from typing import Dict, List, Optional, Callable
+from typing import Callable, Dict, List, Optional
 
 from . import api, util
 from .capture import Capture, CaptureCollection

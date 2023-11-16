@@ -1,20 +1,19 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
 import os
-from pathlib import Path
 import shutil
 import stat
 import tempfile
+from contextlib import contextmanager
+from pathlib import Path
+from typing import IO, TYPE_CHECKING, BinaryIO, Generator, Iterable, Optional, TextIO, Union
 
-from typing import IO, BinaryIO, Generator, TextIO, Union, Iterable, Optional, TYPE_CHECKING
-
-from . import Pipeline, PipeSegment, PrepareInstance, DownloadResults
+from .. import api, util
 from ..api import Status
-from .. import util, api
+from . import DownloadResults, Pipeline, PipeSegment, PrepareInstance
 
 if TYPE_CHECKING:
-    from .. import Instance, Case
+    from .. import Case, Instance
 
 
 class RunInstance(PipeSegment):

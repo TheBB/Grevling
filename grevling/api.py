@@ -1,16 +1,15 @@
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from enum import Enum
 from fnmatch import fnmatch
-import json
 from pathlib import Path
-
-from typing import IO, BinaryIO, ContextManager, Iterable, TextIO, TypeVar, Union, Optional, TYPE_CHECKING
+from typing import IO, TYPE_CHECKING, BinaryIO, ContextManager, Iterable, Optional, TextIO, TypeVar, Union
 
 if TYPE_CHECKING:
-    from .workflow import Pipe
     from . import Case
+    from .workflow import Pipe
 
 
 PathStr = Union[Path, str]

@@ -1,21 +1,20 @@
 from __future__ import annotations
 
-from functools import partial
 import io
 import json
-from pathlib import Path
 import sys
 import traceback
-
+from functools import partial
+from pathlib import Path
 from typing import List
 
-from asteval import Interpreter  # type: ignore
 import click
+from asteval import Interpreter  # type: ignore
 
 import grevling
-from . import Case, util, api
-
 import grevling.workflow.local
+
+from . import Case, api, util
 
 
 def workflows(func):

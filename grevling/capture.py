@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import json
 import re
+from typing import TYPE_CHECKING, Iterable, Optional, Union
 
-from typing import Iterable, Optional, Union, TYPE_CHECKING
-
-from . import util, api, typing
+from . import api, typing, util
 from .schema import RegexCaptureSchema, SimpleCaptureSchema
 
 if TYPE_CHECKING:
-    from .typing import TypeManager, GType
+    from .typing import GType, TypeManager
 
 
 class Capture:

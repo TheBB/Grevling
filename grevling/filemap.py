@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Callable, Iterable, List, Optional, Tuple
 
-from typing import Optional, List, Iterable, Tuple, Callable
-
-from . import util, api
-from .schema import FileMapSchema
+from . import api, util
 from .render import render
+from .schema import FileMapSchema
 
 
 class SingleFileMap:
