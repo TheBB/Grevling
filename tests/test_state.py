@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 from grevling import Case, Instance
@@ -5,13 +7,11 @@ from grevling.api import Status
 from grevling.workflow import PipeSegment
 from grevling.workflow.local import LocalWorkflow
 
-
-DATADIR = Path(__file__).parent / 'data'
+DATADIR = Path(__file__).parent / "data"
 
 
 class VerifyRunningPipe(PipeSegment):
-
-    name = 'Test'
+    name = "Test"
 
     async def apply(self, instance: Instance) -> Instance:
         assert instance._case.state.running
@@ -19,8 +19,7 @@ class VerifyRunningPipe(PipeSegment):
 
 
 class VerifyInstanceStatus(PipeSegment):
-
-    name = 'Test'
+    name = "Test"
 
     status: Status
 
@@ -34,7 +33,7 @@ class VerifyInstanceStatus(PipeSegment):
 
 
 def test_casestate():
-    with Case(DATADIR / 'run' / 'echo') as case:
+    with Case(DATADIR / "run" / "echo") as case:
         case.clear_cache()
 
         assert not case.state.running
@@ -70,8 +69,7 @@ def test_casestate():
         assert case.state.has_collected
         assert not case.state.has_plotted
 
-    with Case(DATADIR / 'run' / 'echo') as case:
-
+    with Case(DATADIR / "run" / "echo") as case:
         assert not case.state.running
         assert case.state.has_data
         assert case.state.has_captured
@@ -104,7 +102,7 @@ def test_casestate():
 
 
 def test_instance_status():
-    with Case(DATADIR / 'run' / 'echo') as case:
+    with Case(DATADIR / "run" / "echo") as case:
         case.clear_cache()
 
         with LocalWorkflow() as w:
