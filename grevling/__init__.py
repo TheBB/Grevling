@@ -155,6 +155,9 @@ class Case:
 
     def __exit__(self, *args, **kwargs):
         self.state.__exit__(*args, **kwargs)
+        assert self.engine
+        self.engine.dispose()
+        del self.engine
         self.engine = None
         self.release_lock(*args, **kwargs)
 

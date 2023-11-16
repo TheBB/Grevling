@@ -1,18 +1,19 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 import pytest
 
 from grevling import Case
 
+DATADIR = Path(__file__).parent / "data"
 
-DATADIR = Path(__file__).parent / 'data'
 
-
-@pytest.mark.parametrize('suffix', ['.yaml', '.gold'])
+@pytest.mark.parametrize("suffix", [".yaml", ".gold"])
 def test_conditions(suffix):
-    with Case(DATADIR / 'valid' / f'conditions{suffix}') as case:
+    with Case(DATADIR / "valid" / f"conditions{suffix}") as case:
         contexts = list(instance.context for instance in case.create_instances())
-    vals = [(ctx['g_index'], ctx['a'], ctx['b']) for ctx in contexts]
+    vals = [(ctx["g_index"], ctx["a"], ctx["b"]) for ctx in contexts]
     assert vals == [
         (0, 1, 2),
         (1, 1, 3),

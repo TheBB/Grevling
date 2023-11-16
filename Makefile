@@ -1,13 +1,17 @@
 .PHONY: lint format pytest myypy test install wheel sdist build
 
 package := grevling
+testpackage := tests
 
 lint:
 	poetry run ruff check $(package)
+	poetry run ruff check $(testpackage)
 	poetry run ruff format --check $(package)
+	poetry run ruff format --check $(testpackage)
 
 format:
 	poetry run ruff format $(package)
+	poetry run ruff format $(testpackage)
 
 pytest:
 	poetry run pytest
