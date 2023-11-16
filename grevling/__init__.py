@@ -4,7 +4,6 @@ from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
-import shutil
 
 from typing import List, Iterable, Optional
 
@@ -153,10 +152,13 @@ class Case:
         return self.state.has_data
 
     def clear_cache(self):
-        self.__exit__(None, None, None)
-        shutil.rmtree(self.storagepath)
-        self.storagepath.mkdir(parents=True, exist_ok=True)
-        self.__enter__()
+        for instance in self.instances():
+            instance.destroy()
+        self.state.has_data = False
+        self.state.has_captured = False
+        self.state.has_collected = False
+        self.state.has_plotted = False
+        self.dataframepath.unlink(missing_ok=True)
 
     def clear_dataframe(self):
         # TODO: Py3.8: use missing_ok=True
@@ -341,6 +343,9 @@ class Instance:
             yield
         finally:
             self.remote = self.remote_book = None
+
+    def destroy(self) -> None:
+        self.local.destroy()
 
     @property
     def index(self) -> int:
