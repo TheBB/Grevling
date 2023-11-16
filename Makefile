@@ -10,6 +10,8 @@ lint:
 	poetry run ruff format --check $(testpackage)
 
 format:
+	poetry run ruff check --fix $(package)
+	poetry run ruff check --fix $(testpackage)
 	poetry run ruff format $(package)
 	poetry run ruff format $(testpackage)
 

@@ -160,3 +160,14 @@ def dump(case: Case, fmt: str, output: io.StringIO):
             indent=4,
             cls=util.JSONEncoder,
         )
+
+
+@main.group()
+def advanced():
+    pass
+
+
+@advanced.command()
+@click.option("--case", "-c", default=".", type=CaseType(file_okay=True, dir_okay=True))
+def touch(case: Case):
+    pass

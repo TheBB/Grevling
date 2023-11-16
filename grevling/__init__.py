@@ -31,8 +31,31 @@ __version__ = "2.0.0"
 
 Migrator = Callable[["Case"], None]
 
-DB_MAJOR_VERSION = 0
-MIGRATORS: dict[int, Migrator] = {}
+
+def migrator_v1(case: Case) -> None:
+    with case.session() as session:
+        try:
+            next(case.instances())
+        except StopIteration:
+            return
+        objs = [
+            {
+                "id": instance.index,
+                "logdir": instance.logdir,
+                "context": instance.context,
+                "status": instance.status,
+                "captured": instance.cached_capture() if case.state.has_captured else None,
+            }
+            for instance in case.instances()
+        ]
+        session.execute(sql.insert(db.Instance), objs)
+        session.commit()
+
+
+DB_MAJOR_VERSION = 1
+MIGRATORS: dict[int, Migrator] = {
+    1: migrator_v1,
+}
 
 
 class CaseState(PersistentObject):
@@ -190,6 +213,11 @@ class Case:
         migrator = MIGRATORS.get(version)
         if migrator:
             migrator(self)
+        with self.session() as session:
+            db_info = session.scalar(sql.select(db.DbInfo))
+            assert db_info is not None
+            db_info.version = version
+            session.commit()
 
     def migrate_to_head(self, config: AlembicCfg) -> None:
         alembic_command.upgrade(config, "head")
@@ -268,7 +296,7 @@ class Case:
         workspace = LocalWorkspace(Path(ctx["g_logdir"]), name="LOG")
         return Instance.create(self, ctx, local=workspace)
 
-    def instances(self, *statuses: api.Status) -> Iterable[Instance]:
+    def instances(self, *statuses: api.Status) -> Iterator[Instance]:
         for name in self.storage_spaces.workspace_names():
             if not self.storage_spaces.open_workspace(name).exists(".grevling/status.txt"):
                 continue

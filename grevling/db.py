@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.types import JSON
+
+from . import api
+from .capture import CaptureCollection
 
 
 def engine(path: Path) -> Engine:
@@ -11,7 +16,10 @@ def engine(path: Path) -> Engine:
 
 
 class Base(DeclarativeBase):
-    pass
+    type_annotation_map = {
+        api.Context: JSON,
+        CaptureCollection: JSON,
+    }
 
 
 class DbInfo(Base):
@@ -21,8 +29,11 @@ class DbInfo(Base):
     version: Mapped[int] = mapped_column(default=0)
 
 
-# class Instance(Base):
-#     __tablename__ = 'instance'
+class Instance(Base):
+    __tablename__ = "instance"
 
-#     id: Mapped[int] = mapped_column(primary_key=True)
-#     logdir: Mapped[str]
+    id: Mapped[int] = mapped_column(primary_key=True)
+    logdir: Mapped[str]
+    context: Mapped[api.Context]
+    captured: Mapped[Optional[CaptureCollection]] = mapped_column(default=None)
+    status: Mapped[api.Status]
