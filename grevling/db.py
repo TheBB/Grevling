@@ -32,7 +32,7 @@ class DbInfo(Base):
 class Instance(Base):
     __tablename__ = "instance"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    index: Mapped[int] = mapped_column("id", primary_key=True)
     logdir: Mapped[str]
     context: Mapped[api.Context]
     captured: Mapped[Optional[CaptureCollection]] = mapped_column(default=None)
