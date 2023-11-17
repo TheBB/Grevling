@@ -24,7 +24,6 @@ from .parameters import ParameterSpace
 from .plotting import Plot
 from .schema import CaseSchema, load
 from .script import Script, ScriptTemplate
-from .typing import PersistentObject
 from .workflow.local import LocalWorkflow, LocalWorkspace, LocalWorkspaceCollection
 
 __version__ = "2.0.0"
@@ -34,6 +33,13 @@ Migrator = Callable[["Case"], None]
 
 def migrator_v1(case: Case) -> None:
     def instances() -> Iterator[db.Instance]:
+        statepath = case.storagepath / "state.json"
+        if statepath.exists():
+            with open(statepath, "r") as f:
+                state = json.load(f)
+                has_captured = state["has_captured"]
+        else:
+            has_captured = False
         for name in case.storage_spaces.workspace_names():
             local = case.storage_spaces.open_workspace(name)
             if not local.exists(".grevling/status.txt"):
@@ -43,7 +49,7 @@ def migrator_v1(case: Case) -> None:
                 context = api.Context(json.load(f))
             with book.open_str("status.txt", "r") as f:
                 status = Status(f.read())
-            if case.state.has_captured:
+            if has_captured:
                 captured = CaptureCollection(case.types)
                 captured.collect_from_cache(book)
             else:
@@ -62,24 +68,32 @@ def migrator_v1(case: Case) -> None:
         session.commit()
 
 
-DB_MAJOR_VERSION = 1
-MIGRATORS: dict[int, Migrator] = {
-    1: migrator_v1,
-}
+def migrator_v2(case: Case) -> None:
+    statepath = case.storagepath / "state.json"
+    if not statepath.exists():
+        db_case = db.Case(index=0)
+    else:
+        with open(statepath, "r") as f:
+            state = json.load(f)
+        db_case = db.Case(
+            index=0,
+            has_collected=state["has_collected"],
+            has_plotted=state["has_plotted"],
+        )
+
+    with case.session() as session:
+        session.add(db_case)
+        session.commit()
 
 
-class CaseState(PersistentObject):
-    running: bool = False  # True if instances are currently running
-    has_data: bool = False  # True if any instances have been run and downloaded
-    has_captured: bool = False  # True if all finished instances have had data captured
-    has_collected: bool = False  # True if data from all finished instances have been collected
-    has_plotted: bool = False  # True if all plots have been generated from finished instances
+DB_MAJOR_VERSION = 2
+MIGRATORS: dict[int, Migrator] = {1: migrator_v1, 2: migrator_v2}
 
 
 class Case:
     lock: Optional[InterProcessLock]
     engine: Optional[sql.Engine]
-    state: CaseState
+    dbc: Optional[db.Case]
 
     # Configs may be provided in pure data, in which case they don't correspond to a file
     configpath: Optional[Path]
@@ -169,6 +183,50 @@ class Case:
 
         self.lock = None
         self.engine = None
+        self.dbc = None
+
+    @property
+    def is_running(self) -> bool:
+        with self.session() as session:
+            return session.query(
+                sql.select(db.Instance)
+                .where(db.Instance.status.in_((api.Status.Started, api.Status.Prepared)))
+                .exists()
+            ).scalar()
+
+    @property
+    def has_data(self) -> bool:
+        with self.session() as session:
+            return session.query(
+                sql.select(db.Instance).where(db.Instance.status == api.Status.Downloaded).exists()
+            ).scalar()
+
+    @property
+    def has_captured(self) -> bool:
+        with self.session() as session:
+            return not session.query(
+                sql.select(db.Instance).where(db.Instance.captured.is_(None)).exists()
+            ).scalar()
+
+    @property
+    def has_collected(self) -> bool:
+        assert self.dbc is not None
+        return self.dbc.has_collected
+
+    @has_collected.setter
+    def has_collected(self, value: bool) -> None:
+        assert self.dbc is not None
+        self.dbc.has_collected = value
+
+    @property
+    def has_plotted(self) -> bool:
+        assert self.dbc is not None
+        return self.dbc.has_plotted
+
+    @has_plotted.setter
+    def has_plotted(self, value: bool) -> None:
+        assert self.dbc is not None
+        self.dbc.has_plotted = value
 
     def acquire_lock(self):
         assert not self.lock
@@ -181,13 +239,27 @@ class Case:
 
     def __enter__(self) -> Case:
         self.acquire_lock()
-        self.state = CaseState.from_path(self.storagepath / "state.json").__enter__()
         self.engine = sql.create_engine(f"sqlite:///{self.dbpath}")
         self.auto_migrate()
+        with self.session() as session:
+            self.dbc = session.scalar(sql.select(db.Case))
         return self
 
     def __exit__(self, *args, **kwargs):
-        self.state.__exit__(*args, **kwargs)
+        with open(self.storagepath / "state.json", "w") as f:
+            json.dump(
+                {
+                    "running": self.is_running,
+                    "has_data": self.has_data,
+                    "has_captured": self.has_captured,
+                    "has_collected": self.has_collected,
+                    "has_plotted": self.has_plotted,
+                },
+                f,
+            )
+        with self.session() as session:
+            session.merge(self.dbc)
+            session.commit()
         assert self.engine
         self.engine.dispose()
         del self.engine
@@ -248,24 +320,19 @@ class Case:
     def parameters(self) -> ParameterSpace:
         return self.context_mgr.parameters
 
-    def has_data(self) -> bool:
-        return self.state.has_data
-
     def clear_cache(self):
         for instance in self.instances():
             instance.destroy()
-        self.state.has_data = False
-        self.state.has_captured = False
-        self.state.has_collected = False
-        self.state.has_plotted = False
+        self.has_collected = False
+        self.has_plotted = False
         self.dataframepath.unlink(missing_ok=True)
 
     def clear_dataframe(self):
         self.dataframepath.unlink(missing_ok=True)
-        self.state.has_collected = False
+        self.has_collected = False
 
     def load_dataframe(self) -> pd.DataFram:
-        if self.state.has_collected:
+        if self.has_collected:
             return pd.read_parquet(self.dataframepath, engine="pyarrow")
         types = self.type_guess()
         data = {k: pd.Series([], dtype=v) for k, v in types.pandas().items() if k != "g_index"}
@@ -333,7 +400,6 @@ class Case:
     def capture(self):
         for instance in self.instances(Status.Downloaded):
             instance.capture()
-        self.state.has_captured = True
 
     def collect(self):
         data = self.load_dataframe()
@@ -342,12 +408,12 @@ class Case:
             data = collector.commit_to_dataframe(data)
         data = data.sort_index()
         self.save_dataframe(data)
-        self.state.has_collected = True
+        self.has_collected = True
 
     def plot(self):
         for plot in self.plots:
             plot.generate_all(self)
-        self.state.has_plotted = True
+        self.has_plotted = True
 
     def run(self, nprocs=1) -> bool:
         nprocs = nprocs or 1
@@ -458,8 +524,6 @@ class Instance:
         premap.copy(self.context, src, self.remote, ignore_missing=self._case._ignore_missing)
 
         self.status = Status.Prepared
-        self._case.state.running = True
-
         self.commit()
 
     def download(self):
@@ -482,10 +546,8 @@ class Instance:
         collector.commit_to_file(self.local_book)
 
         self.status = Status.Downloaded
-        self._case.state.has_data = True
-        self._case.state.has_captured = False
-        self._case.state.has_collected = False
-        self._case.state.has_plotted = False
+        self._case.has_collected = False
+        self._case.has_plotted = False
 
         self.dbi.captured = collector
         self.commit()

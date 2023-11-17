@@ -145,7 +145,3 @@ class DownloadResults(PipeSegment):
         with instance.bind_remote(self.workspaces):
             instance.download()
         return instance
-
-    def finalize(self, success: bool):
-        if success:
-            self.case.state.running = False
