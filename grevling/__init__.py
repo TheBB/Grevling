@@ -261,11 +261,7 @@ class Case:
         self.dataframepath.unlink(missing_ok=True)
 
     def clear_dataframe(self):
-        # TODO: Py3.8: use missing_ok=True
-        try:
-            self.dataframepath.unlink()
-        except FileNotFoundError:
-            pass
+        self.dataframepath.unlink(missing_ok=True)
         self.state.has_collected = False
 
     def load_dataframe(self) -> pd.DataFram:
@@ -362,20 +358,6 @@ class Case:
         instance = self.create_instance(namespace, logdir=logdir, index=index)
         with LocalWorkflow() as workflow:
             workflow.pipeline(self).run([instance])
-
-    # Deprecated methods
-
-    @util.deprecated("use Case.instances() instead", name="Case.iter_instancedirs")
-    def iter_instancedirs(self) -> Iterable[api.Workspace]:
-        for path in self.storagepath.iterdir():
-            if not (path / ".grevling" / "context.json").exists():
-                continue
-            yield LocalWorkspace(path)
-
-    @property  # type: ignore
-    @util.deprecated("will be removed", name="Case.shape")
-    def shape(self):
-        return tuple(map(len, self.parameters.values()))
 
 
 class Instance:
