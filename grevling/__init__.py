@@ -33,22 +33,32 @@ Migrator = Callable[["Case"], None]
 
 
 def migrator_v1(case: Case) -> None:
+    def instances() -> Iterator[db.Instance]:
+        for name in case.storage_spaces.workspace_names():
+            local = case.storage_spaces.open_workspace(name)
+            if not local.exists(".grevling/status.txt"):
+                continue
+            book = local.subspace(".grevling")
+            with book.open_str("context.json", "r") as f:
+                context = api.Context(json.load(f))
+            with book.open_str("status.txt", "r") as f:
+                status = Status(f.read())
+            if case.state.has_captured:
+                captured = CaptureCollection(case.types)
+                captured.collect_from_cache(book)
+            else:
+                captured = None
+            db_instance = db.Instance(
+                index=context["g_index"],
+                logdir=context["g_logdir"],
+                context=context,
+                captured=captured,
+                status=status,
+            )
+            yield db_instance
+
     with case.session() as session:
-        try:
-            next(case.instances())
-        except StopIteration:
-            return
-        objs = [
-            {
-                "id": instance.index,
-                "logdir": instance.logdir,
-                "context": instance.context,
-                "status": instance.status,
-                "captured": instance.cached_capture() if case.state.has_captured else None,
-            }
-            for instance in case.instances()
-        ]
-        session.execute(sql.insert(db.Instance), objs)
+        session.add_all(instances())
         session.commit()
 
 
@@ -228,6 +238,12 @@ class Case:
         with Session(self.engine) as session:
             yield session
 
+    def instance_by_index(self, index: int) -> Instance:
+        with self.session() as session:
+            db_instance = session.scalar(sql.select(db.Instance).where(db.Instance.index == index))
+        assert db_instance is not None
+        return Instance(self, db_instance)
+
     @property
     def parameters(self) -> ParameterSpace:
         return self.context_mgr.parameters
@@ -272,7 +288,14 @@ class Case:
         base_ctx = {"g_sourcedir": os.getcwd()}
         for i, ctx in enumerate(self.context_mgr.fullspace(context=base_ctx)):
             ctx["g_logdir"] = self._logdir(ctx)
-            yield Instance.create(self, ctx)
+            db_instance = db.Instance(
+                index=ctx["g_index"],
+                logdir=ctx["g_logdir"],
+                context=ctx,
+                captured=None,
+                status=Status.Created,
+            )
+            yield Instance(self, db_instance)
 
     def create_instance(
         self,
@@ -294,16 +317,22 @@ class Case:
             logdir = Path(self._logdir(ctx))
         ctx["g_logdir"] = str(logdir)
         workspace = LocalWorkspace(Path(ctx["g_logdir"]), name="LOG")
-        return Instance.create(self, ctx, local=workspace)
+        db_instance = db.Instance(
+            index=ctx["g_index"],
+            logdir=ctx["g_logdix"],
+            context=ctx,
+            captured=None,
+            status=Status.Created,
+        )
+        return Instance(self, db_instance, local=workspace)
 
     def instances(self, *statuses: api.Status) -> Iterator[Instance]:
-        for name in self.storage_spaces.workspace_names():
-            if not self.storage_spaces.open_workspace(name).exists(".grevling/status.txt"):
-                continue
-            instance = Instance(self, logdir=name)
-            if statuses and instance.status not in statuses:
-                continue
-            yield instance
+        with self.session() as session:
+            select = sql.select(db.Instance)
+            if statuses:
+                select = select.where(db.Instance.status.in_(statuses))
+            for db_instance in session.scalars(select):
+                yield Instance(self, db_instance)
 
     def capture(self):
         for instance in self.instances(Status.Downloaded):
@@ -353,37 +382,22 @@ class Instance:
     local: api.Workspace
     local_book: api.Workspace
 
+    dbi: db.Instance
+
     remote: Optional[api.Workspace]
     remote_book: Optional[api.Workspace]
 
-    logdir: str
-
     _case: Case
-    _context: Optional[api.Context]
-    _status: Optional[Status]
-
-    @classmethod
-    def create(cls, case: Case, context: api.Context, local=None) -> Instance:
-        obj = cls(case, context=context, local=local)
-        obj.status = Status.Created
-        obj.write_context()
-        return obj
 
     def __init__(
         self,
         case: Case,
-        context: Optional[api.Context] = None,
-        logdir: Optional[str] = None,
+        dbi: db.Instance,
+        /,
         local: Optional[api.Workspace] = None,
     ):
         self._case = case
-        self._context = context
-
-        if context:
-            self.logdir = context["g_logdir"]
-        else:
-            assert logdir is not None
-            self.logdir = logdir
+        self.dbi = dbi
 
         if local is None:
             self.local = self.open_workspace(case.storage_spaces)
@@ -392,28 +406,24 @@ class Instance:
 
         self.local_book = self.local.subspace(".grevling")
         self.remote = self.remote_book = None
-        self._status = None
 
     @property
     def status(self) -> api.Status:
-        if not self._status:
-            with self.local_book.open_str("status.txt", "r") as f:
-                status = f.read()
-            self._status = Status(status)
-        return self._status
+        return self.dbi.status
 
     @status.setter
     def status(self, value: api.Status):
+        self.dbi.status = value
         with self.local_book.open_str("status.txt", "w") as f:
             f.write(value.value)
-        self._status = value
 
     @property
     def context(self) -> api.Context:
-        if self._context is None:
-            with self.local_book.open_str("context.json", "r") as f:
-                self._context = api.Context(json.load(f))
-        return self._context
+        return api.Context(self.dbi.context)
+
+    @property
+    def logdir(self) -> str:
+        return self.dbi.logdir
 
     @property
     def types(self) -> TypeManager:
@@ -430,10 +440,19 @@ class Instance:
 
     def destroy(self) -> None:
         self.local.destroy()
+        with self._case.session() as session:
+            db = session.merge(self.dbi)
+            session.delete(db)
+            session.commit()
+
+    def commit(self) -> None:
+        with self._case.session() as session:
+            session.merge(self.dbi)
+            session.commit()
 
     @property
     def index(self) -> int:
-        return self.context["g_index"]
+        return self.dbi.index
 
     @property
     def script(self) -> Script:
@@ -458,6 +477,8 @@ class Instance:
 
         self.status = Status.Prepared
         self._case.state.running = True
+
+        self.commit()
 
     def download(self):
         assert self.remote
@@ -484,6 +505,9 @@ class Instance:
         self._case.state.has_collected = False
         self._case.state.has_plotted = False
 
+        self.dbi.captured = collector
+        self.commit()
+
     def capture(self):
         assert self.status == Status.Downloaded
         collector = CaptureCollection(self.types)
@@ -492,7 +516,11 @@ class Instance:
         self._case.script.render(self.context).capture(collector, self.local_book)
         collector.commit_to_file(self.local_book)
 
+        self.dbi.captured = collector
+        self.commit()
+
     def cached_capture(self, raw: bool = False) -> CaptureCollection:
+        assert self.dbi.captured is not None
         collector = CaptureCollection(self.types)
-        collector.collect_from_cache(self.local_book)
+        collector.update(self.dbi.captured)
         return collector
