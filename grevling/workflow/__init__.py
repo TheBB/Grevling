@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import traceback
 from abc import ABC, abstractmethod
 from io import StringIO
@@ -18,9 +17,6 @@ class Pipe(ABC):
     ncopies: int = 1
 
     def run(self, inputs: Iterable[Any]) -> bool:
-        # TODO: As far as I can tell, this is only needed on Python 3.7
-        if os.name == "nt":
-            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())  # type: ignore
         return asyncio.run(self._run(inputs))
 
     @abstractmethod
