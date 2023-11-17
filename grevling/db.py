@@ -29,6 +29,14 @@ class DbInfo(Base):
     version: Mapped[int] = mapped_column(default=0)
 
 
+class Case(Base):
+    __tablename__ = "case"
+
+    index: Mapped[int] = mapped_column("id", primary_key=True)
+    has_collected: Mapped[bool] = mapped_column(default=False)
+    has_plotted: Mapped[bool] = mapped_column(default=False)
+
+
 class Instance(Base):
     __tablename__ = "instance"
 

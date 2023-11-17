@@ -27,7 +27,7 @@ def test_migrate(db):
         cur = con.cursor()
 
         res = cur.execute("SELECT * FROM dbinfo")
-        assert list(res) == [(0, 1)]
+        assert list(res) == [(0, 2)]
 
         ninstances = 0
         for logdir in case.storagepath.iterdir():
@@ -53,3 +53,12 @@ def test_migrate(db):
             assert res[4].casefold() == status.casefold()
 
         assert cur.execute("SELECT COUNT (*) FROM instance").fetchone() == (ninstances,)
+
+        res = cur.execute("SELECT * FROM 'case'")
+        assert list(res) == [
+            (
+                0,
+                False,
+                False,
+            )
+        ]

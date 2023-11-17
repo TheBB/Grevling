@@ -1,17 +1,11 @@
 from __future__ import annotations
 
-import json
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, Type, TypeVar
+from typing import Any, Dict
 
 import pandas as pd  # type: ignore
-from pydantic import PrivateAttr
-from pydantic.main import BaseModel
-
-from . import api
 
 
 class GType(ABC):
@@ -184,29 +178,3 @@ class TypeManager(Dict[str, GType]):
     def fill_obj(self, data: Dict[str, str]):
         for name, typename in data.items():
             self[name] = GType.from_obj(typename)
-
-
-Self = TypeVar("Self", bound="PersistentObject")
-
-
-class PersistentObject(BaseModel):
-    _path: Path = PrivateAttr()
-
-    @classmethod
-    def from_path(cls: Type[Self], path: api.PathStr) -> Self:
-        path = Path(path)
-        if path.exists():
-            with open(path, "r") as f:
-                data = json.load(f)
-            self = cls(**data)
-        else:
-            self = cls()
-        self._path = path
-        return self
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args, **kwargs):
-        with open(self._path, "w") as f:
-            f.write(self.model_dump_json())
