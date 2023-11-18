@@ -430,7 +430,7 @@ class Instance:
     local: api.Workspace
     local_book: api.Workspace
 
-    dbi: db.Instance
+    dbo: db.Instance
 
     remote: Optional[api.Workspace]
     remote_book: Optional[api.Workspace]
@@ -445,7 +445,7 @@ class Instance:
         local: Optional[api.Workspace] = None,
     ):
         self._case = case
-        self.dbi = dbi
+        self.dbo = dbi
 
         if local is None:
             self.local = self.open_workspace(case.storage_spaces)
@@ -457,21 +457,21 @@ class Instance:
 
     @property
     def status(self) -> api.Status:
-        return self.dbi.status
+        return self.dbo.status
 
     @status.setter
     def status(self, value: api.Status):
-        self.dbi.status = value
+        self.dbo.status = value
         with self.local_book.open_str("status.txt", "w") as f:
             f.write(value.value)
 
     @property
     def context(self) -> api.Context:
-        return api.Context(self.dbi.context)
+        return api.Context(self.dbo.context)
 
     @property
     def logdir(self) -> str:
-        return self.dbi.logdir
+        return self.dbo.logdir
 
     @property
     def types(self) -> TypeManager:
@@ -489,18 +489,18 @@ class Instance:
     def destroy(self) -> None:
         self.local.destroy()
         with self._case.session() as session:
-            db = session.merge(self.dbi)
+            db = session.merge(self.dbo)
             session.delete(db)
             session.commit()
 
     def commit(self) -> None:
         with self._case.session() as session:
-            session.merge(self.dbi)
+            session.merge(self.dbo)
             session.commit()
 
     @property
     def index(self) -> int:
-        return self.dbi.index
+        return self.dbo.index
 
     @property
     def script(self) -> Script:
@@ -549,7 +549,7 @@ class Instance:
         self._case.has_collected = False
         self._case.has_plotted = False
 
-        self.dbi.captured = collector
+        self.dbo.captured = collector
         self.commit()
 
     def capture(self):
@@ -560,11 +560,11 @@ class Instance:
         self._case.script.render(self.context).capture(collector, self.local_book)
         collector.commit_to_file(self.local_book)
 
-        self.dbi.captured = collector
+        self.dbo.captured = collector
         self.commit()
 
     def cached_capture(self, raw: bool = False) -> CaptureCollection:
-        assert self.dbi.captured is not None
+        assert self.dbo.captured is not None
         collector = CaptureCollection(self.types)
-        collector.update(self.dbi.captured)
+        collector.update(self.dbo.captured)
         return collector
