@@ -30,6 +30,6 @@ wheel:
 	poetry build -f wheel
 
 sdist:
-	poetry build -f sdict
+	poetry build -f sdist
 
 build: wheel sdist
