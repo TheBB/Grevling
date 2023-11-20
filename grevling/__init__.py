@@ -63,9 +63,8 @@ def migrator_v1(case: Case) -> None:
             )
             yield db_instance
 
-    with case.session() as session:
-        session.add_all(instances())
-        session.commit()
+    case.session.add_all(instances())
+    case.session.commit()
 
 
 def migrator_v2(case: Case) -> None:
@@ -81,9 +80,8 @@ def migrator_v2(case: Case) -> None:
             has_plotted=state["has_plotted"],
         )
 
-    with case.session() as session:
-        session.add(db_case)
-        session.commit()
+    case.session.add(db_case)
+    case.session.commit()
 
 
 DB_MAJOR_VERSION = 2
@@ -91,9 +89,10 @@ MIGRATORS: dict[int, Migrator] = {1: migrator_v1, 2: migrator_v2}
 
 
 class Case:
-    lock: Optional[InterProcessLock]
-    engine: Optional[sql.Engine]
-    dbc: Optional[db.Case]
+    lock: InterProcessLock
+    engine: sql.Engine
+    session: Session
+    dbc: db.Case
 
     # Configs may be provided in pure data, in which case they don't correspond to a file
     configpath: Optional[Path]
@@ -181,68 +180,60 @@ class Case:
         # Construct plot objects
         self.plots = [Plot.from_schema(schema, self.parameters) for schema in casedata.plots]
 
-        self.lock = None
-        self.engine = None
-        self.dbc = None
-
     @property
     def is_running(self) -> bool:
-        with self.session() as session:
-            return session.query(
-                sql.select(db.Instance)
-                .where(db.Instance.status.in_((api.Status.Started, api.Status.Prepared)))
-                .exists()
-            ).scalar()
+        return self.session.query(
+            sql.select(db.Instance)
+            .where(db.Instance.status.in_((api.Status.Started, api.Status.Prepared)))
+            .exists()
+        ).scalar()
 
     @property
     def has_data(self) -> bool:
-        with self.session() as session:
-            return session.query(
-                sql.select(db.Instance).where(db.Instance.status == api.Status.Downloaded).exists()
-            ).scalar()
+        return self.session.query(
+            sql.select(db.Instance).where(db.Instance.status == api.Status.Downloaded).exists()
+        ).scalar()
 
     @property
     def has_captured(self) -> bool:
-        with self.session() as session:
-            return not session.query(
-                sql.select(db.Instance).where(db.Instance.captured.is_(None)).exists()
-            ).scalar()
+        return not self.session.query(
+            sql.select(db.Instance).where(db.Instance.captured.is_(None)).exists()
+        ).scalar()
 
     @property
     def has_collected(self) -> bool:
-        assert self.dbc is not None
         return self.dbc.has_collected
 
     @has_collected.setter
     def has_collected(self, value: bool) -> None:
-        assert self.dbc is not None
         self.dbc.has_collected = value
 
     @property
     def has_plotted(self) -> bool:
-        assert self.dbc is not None
         return self.dbc.has_plotted
 
     @has_plotted.setter
     def has_plotted(self, value: bool) -> None:
-        assert self.dbc is not None
         self.dbc.has_plotted = value
 
     def acquire_lock(self):
-        assert not self.lock
         self.lock = InterProcessLock(self.storagepath / "lockfile").__enter__()
 
     def release_lock(self, *args, **kwargs):
         assert self.lock
         self.lock.__exit__(*args, **kwargs)
-        self.lock = None
+        del self.lock
 
     def __enter__(self) -> Case:
         self.acquire_lock()
         self.engine = sql.create_engine(f"sqlite:///{self.dbpath}")
+        self.session = Session(self.engine).__enter__()
         self.auto_migrate()
-        with self.session() as session:
-            self.dbc = session.scalar(sql.select(db.Case))
+
+        dbc = self.session.scalar(sql.select(db.Case))
+        assert dbc
+        self.dbc = dbc
+
         return self
 
     def __exit__(self, *args, **kwargs):
@@ -257,13 +248,10 @@ class Case:
                 },
                 f,
             )
-        with self.session() as session:
-            session.merge(self.dbc)
-            session.commit()
-        assert self.engine
+        self.session.commit()
+        del self.session
         self.engine.dispose()
         del self.engine
-        self.engine = None
         self.release_lock(*args, **kwargs)
 
     def auto_migrate(self) -> None:
@@ -272,10 +260,9 @@ class Case:
         if not inspector.has_table("dbinfo"):
             current_version = -1
         else:
-            with self.session() as session:
-                db_info = session.scalar(sql.select(db.DbInfo))
-                assert db_info is not None
-                current_version = db_info.version
+            db_info = self.session.scalar(sql.select(db.DbInfo))
+            assert db_info is not None
+            current_version = db_info.version
 
         migrations_path = Path(__file__).parent / "migrations"
         config = AlembicCfg()
@@ -295,24 +282,22 @@ class Case:
         migrator = MIGRATORS.get(version)
         if migrator:
             migrator(self)
-        with self.session() as session:
-            db_info = session.scalar(sql.select(db.DbInfo))
-            assert db_info is not None
-            db_info.version = version
-            session.commit()
+        db_info = self.session.scalar(sql.select(db.DbInfo))
+        assert db_info is not None
+        db_info.version = version
+        self.session.commit()
 
     def migrate_to_head(self, config: AlembicCfg) -> None:
         alembic_command.upgrade(config, "head")
 
-    @contextmanager
-    def session(self) -> Iterator[Session]:
-        assert self.engine is not None
-        with Session(self.engine) as session:
-            yield session
+    # @contextmanager
+    # def session(self) -> Iterator[Session]:
+    #     assert self.engine is not None
+    #     with Session(self.engine) as session:
+    #         yield session
 
     def instance_by_index(self, index: int) -> Instance:
-        with self.session() as session:
-            db_instance = session.scalar(sql.select(db.Instance).where(db.Instance.index == index))
+        db_instance = self.session.scalar(sql.select(db.Instance).where(db.Instance.index == index))
         assert db_instance is not None
         return Instance(self, db_instance)
 
@@ -351,6 +336,14 @@ class Case:
         base_ctx = {"g_sourcedir": os.getcwd()}
         for i, ctx in enumerate(self.context_mgr.fullspace(context=base_ctx)):
             ctx["g_logdir"] = self._logdir(ctx)
+
+            # TODO: Think more about this
+            db_instance = self.session.scalar(
+                sql.select(db.Instance).where(db.Instance.index == ctx["g_index"])
+            )
+            if db_instance is not None:
+                Instance(self, db_instance).destroy()
+
             db_instance = db.Instance(
                 index=ctx["g_index"],
                 logdir=ctx["g_logdir"],
@@ -358,6 +351,7 @@ class Case:
                 captured=None,
                 status=Status.Created,
             )
+            self.session.add(db_instance)
             yield Instance(self, db_instance)
 
     def create_instance(
@@ -387,15 +381,15 @@ class Case:
             captured=None,
             status=Status.Created,
         )
+        self.session.add(db_instance)
         return Instance(self, db_instance, local=workspace)
 
     def instances(self, *statuses: api.Status) -> Iterator[Instance]:
-        with self.session() as session:
-            select = sql.select(db.Instance)
-            if statuses:
-                select = select.where(db.Instance.status.in_(statuses))
-            for db_instance in session.scalars(select):
-                yield Instance(self, db_instance)
+        select = sql.select(db.Instance)
+        if statuses:
+            select = select.where(db.Instance.status.in_(statuses))
+        for db_instance in self.session.scalars(select):
+            yield Instance(self, db_instance)
 
     def capture(self):
         for instance in self.instances(Status.Downloaded):
@@ -440,12 +434,12 @@ class Instance:
     def __init__(
         self,
         case: Case,
-        dbi: db.Instance,
+        dbo: db.Instance,
         /,
         local: Optional[api.Workspace] = None,
     ):
         self._case = case
-        self.dbo = dbi
+        self.dbo = dbo
 
         if local is None:
             self.local = self.open_workspace(case.storage_spaces)
@@ -486,17 +480,19 @@ class Instance:
         finally:
             self.remote = self.remote_book = None
 
+    def clean(self) -> None:
+        self.local.destroy()
+        self.status = Status.Created
+        self.dbo.captured = None
+        self.commit()
+
     def destroy(self) -> None:
         self.local.destroy()
-        with self._case.session() as session:
-            db = session.merge(self.dbo)
-            session.delete(db)
-            session.commit()
+        self._case.session.delete(self.dbo)
+        self._case.session.commit()
 
     def commit(self) -> None:
-        with self._case.session() as session:
-            session.merge(self.dbo)
-            session.commit()
+        self._case.session.commit()
 
     @property
     def index(self) -> int:
