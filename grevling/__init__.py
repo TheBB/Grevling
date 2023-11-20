@@ -27,7 +27,7 @@ from .schema import CaseSchema, PluginSchema, load
 from .script import Script, ScriptTemplate
 from .workflow.local import LocalWorkflow, LocalWorkspace, LocalWorkspaceCollection
 
-__version__ = "3.0.0a1"
+__version__ = "3.0.0a2"
 
 Migrator = Callable[["Case"], None]
 

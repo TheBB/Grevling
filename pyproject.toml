@@ -5,7 +5,7 @@ skip-string-normalization = true
 
 [tool.poetry]
 name = "grevling"
-version = "3.0.0a1"
+version = "3.0.0a2"
 description = "A batch runner tool"
 authors = ["Eivind Fonn <eivind.fonn@sintef.no>"]
 license = "AGPL3"
