@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from contextlib import contextmanager
+from importlib import import_module
 from pathlib import Path
 from typing import Callable, Iterable, Iterator, List, Optional
 
@@ -22,7 +23,7 @@ from .context import ContextProvider
 from .filemap import FileMap, FileMapTemplate
 from .parameters import ParameterSpace
 from .plotting import Plot
-from .schema import CaseSchema, load
+from .schema import CaseSchema, PluginSchema, load
 from .script import Script, ScriptTemplate
 from .workflow.local import LocalWorkflow, LocalWorkspace, LocalWorkspaceCollection
 
@@ -88,6 +89,11 @@ DB_MAJOR_VERSION = 2
 MIGRATORS: dict[int, Migrator] = {1: migrator_v1, 2: migrator_v2}
 
 
+def load_plugin(case: Case, spec: PluginSchema) -> api.Plugin:
+    module = import_module(spec.name)
+    return module.Plugin(case, spec.settings)
+
+
 class Case:
     lock: InterProcessLock
     engine: sql.Engine
@@ -115,6 +121,8 @@ class Case:
     _ignore_missing: bool
 
     types: TypeManager
+
+    plugins: list[api.Plugin]
 
     def __init__(
         self,
@@ -145,6 +153,9 @@ class Case:
             if configpath is not None and not configpath.is_file():
                 raise FileNotFoundError("Found a grevling configuration, but it's not a file")
             casedata = load(configpath)
+
+        # Load plugins first
+        self.plugins = [load_plugin(self, plugin) for plugin in casedata.plugins]
 
         if storagepath is None:
             storagepath = self.sourcepath / casedata.settings.storagedir
@@ -268,6 +279,7 @@ class Case:
         config = AlembicCfg()
         config.set_main_option("script_location", str(migrations_path))
         config.set_main_option("sqlalchemy.url", f"sqlite:///{self.dbpath}")
+        # config.set_section_option("")
 
         if current_version >= DB_MAJOR_VERSION:
             self.migrate_to_head(config)

@@ -1,0 +1,14 @@
+{
+    settings: {
+        storagedir: "grevlingdata",
+    },
+    plugins: [
+        "grevling_testplugin",
+        {
+            name: "grevling_testplugin_with_settings",
+            settings: {
+                something: "something else",
+            },
+        },
+    ],
+}
