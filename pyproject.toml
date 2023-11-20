@@ -10,6 +10,7 @@ description = "A batch runner tool"
 authors = ["Eivind Fonn <eivind.fonn@sintef.no>"]
 license = "AGPL3"
 readme = "README.md"
+include = ["grevling/py.typed"]
 
 [tool.poetry.dependencies]
 python = "^3.9"
