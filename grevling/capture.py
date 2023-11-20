@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import re
-from typing import TYPE_CHECKING, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Any, Iterable, Optional, Union, cast
+
+import pandas as pd
 
 from . import api, typing, util
 from .schema import RegexCaptureSchema, SimpleCaptureSchema
@@ -17,7 +19,7 @@ class Capture:
     _type: Optional[GType]
 
     @staticmethod
-    def from_schema(schema: Union[RegexCaptureSchema, SimpleCaptureSchema]):
+    def from_schema(schema: Union[RegexCaptureSchema, SimpleCaptureSchema]) -> Capture:
         if isinstance(schema, RegexCaptureSchema):
             return Capture(
                 pattern=schema.pattern,
@@ -39,7 +41,7 @@ class Capture:
         return Capture(pattern, mode, tp)
 
     @classmethod
-    def load(cls, spec) -> Capture:
+    def load(cls, spec: Any) -> Capture:
         if isinstance(spec, str):
             return cls(spec)
         if spec.get("type") in ("integer", "float"):
@@ -56,19 +58,19 @@ class Capture:
             mode = spec.get("mode", "last")
             tp = typing.GType.from_string(spec["type"])
             return cls(pattern, mode, tp)
-        return util.call_yaml(cls, spec)
+        return cast(Capture, util.call_yaml(cls, spec))
 
     def __init__(
         self,
         pattern: str,
         mode: str = "last",
         tp: Optional[GType] = None,
-    ):
+    ) -> None:
         self._regex = re.compile(pattern)
         self._mode = mode
         self._type = tp
 
-    def find_in(self, collector: CaptureCollection, string: str):
+    def find_in(self, collector: CaptureCollection, string: str) -> None:
         matches = self._regex.finditer(string)
         filtered: Iterable[re.Match]
 
@@ -104,7 +106,7 @@ class CaptureCollection(api.Context):
     def __init__(self, types: TypeManager):
         self.types = types
 
-    def collect(self, name, value, tp: Optional[GType] = None):
+    def collect(self, name: str, value: Any, tp: Optional[GType] = None) -> None:
         gtp: GType = tp if tp is not None else self.types.get(name, typing.AnyType())
         value = gtp.coerce(value)
         if gtp.is_list:
@@ -112,28 +114,28 @@ class CaptureCollection(api.Context):
         else:
             self[name] = value
 
-    def collect_from_file(self, ws: api.Workspace, filename: str):
+    def collect_from_file(self, ws: api.Workspace, filename: str) -> None:
         with ws.open_str(filename, "r") as f:
             data = json.load(f)
         self.update(data)
 
-    def collect_from_context(self, ws: api.Workspace):
+    def collect_from_context(self, ws: api.Workspace) -> None:
         self.collect_from_file(ws, "context.json")
 
-    def collect_from_cache(self, ws: api.Workspace):
+    def collect_from_cache(self, ws: api.Workspace) -> None:
         self.collect_from_file(ws, "captured.json")
 
-    def collect_from_info(self, ws: api.Workspace):
+    def collect_from_info(self, ws: api.Workspace) -> None:
         with ws.open_str("grevling.txt", "r") as f:
             for line in f:
                 key, value = line.strip().split("=", 1)
                 self.collect(key, value)
 
-    def commit_to_file(self, ws: api.Workspace):
+    def commit_to_file(self, ws: api.Workspace) -> None:
         with ws.open_str("captured.json", "w") as f:
             f.write(self.json())
 
-    def commit_to_dataframe(self, data):
+    def commit_to_dataframe(self, data: pd.DataFrame) -> pd.DataFrame:
         index = self["g_index"]
         data.loc[index, :] = [None] * data.shape[1]
         for key, value in self.items():

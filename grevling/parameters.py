@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Sequence, Tuple
+from typing import Any, Dict, Iterable, Sequence, Tuple, Union, overload
 
 import numpy as np
 
@@ -15,7 +15,7 @@ from .schema import (
 
 class Parameter(Sequence):
     name: str
-    values: List
+    values: list[Any]
 
     @staticmethod
     def from_schema(name: str, schema: ParameterSchema) -> Parameter:
@@ -26,14 +26,22 @@ class Parameter(Sequence):
         if isinstance(schema, GradedParameterSchema):
             return GradedParameter(name, schema.interval, schema.num, schema.grading)
 
-    def __init__(self, name: str, values: List):
+    def __init__(self, name: str, values: list):
         self.name = name
         self.values = values
 
     def __len__(self) -> int:
         return len(self.values)
 
-    def __getitem__(self, index) -> Any:
+    @overload
+    def __getitem__(self, index: int) -> Any:
+        ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[Any]:
+        ...
+
+    def __getitem__(self, index: Union[int, slice]) -> Any:
         return self.values[index]
 
 
@@ -55,7 +63,7 @@ class GradedParameter(Parameter):
 
 class ParameterSpace(dict):
     @classmethod
-    def from_schema(cls, schema: Dict[str, ParameterSchema]):
+    def from_schema(cls, schema: Dict[str, ParameterSchema]) -> ParameterSpace:
         return cls({name: Parameter.from_schema(name, spec) for name, spec in schema.items()})
 
     def subspace(self, *names: str) -> Iterable[Dict]:

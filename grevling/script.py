@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from time import time as osclock
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, Iterator, List, Optional
 
 from . import api, util
 from .capture import Capture, CaptureCollection
@@ -17,7 +17,7 @@ from .schema import CommandSchema
 
 
 @contextmanager
-def time():
+def time() -> Iterator[Callable[[], float]]:
     start = osclock()
     yield lambda: end - start
     end = osclock()
@@ -130,14 +130,14 @@ class Command:
         util.log.debug(" ".join(shlex.quote(c) for c in command))
 
         # TODO: How to get good timings when we run async?
-        with time() as duration:
+        with time() as get_duration:
             while True:
                 result = await run(command, **kwargs)  # type: ignore
                 if self.retry_on_fail and result.returncode:
                     util.log.info("Failed, retrying...")
                     continue
                 break
-        duration = duration()
+        duration = get_duration()
 
         log_ws.write_file(f"{self.name}.stdout", result.stdout)
         log_ws.write_file(f"{self.name}.stderr", result.stderr)
@@ -154,7 +154,7 @@ class Command:
 
         return True
 
-    def capture(self, collector: CaptureCollection, workspace: api.Workspace):
+    def capture(self, collector: CaptureCollection, workspace: api.Workspace) -> None:
         try:
             with workspace.open_str(f"{self.name}.stdout", "r") as f:
                 stdout = f.read()
@@ -184,7 +184,7 @@ class Script:
         finally:
             log_ws.write_file("grevling.txt", f"g_finished={datetime.datetime.now()}\n", append=True)
 
-    def capture(self, collector: CaptureCollection, workspace: api.Workspace):
+    def capture(self, collector: CaptureCollection, workspace: api.Workspace) -> None:
         for cmd in self.commands:
             cmd.capture(collector, workspace)
 

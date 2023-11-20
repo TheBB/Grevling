@@ -119,7 +119,7 @@ class MockBackend(PlotBackend):
         )
 
     def add_scatter(self, *args, **kwargs):
-        return self.add_line(*args, **kwargs, mode="scatter")
+        return self.add_line(*args, **kwargs, mode="scatter")  # type: ignore[misc]
 
     def set_title(self, title: str):
         self.meta["title"] = title
@@ -243,7 +243,7 @@ class PlotlyBackend(PlotBackend):
         self.figure.add_scatter(x=xpoints, y=ypoints, mode=mode, name=legend)
 
     def add_scatter(self, *args, **kwargs):
-        self.add_line(*args, **kwargs, mode="markers")
+        self.add_line(*args, **kwargs, mode="markers")  # type: ignore[misc]
 
     def set_title(self, title: str):
         self.figure.layout.title.text = title
@@ -391,7 +391,7 @@ class PlotStyleManager:
         s = getter(self._defaults, style)
         s = getter(s, "category" if style in self._category_to_style.inverse else "single")
         s = getter(s, self._mode)
-        return s
+        return s  # type: ignore[no-any-return]
 
     def styles(self, space: ParameterSpace, *categories: str) -> Iterable[Dict[str, str]]:
         names, values = [], []

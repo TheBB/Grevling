@@ -5,13 +5,14 @@ import os
 from contextlib import contextmanager
 from importlib import import_module
 from pathlib import Path
-from typing import Callable, Iterable, Iterator, List, Optional
+from types import TracebackType
+from typing import Callable, Iterable, Iterator, List, Optional, Type, cast
 
-import pandas as pd  # type: ignore
+import pandas as pd
 import sqlalchemy as sql
 from alembic import command as alembic_command
 from alembic.config import Config as AlembicCfg
-from fasteners import InterProcessLock  # type: ignore
+from fasteners import InterProcessLock
 from sqlalchemy.orm import Session
 
 from grevling.typing import TypeManager
@@ -91,7 +92,7 @@ MIGRATORS: dict[int, Migrator] = {1: migrator_v1, 2: migrator_v2}
 
 def load_plugin(case: Case, spec: PluginSchema) -> api.Plugin:
     module = import_module(spec.name)
-    return module.Plugin(case, spec.settings)
+    return cast(api.Plugin, module.Plugin(case, spec.settings))
 
 
 class Case:
@@ -193,23 +194,32 @@ class Case:
 
     @property
     def is_running(self) -> bool:
-        return self.session.query(
-            sql.select(db.Instance)
-            .where(db.Instance.status.in_((api.Status.Started, api.Status.Prepared)))
-            .exists()
-        ).scalar()
+        return cast(
+            bool,
+            self.session.query(
+                sql.select(db.Instance)
+                .where(db.Instance.status.in_((api.Status.Started, api.Status.Prepared)))
+                .exists()
+            ).scalar(),
+        )
 
     @property
     def has_data(self) -> bool:
-        return self.session.query(
-            sql.select(db.Instance).where(db.Instance.status == api.Status.Downloaded).exists()
-        ).scalar()
+        return cast(
+            bool,
+            self.session.query(
+                sql.select(db.Instance).where(db.Instance.status == api.Status.Downloaded).exists()
+            ).scalar(),
+        )
 
     @property
     def has_captured(self) -> bool:
-        return not self.session.query(
-            sql.select(db.Instance).where(db.Instance.captured.is_(None)).exists()
-        ).scalar()
+        return cast(
+            bool,
+            not self.session.query(
+                sql.select(db.Instance).where(db.Instance.captured.is_(None)).exists()
+            ).scalar(),
+        )
 
     @property
     def has_collected(self) -> bool:
@@ -227,12 +237,17 @@ class Case:
     def has_plotted(self, value: bool) -> None:
         self.dbc.has_plotted = value
 
-    def acquire_lock(self):
+    def acquire_lock(self) -> None:
         self.lock = InterProcessLock(self.storagepath / "lockfile").__enter__()
 
-    def release_lock(self, *args, **kwargs):
+    def release_lock(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
         assert self.lock
-        self.lock.__exit__(*args, **kwargs)
+        self.lock.__exit__(exc_type, exc_val, exc_tb)
         del self.lock
 
     def __enter__(self) -> Case:
@@ -247,7 +262,12 @@ class Case:
 
         return self
 
-    def __exit__(self, *args, **kwargs):
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
         with open(self.storagepath / "state.json", "w") as f:
             json.dump(
                 {
@@ -263,7 +283,7 @@ class Case:
         del self.session
         self.engine.dispose()
         del self.engine
-        self.release_lock(*args, **kwargs)
+        self.release_lock(exc_type, exc_val, exc_tb)
 
     def auto_migrate(self) -> None:
         inspector = sql.inspect(self.engine)
@@ -302,12 +322,6 @@ class Case:
     def migrate_to_head(self, config: AlembicCfg) -> None:
         alembic_command.upgrade(config, "head")
 
-    # @contextmanager
-    # def session(self) -> Iterator[Session]:
-    #     assert self.engine is not None
-    #     with Session(self.engine) as session:
-    #         yield session
-
     def instance_by_index(self, index: int) -> Instance:
         db_instance = self.session.scalar(sql.select(db.Instance).where(db.Instance.index == index))
         assert db_instance is not None
@@ -317,25 +331,25 @@ class Case:
     def parameters(self) -> ParameterSpace:
         return self.context_mgr.parameters
 
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         for instance in self.instances():
             instance.destroy()
         self.has_collected = False
         self.has_plotted = False
         self.dataframepath.unlink(missing_ok=True)
 
-    def clear_dataframe(self):
+    def clear_dataframe(self) -> None:
         self.dataframepath.unlink(missing_ok=True)
         self.has_collected = False
 
-    def load_dataframe(self) -> pd.DataFram:
+    def load_dataframe(self) -> pd.DataFrame:
         if self.has_collected:
             return pd.read_parquet(self.dataframepath, engine="pyarrow")
         types = self.type_guess()
         data = {k: pd.Series([], dtype=v) for k, v in types.pandas().items() if k != "g_index"}
         return pd.DataFrame(index=pd.Index([], dtype=int), data=data)
 
-    def save_dataframe(self, df: pd.DataFrame):
+    def save_dataframe(self, df: pd.DataFrame) -> None:
         df.to_parquet(self.dataframepath, engine="pyarrow", index=True)
 
     def type_guess(self) -> TypeManager:
@@ -403,11 +417,11 @@ class Case:
         for db_instance in self.session.scalars(select):
             yield Instance(self, db_instance)
 
-    def capture(self):
+    def capture(self) -> None:
         for instance in self.instances(Status.Downloaded):
             instance.capture()
 
-    def collect(self):
+    def collect(self) -> None:
         data = self.load_dataframe()
         for instance in self.instances(Status.Downloaded):
             collector = instance.cached_capture()
@@ -416,17 +430,16 @@ class Case:
         self.save_dataframe(data)
         self.has_collected = True
 
-    def plot(self):
+    def plot(self) -> None:
         for plot in self.plots:
             plot.generate_all(self)
         self.has_plotted = True
 
-    def run(self, nprocs=1) -> bool:
-        nprocs = nprocs or 1
+    def run(self, nprocs: int = 1) -> bool:
         with LocalWorkflow(nprocs=nprocs) as workflow:
             return workflow.pipeline(self).run(self.create_instances())
 
-    def run_single(self, namespace: api.Context, logdir: Path, index: int = 0):
+    def run_single(self, namespace: api.Context, logdir: Path, index: int = 0) -> None:
         instance = self.create_instance(namespace, logdir=logdir, index=index)
         with LocalWorkflow() as workflow:
             workflow.pipeline(self).run([instance])
@@ -466,7 +479,7 @@ class Instance:
         return self.dbo.status
 
     @status.setter
-    def status(self, value: api.Status):
+    def status(self, value: api.Status) -> None:
         self.dbo.status = value
         with self.local_book.open_str("status.txt", "w") as f:
             f.write(value.value)
@@ -484,7 +497,7 @@ class Instance:
         return self._case.types
 
     @contextmanager
-    def bind_remote(self, spaces: api.WorkspaceCollection):
+    def bind_remote(self, spaces: api.WorkspaceCollection) -> Iterator[None]:
         self.remote = self.open_workspace(spaces, "WRK")
         self.remote_book = self.remote.subspace(".grevling")
         try:
@@ -514,14 +527,14 @@ class Instance:
     def script(self) -> Script:
         return self._case.script.render(self.context)
 
-    def write_context(self):
+    def write_context(self) -> None:
         with self.local_book.open_str("context.json", "w") as f:
             f.write(self.context.json(sort_keys=True, indent=4))
 
-    def open_workspace(self, workspaces, name="") -> api.Workspace:
+    def open_workspace(self, workspaces: api.WorkspaceCollection, name: str = "") -> api.Workspace:
         return workspaces.open_workspace(self.logdir, name)
 
-    def prepare(self):
+    def prepare(self) -> None:
         assert self.remote
         assert self.status == Status.Created
 
@@ -534,7 +547,7 @@ class Instance:
         self.status = Status.Prepared
         self.commit()
 
-    def download(self):
+    def download(self) -> None:
         assert self.remote
         assert self.remote_book
         assert self.status == Status.Finished
@@ -560,7 +573,7 @@ class Instance:
         self.dbo.captured = collector
         self.commit()
 
-    def capture(self):
+    def capture(self) -> None:
         assert self.status == Status.Downloaded
         collector = CaptureCollection(self.types)
         collector.update(self.context)

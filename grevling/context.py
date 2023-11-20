@@ -1,10 +1,17 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterator, List, Optional, TypedDict
+
+from typing_extensions import Unpack
 
 from . import api
 from .parameters import ParameterSpace
 from .schema import CaseSchema, Constant
+
+
+class EvaluateKwargs(TypedDict, total=False):
+    verbose: bool
+    add_constants: bool
 
 
 class ContextProvider:
@@ -28,15 +35,15 @@ class ContextProvider:
         self.evaluables = schema.evaluate
         self.cond_func = schema.where
 
-    def evaluate_context(self, *args, **kwargs) -> api.Context:
-        return self.evaluate(*args, **kwargs)
+    def evaluate_context(self, context: dict[str, Any], **kwargs: Unpack[EvaluateKwargs]) -> api.Context:
+        return self.evaluate(context, **kwargs)
 
-    def evaluate(self, *args, **kwargs) -> api.Context:
-        return api.Context(self.raw_evaluate(*args, **kwargs))
+    def evaluate(self, context: dict[str, Any], **kwargs: Unpack[EvaluateKwargs]) -> api.Context:
+        return self.raw_evaluate(context, **kwargs)
 
     def raw_evaluate(
         self,
-        context,
+        context: dict[str, Any],
         verbose: bool = True,
         add_constants: bool = True,
     ) -> api.Context:
@@ -50,7 +57,12 @@ class ContextProvider:
 
         return api.Context(context)
 
-    def _subspace(self, *names: str, context=None, **kwargs) -> Iterable[api.Context]:
+    def _subspace(
+        self,
+        *names: str,
+        context: Optional[dict[str, Any]] = None,
+        **kwargs: Unpack[EvaluateKwargs],
+    ) -> Iterator[api.Context]:
         if context is None:
             context = {}
         for values in self.parameters.subspace(*names):
@@ -63,10 +75,19 @@ class ContextProvider:
             yield ctx
             continue
 
-    def subspace(self, *args, **kwargs) -> Iterable[api.Context]:
-        for i, ctx in enumerate(self._subspace(*args, **kwargs)):
+    def subspace(
+        self,
+        *names: str,
+        context: Optional[dict[str, Any]] = None,
+        **kwargs: Unpack[EvaluateKwargs],
+    ) -> Iterator[api.Context]:
+        for i, ctx in enumerate(self._subspace(*names, context=context, **kwargs)):
             ctx["g_index"] = i
             yield ctx
 
-    def fullspace(self, context=None, **kwargs) -> Iterable[api.Context]:
+    def fullspace(
+        self,
+        context: Optional[dict[str, Any]] = None,
+        **kwargs: Unpack[EvaluateKwargs],
+    ) -> Iterator[api.Context]:
         yield from self.subspace(*self.parameters, context=context, **kwargs)

@@ -7,7 +7,7 @@ import logging
 from contextlib import contextmanager
 from functools import wraps
 from itertools import chain, product
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -117,7 +117,7 @@ class JSONEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
-def prod(nums):
+def prod(nums: Iterable[int]) -> int:
     retval = 1
     for n in nums:
         retval *= n
@@ -160,18 +160,6 @@ def find_subclass(cls, name, root=False, attr="__tag__", predicate=(lambda a, b:
     return None
 
 
-def completer(options):
-    matches = []
-
-    def complete(text, state):
-        if state == 0:
-            matches.clear()
-            matches.extend(c for c in options if c.startswith(text.lower()))
-        return matches[state] if state < len(matches) else None
-
-    return complete
-
-
 def format_seconds(secs: float):
     if secs < 0.1:
         return "< 0.1 s"
@@ -194,8 +182,8 @@ def call_yaml(func, mapping, *args, **kwargs):
     return func(*binding.args, **binding.kwargs)
 
 
-def to_queue(it):
-    q = asyncio.Queue()
+def to_queue(it) -> asyncio.Queue:
+    q: asyncio.Queue = asyncio.Queue()
     for i in it:
         q.put_nowait(i)
     return q

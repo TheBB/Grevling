@@ -11,7 +11,7 @@ their outputs must necessarily be delayed.
 from __future__ import annotations
 
 from functools import partial
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, TypeVar, Union
 
 from pydantic import BaseModel, Field
 from typing_extensions import Self
@@ -94,7 +94,7 @@ class FileMapBaseSchema(BaseModel):
     template: bool
 
     @classmethod
-    def from_any(cls: Type[Self], source: Union[str, Dict]) -> Self:
+    def from_any(cls: Type[Self], source: Union[str, dict[str, Any], Self]) -> Self:
         """Convert an object with 'any' type to a filemap schema. Most
         importantly, convert strings by interpreting them as source
         filenames.
@@ -156,7 +156,7 @@ class CommandSchema(BaseModel):
             return CommandSchema.model_validate(source)
         return CommandSchema.model_validate({"command": source})
 
-    def render(self, context: api.Context):
+    def render(self, context: api.Context) -> CommandSchema:
         """Perform template substitution in the attributes that require it."""
 
         # If commands are provided as strings instead of lists, templates must
@@ -266,7 +266,7 @@ class PlotStyleSchema(BaseModel):
     marker: Optional[Union[str, List[str]]] = None
 
     def refine(self) -> refined.PlotStyleSchema:
-        def fix(x):
+        def fix(x: Optional[Union[str, list[str]]]) -> Optional[list[str]]:
             return [x] if isinstance(x, str) else x
 
         return refined.PlotStyleSchema.model_validate(
@@ -370,6 +370,9 @@ class PluginSchema(BaseModel):
         return refined.PluginSchema.model_validate(self.model_dump())
 
 
+FSchema = TypeVar("FSchema", TemplateSchema, FileMapSchema)
+
+
 class CaseSchema(BaseModel):
     """Root model for specifying a Grevling case."""
 
@@ -383,9 +386,9 @@ class CaseSchema(BaseModel):
     p_where: Union[Callable, str, List[str]] = Field(alias="where", default=[])
     types: Dict[str, str] = {}
 
-    p_templates: Union[Callable, List[Union[str, TemplateSchema]]] = Field(alias="templates", default=[])
-    p_prefiles: Union[Callable, List[Union[str, FileMapSchema]]] = Field(alias="prefiles", default=[])
-    p_postfiles: Union[Callable, List[Union[str, FileMapSchema]]] = Field(alias="postfiles", default=[])
+    p_templates: Union[Callable, list[Union[str, TemplateSchema]]] = Field(alias="templates", default=[])
+    p_prefiles: Union[Callable, list[Union[str, FileMapSchema]]] = Field(alias="prefiles", default=[])
+    p_postfiles: Union[Callable, list[Union[str, FileMapSchema]]] = Field(alias="postfiles", default=[])
 
     plots: List[PlotSchema] = []
 
@@ -437,21 +440,24 @@ class CaseSchema(BaseModel):
         return lambda ctx: p_where(**ctx)
 
     @staticmethod
-    def refine_filemap(schemas, schema_converter):
+    def refine_filemap(
+        schemas: Union[Callable, List[Union[str, FSchema]]],
+        schema_converter: Callable[[Union[str, FSchema]], FSchema],
+    ) -> Callable[[api.Context], list[refined.FileMapSchema]]:
         """Helper method for converting filemaps to refined models."""
         if isinstance(schemas, list):
             return lambda ctx: [schema_converter(schema).render(ctx).refine() for schema in schemas]
         return lambda ctx: [schema_converter(schema).refine() for schema in schemas(**ctx)]
 
-    def templates_callable(self) -> Callable[[api.Context], List[FileMapSchema]]:
+    def templates_callable(self) -> Callable[[api.Context], List[refined.FileMapSchema]]:
         """Convert the *templates* attribute to a callable."""
         return CaseSchema.refine_filemap(self.p_templates, lambda schema: TemplateSchema.from_any(schema))
 
-    def prefiles_callable(self) -> Callable[[api.Context], List[FileMapSchema]]:
+    def prefiles_callable(self) -> Callable[[api.Context], List[refined.FileMapSchema]]:
         """Convert the *prefiles* attribute to a callable."""
         return CaseSchema.refine_filemap(self.p_prefiles, lambda schema: FileMapSchema.from_any(schema))
 
-    def refine_prefiles(self) -> Callable[[api.Context], List[FileMapSchema]]:
+    def refine_prefiles(self) -> Callable[[api.Context], List[refined.FileMapSchema]]:
         """Combine the *templates* and *prefiles* attributes into a callable
         so that it's accepted by the refined model.
         """
@@ -459,7 +465,7 @@ class CaseSchema(BaseModel):
         templates = self.templates_callable()
         return lambda ctx: [*prefiles(ctx), *templates(ctx)]
 
-    def refine_postfiles(self) -> Callable[[api.Context], List[FileMapSchema]]:
+    def refine_postfiles(self) -> Callable[[api.Context], List[refined.FileMapSchema]]:
         """Convert the *postfiles* attribute to a callable so that it's accepted
         by the refined model.
         """
