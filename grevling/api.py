@@ -5,7 +5,20 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, BinaryIO, ContextManager, Iterable, Optional, TextIO, TypeVar, Union
+from typing import (
+    IO,
+    TYPE_CHECKING,
+    Any,
+    BinaryIO,
+    ContextManager,
+    Iterable,
+    Optional,
+    TextIO,
+    TypeVar,
+    Union,
+)
+
+import click
 
 if TYPE_CHECKING:
     from . import Case
@@ -130,3 +143,11 @@ class Context(dict):
 
     def json(self, **kwargs) -> str:
         return json.dumps(self, **kwargs)
+
+
+class Plugin:
+    def __init__(self, case: Case, settings: Any) -> None:
+        pass
+
+    def commands(self, ctx: click.Context) -> list[click.Command]:
+        return []

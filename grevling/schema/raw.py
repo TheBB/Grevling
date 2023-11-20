@@ -362,6 +362,14 @@ ScriptSchema = Union[
 ]
 
 
+class PluginSchema(BaseModel):
+    name: str
+    settings: Any = None
+
+    def refine(self) -> refined.PluginSchema:
+        return refined.PluginSchema.model_validate(self.model_dump())
+
+
 class CaseSchema(BaseModel):
     """Root model for specifying a Grevling case."""
 
@@ -382,6 +390,8 @@ class CaseSchema(BaseModel):
     plots: List[PlotSchema] = []
 
     settings: SettingsSchema = SettingsSchema()
+
+    plugins: list[Union[str, PluginSchema]] = []
 
     def refine_parameters(self) -> Dict[str, Union[Dict, refined.ParameterSchema]]:
         """Convert the *parameters* attribute so that raw lists are converted to
@@ -459,6 +469,15 @@ class CaseSchema(BaseModel):
         """Refine all the plots in the *plots* attribute."""
         return [plot.refine() for plot in self.plots]
 
+    def refine_plugins(self) -> list[refined.PluginSchema]:
+        """Refine all the plugin load specifications in the *plugins* attribute."""
+        return [
+            PluginSchema.model_validate({"name": plugin}).refine()
+            if isinstance(plugin, str)
+            else plugin.refine()
+            for plugin in self.plugins
+        ]
+
     def refine(self) -> refined.CaseSchema:
         return refined.CaseSchema.model_validate(
             {
@@ -471,5 +490,6 @@ class CaseSchema(BaseModel):
                 "postfiles": self.refine_postfiles(),
                 "settings": self.settings.refine(),
                 "plots": self.refine_plots(),
+                "plugins": self.refine_plugins(),
             }
         )

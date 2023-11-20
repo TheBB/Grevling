@@ -151,6 +151,11 @@ class SettingsSchema(BaseModel):
     ignore_missing_files: bool
 
 
+class PluginSchema(BaseModel):
+    name: str
+    settings: Any
+
+
 class CaseSchema(BaseModel):
     parameters: Dict[str, ParameterSchema]
     script: Callable[[api.Context], List[CommandSchema]]
@@ -162,3 +167,4 @@ class CaseSchema(BaseModel):
     types: Dict[str, str]
     settings: SettingsSchema
     plots: List[PlotSchema]
+    plugins: list[PluginSchema]

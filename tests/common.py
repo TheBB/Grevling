@@ -25,8 +25,10 @@ def cli_run(commands=["run", "collect"]):
             case.clear_cache()
         r = CliRunner()
         for cmd in commands:
-            result = r.invoke(main, [cmd, "-c", str(path)])
+            args = [cmd] if isinstance(cmd, str) else cmd
+            result = r.invoke(main, ["-c", str(path), *args])
             if result.exit_code != 0:
+                print(result)
                 print(result.stdout)
             assert result.exit_code == 0
 
