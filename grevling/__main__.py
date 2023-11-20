@@ -32,7 +32,7 @@ class CaseType(click.Path):
     def convert(self, value, param, ctx):
         if isinstance(value, Case):
             return value
-        path = Path(super().convert(value, param, ctx))
+        path = Path(cast(str, super().convert(value, param, ctx)))
         casefile = path
         if path.is_dir():
             for candidate in ["grevling.gold", "grevling.yaml", "badger.yaml"]:
@@ -44,7 +44,7 @@ class CaseType(click.Path):
         if not casefile.is_file():
             raise click.FileError(str(casefile), hint="is not a file")
 
-        case = Case(path)
+        case = Case(casefile)
         return case
 
 

@@ -6,7 +6,8 @@ import stat
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, BinaryIO, Generator, Iterable, Optional, TextIO, Union
+from types import TracebackType
+from typing import IO, TYPE_CHECKING, BinaryIO, Generator, Iterable, Iterator, Optional, TextIO, Type, Union
 
 from .. import api, util
 from ..api import Status
@@ -38,15 +39,22 @@ class LocalWorkflow(api.Workflow):
     name = "local"
     nprocs: int
 
+    workspaces: TempWorkspaceCollection
+
     def __init__(self, nprocs: int = 1):
         self.nprocs = nprocs
 
-    def __enter__(self):
+    def __enter__(self) -> LocalWorkflow:
         self.workspaces = TempWorkspaceCollection("WRK").__enter__()
         return self
 
-    def __exit__(self, *args, **kwargs):
-        self.workspaces.__exit__(*args, **kwargs)
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        self.workspaces.__exit__(exc_type, exc_val, exc_tb)
 
     def pipeline(self, case: Case) -> Pipeline:
         return Pipeline(
@@ -66,7 +74,12 @@ class LocalWorkspaceCollection(api.WorkspaceCollection):
     def __enter__(self) -> LocalWorkspaceCollection:
         return self
 
-    def __exit__(self, *args, **kwargs):
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
         pass
 
     def new_workspace(self, prefix: Optional[str] = None, name: str = "") -> LocalWorkspace:
@@ -92,10 +105,10 @@ class LocalWorkspace(api.Workspace):
         self.root = Path(root)
         self.name = name
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self.root)
 
-    def destroy(self):
+    def destroy(self) -> None:
         shutil.rmtree(self.root)
 
     def to_root(self, path: Union[Path, str]) -> Path:
@@ -106,16 +119,18 @@ class LocalWorkspace(api.Workspace):
         return self.root / path
 
     @contextmanager
-    def open_str(self, path, mode: str = "w") -> Generator[TextIO, None, None]:
+    def open_str(self, path: Union[Path, str], mode: str = "w") -> Generator[TextIO, None, None]:
         with open(self.to_root(path), mode) as f:
             yield f  # type: ignore
 
     @contextmanager
-    def open_bytes(self, path, mode: str = "rb") -> Generator[BinaryIO, None, None]:
+    def open_bytes(self, path: Union[Path, str], mode: str = "rb") -> Generator[BinaryIO, None, None]:
         with open(self.to_root(path), mode) as f:
             yield f  # type: ignore
 
-    def write_file(self, path, source: Union[str, bytes, IO, Path], append: bool = False):
+    def write_file(
+        self, path: Union[Path, str], source: Union[str, bytes, IO, Path], append: bool = False
+    ) -> None:
         target = self.to_root(path)
         target.parent.mkdir(parents=True, exist_ok=True)
 
@@ -134,18 +149,18 @@ class LocalWorkspace(api.Workspace):
                 shutil.copyfileobj(source, f)
             return
 
-    def files(self) -> Iterable[Path]:
+    def files(self) -> Iterator[Path]:
         for path in self.root.rglob("*"):
             if path.is_file():
                 yield path.relative_to(self.root)
 
-    def exists(self, path) -> bool:
+    def exists(self, path: Union[Path, str]) -> bool:
         return self.to_root(path).exists()
 
-    def mode(self, path) -> int:
+    def mode(self, path: Union[Path, str]) -> int:
         return os.stat(self.to_root(path)).st_mode
 
-    def set_mode(self, path, mode: int):
+    def set_mode(self, path: Union[Path, str], mode: int) -> None:
         os.chmod(self.to_root(path), stat.S_IMODE(mode))
 
     def subspace(self, path: str, name: str = "") -> api.Workspace:
@@ -164,11 +179,16 @@ class TempWorkspaceCollection(LocalWorkspaceCollection):
     def __init__(self, name: str = ""):
         super().__init__(root="", name=name)
 
-    def __enter__(self) -> LocalWorkspaceCollection:
+    def __enter__(self) -> TempWorkspaceCollection:
         self.tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self.tempdir.__enter__())
         return self
 
-    def __exit__(self, *args, **kwargs):
-        super().__exit__(*args, **kwargs)
-        self.tempdir.__exit__(*args, **kwargs)
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        super().__exit__(exc_type, exc_val, exc_tb)
+        self.tempdir.__exit__(exc_type, exc_val, exc_tb)

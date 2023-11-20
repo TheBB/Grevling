@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, Iterable, List, Optional, Tuple
+from typing import Callable, Iterable, List, Optional, Tuple, TypedDict
+
+from typing_extensions import Unpack
 
 from . import api, util
 from .render import render
 from .schema import FileMapSchema
+
+
+class CopyKwargs(TypedDict, total=False):
+    ignore_missing: bool
 
 
 class SingleFileMap:
@@ -103,7 +109,7 @@ class FileMap:
         context: api.Context,
         source: api.Workspace,
         target: api.Workspace,
-        **kwargs,
+        **kwargs: Unpack[CopyKwargs],
     ) -> bool:
         for mapper in self.elements:
             if not mapper.copy(context, source, target, **kwargs):

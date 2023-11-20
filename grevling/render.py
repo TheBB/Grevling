@@ -3,7 +3,7 @@ from __future__ import annotations
 import shlex
 from typing import Dict, List, Optional, TypeVar, Union
 
-from mako.template import Template  # type: ignore
+from mako.template import Template
 
 from . import api
 

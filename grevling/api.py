@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from fnmatch import fnmatch
 from pathlib import Path
+from types import TracebackType
 from typing import (
     IO,
     TYPE_CHECKING,
@@ -12,13 +13,19 @@ from typing import (
     BinaryIO,
     ContextManager,
     Iterable,
+    Iterator,
     Optional,
+    Protocol,
     TextIO,
+    Type,
+    TypedDict,
     TypeVar,
     Union,
+    cast,
 )
 
 import click
+from typing_extensions import Unpack
 
 if TYPE_CHECKING:
     from . import Case
@@ -47,7 +54,7 @@ class Workspace(ABC):
         ...
 
     @abstractmethod
-    def destroy(self):
+    def destroy(self) -> None:
         ...
 
     @abstractmethod
@@ -59,11 +66,11 @@ class Workspace(ABC):
         ...
 
     @abstractmethod
-    def write_file(self, path: PathStr, source: Union[str, bytes, IO, Path], append: bool = False):
+    def write_file(self, path: PathStr, source: Union[str, bytes, IO, Path], append: bool = False) -> None:
         ...
 
     @abstractmethod
-    def files(self) -> Iterable[Path]:
+    def files(self) -> Iterator[Path]:
         ...
 
     @abstractmethod
@@ -75,7 +82,7 @@ class Workspace(ABC):
         ...
 
     @abstractmethod
-    def set_mode(self, path: PathStr, mode: int):
+    def set_mode(self, path: PathStr, mode: int) -> None:
         ...
 
     @abstractmethod
@@ -86,7 +93,7 @@ class Workspace(ABC):
     def top_name(self) -> str:
         ...
 
-    def glob(self, pattern: str) -> Iterable[Path]:
+    def glob(self, pattern: str) -> Iterator[Path]:
         for path in self.files():
             if fnmatch(str(path), pattern):
                 yield path
@@ -98,7 +105,12 @@ class WorkspaceCollection(ABC):
         ...
 
     @abstractmethod
-    def __exit__(self, *args, **kwargs):
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
         ...
 
     @abstractmethod
@@ -114,34 +126,46 @@ class WorkspaceCollection(ABC):
         ...
 
 
+class WorkflowConstructor(Protocol):
+    def __call__(self, nprocs: int = 1) -> Workflow:
+        ...
+
+
 class Workflow(ABC):
     @abstractmethod
     def __enter__(self) -> Workflow:
         ...
 
     @abstractmethod
-    def __exit__(self, *args, **kwargs):
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
         ...
 
     @staticmethod
-    def get_workflow(name: str):
+    def get_workflow(name: str) -> WorkflowConstructor:
         from . import util
 
         cls = util.find_subclass(Workflow, name, attr="name")
         if not cls:
             raise ImportError(f"Unknown workflow, or additional dependencies required: {name}")
-        return cls
+        return cast(WorkflowConstructor, cls)
 
     @abstractmethod
     def pipeline(self, case: Case) -> Pipe:
         ...
 
 
-class Context(dict):
-    def __call__(self, fn):
-        return fn(**self)
+class JsonKwargs(TypedDict, total=False):
+    indent: int
+    sort_keys: bool
 
-    def json(self, **kwargs) -> str:
+
+class Context(dict):
+    def json(self, **kwargs: Unpack[JsonKwargs]) -> str:
         return json.dumps(self, **kwargs)
 
 
