@@ -35,6 +35,8 @@ ruff = "^0.1.5"
 mypy = "^1.7.0"
 types-pyyaml = "^6.0.12.12"
 pandas-stubs = "^2.1.1.230928"
+mkdocs = "^1.5.3"
+mkdocs-material = "^9.4.12"
 
 [tool.poetry.group.matplotlib.dependencies]
 matplotlib = "^3.7"
