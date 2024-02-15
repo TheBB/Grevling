@@ -1,9 +1,23 @@
 site_name: Grevling
+site_url: https://thebb.github.io/Grevling
 nav:
   - Introduction: 'index.md'
   - 'configuration.md'
+markdown_extensions:
+  - attr_list
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+copyright: Copyright &copy; 2023 SINTEF AS
+extra:
+  generator: false
+  version:
+    provider: mike
 theme:
   name: material
+  logo: assets/logo-640.png
+  favicon: assets/logo-640.png
   palette:
     - scheme: default
       toggle:
