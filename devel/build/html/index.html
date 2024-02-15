@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html >
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+      <title>Grevling</title>
+    
+          <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+          <link rel="stylesheet" href="_static/theme.css " type="text/css" />
+      
+      <!-- sphinx script_files -->
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+
+      
+      <!-- bundled in js (rollup iife) -->
+      <!-- <script src="_static/theme-vendors.js"></script> -->
+      <script src="_static/theme.js" defer></script>
+    
+  <link rel="index" title="Index" href="genindex.html" />
+  <link rel="search" title="Search" href="search.html" />
+  <link rel="next" title="Getting started" href="getting-started.html" /> 
+  </head>
+
+  <body>
+    <div id="app">
+    <div class="theme-container" :class="pageClasses"><navbar @toggle-sidebar="toggleSidebar">
+  <router-link to="#" class="home-link">
+    
+      <span class="site-name">Grevling</span>
+    
+  </router-link>
+
+  <div class="links">
+    <navlinks class="can-hide">
+
+
+
+    </navlinks>
+  </div>
+</navbar>
+
+      
+      <div class="sidebar-mask" @click="toggleSidebar(false)">
+      </div>
+        <sidebar @toggle-sidebar="toggleSidebar">
+          
+          <navlinks>
+            
+
+
+
+            
+          </navlinks><div id="searchbox" class="searchbox" role="search">
+  <div class="caption"><span class="caption-text">Quick search</span>
+    <div class="searchformwrapper">
+      <form class="search" action="search.html" method="get">
+        <input type="text" name="q" />
+        <input type="submit" value="Search" />
+        <input type="hidden" name="check_keywords" value="yes" />
+        <input type="hidden" name="area" value="default" />
+      </form>
+    </div>
+  </div>
+</div><div class="sidebar-links" role="navigation" aria-label="main navigation">
+  
+    <div class="sidebar-group">
+      <p class="caption">
+        <span class="caption-text"><a href="#grevling">Contents:</a></span>
+      </p>
+      <ul class="">
+        
+          <li class="toctree-l1 ">
+            
+              <a href="getting-started.html" class="reference internal ">Getting started</a>
+            
+
+            
+          </li>
+
+        
+      </ul>
+    </div>
+  
+</div>
+        </sidebar>
+
+      <page>
+          <div class="body-header" role="navigation" aria-label="navigation">
+  
+  <ul class="breadcrumbs">
+    <li><a href="#">Docs</a> &raquo;</li>
+    
+    <li>Grevling</li>
+  </ul>
+  
+
+  <ul class="page-nav">
+  <li class="next">
+    <a href="getting-started.html"
+       title="next chapter">Getting started →</a>
+  </li>
+</ul>
+  
+</div>
+<hr>
+          <div class="content" role="main" v-pre>
+            
+  <section id="grevling">
+<h1>Grevling<a class="headerlink" href="#grevling" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+</div>
+<p>Welcome to <em>Grevling</em>.  Grevling (the Norwegian word for “Badger”) is a tool for
+parametrizing workflows.  Think of Grevling as solving a problem similar to
+Make.</p>
+<section id="typical-use-case">
+<h2>Typical use case<a class="headerlink" href="#typical-use-case" title="Permalink to this headline">¶</a></h2>
+<p>You’re a scientist working with a numerical simulation tool.  This tool is
+impressive, it has a large variety of options and a daunting but well-structured
+input file format.  You wish to generate and simulate a large family of similar
+but different cases.  Many of these cases require pre- and post-processing steps
+as well.  In addition, you want to collect information from each run and store
+them in a table, maybe also make some plots.</p>
+<p>At some point, setting up the input for each case by hand becomes intractable.
+You could script it, say, in Bash, but Bash is nobody’s favorite tool.  You
+already have a number of such scripts lying around, each of them with subtle
+differences, and you can’t remember which one does what anyway.</p>
+<p>Instead, you can configure your setup with Grevling.  Grevling will be able to:</p>
+<ul class="simple">
+<li><p>generate the inputs for each case</p></li>
+<li><p>run the simulator with pre- and post-processing</p></li>
+<li><p>gather data from each run and collect them in a data frame</p></li>
+<li><p>produce plots</p></li>
+</ul>
+</section>
+<section id="design-goals">
+<h2>Design goals<a class="headerlink" href="#design-goals" title="Permalink to this headline">¶</a></h2>
+<p>Grevling should</p>
+<ul class="simple">
+<li><p>never require support from third-party tools: it should not be necessary for
+other programs to know that they are being run by Grevling,</p></li>
+<li><p>be fully declarative: no more ad-hoc scripting (although technically you can
+this in Grevling, the design should not encourage it).</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          <div class="page-nav">
+            <div class="inner"><ul class="page-nav">
+  <li class="next">
+    <a href="getting-started.html"
+       title="next chapter">Getting started →</a>
+  </li>
+</ul><div class="footer" role="contentinfo">
+      &#169; Copyright 2021, Eivind Fonn.
+    <br>
+    Created using <a href="http://sphinx-doc.org/">Sphinx</a> 4.1.2 with <a href="https://github.com/schettino72/sphinx_press_theme">Press Theme</a> 0.8.0.
+</div>
+            </div>
+          </div>
+      </page>
+    </div></div>
+    
+    
+  </body>
+</html>
