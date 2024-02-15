@@ -1,9 +1,30 @@
-# Grevling
+<div align="center">
+    <img src="https://raw.githubusercontent.com/TheBB/Grevling/master/docs/assets/logo-640.png" width="250" alt="Logo">
+    <br> <br>
+
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/TheBB/Grevling/python-package.yml?logo=github&label=CI)](https://github.com/TheBB/Grevling/actions/workflows/python-package.yml)
+[![Static Badge](https://img.shields.io/badge/Documentation-purple?logo=githubpages)](https://thebb.github.io/Grevling/)
+
+</div>
+
+
+Grevling
+========
 
 Grevling (Norwegian for "badger") is a tool for running parameter studies, where
 for a given set of parameter values, a sequence of commands are run based on
 input files, generating output that should be captured or analyzed. Grevling
 intends, in this setting, to replace the ubiquitous bash scripts.
+
+## Documentation
+
+The official documentation for Grevling is a work-in-progress that you can view
+[here](https://thebb.github.io/Grevling/).
+
+The information below is to be treated as potentially unreliable until the
+official documentation is able to supplant it in its enterity. Of particular
+note is the fact that Grevling configuration is no longer done in YAML, but in
+the Gold language.
 
 ## Usage
 
