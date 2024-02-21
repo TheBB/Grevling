@@ -26,7 +26,8 @@ from typing import Any, Optional
 import goldpy as gold  # type: ignore
 import yaml
 
-from .. import util
+from grevling import util
+
 from . import raw, refined
 from .refined import *  # noqa: F403
 
@@ -53,10 +54,10 @@ def load(path: Path) -> refined.CaseSchema:
     # We recommend new cases are written in Gold, thus we require that YAML
     # files are explicitly named as such
     if path.suffix.lower() in (".yaml", ".yml"):
-        with open(path, "r") as f:
+        with path.open() as f:
             data = yaml.load(f, Loader=yaml.CLoader)
     else:
-        with open(path, "r") as f:
+        with path.open() as f:
             src = f.read()
         resolver = gold.ImportConfig(root=str(path.parent), custom=libfinder)
         data = gold.eval(src, resolver)

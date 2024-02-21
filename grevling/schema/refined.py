@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
+from typing import Annotated, Any, Callable, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
-from typing_extensions import Annotated
 
-from .. import api
+from grevling import api
 
 Scalar = Union[int, float]
 Constant = Union[str, None, Scalar, bool]
@@ -14,20 +13,20 @@ Constant = Union[str, None, Scalar, bool]
 class ListedParameterSchema(BaseModel):
     kind: Literal["listed"]
     values: Union[
-        List[Scalar],
-        List[str],
+        list[Scalar],
+        list[str],
     ]
 
 
 class UniformParameterSchema(BaseModel):
     kind: Literal["uniform"]
-    interval: Tuple[Scalar, Scalar]
+    interval: tuple[Scalar, Scalar]
     num: int
 
 
 class GradedParameterSchema(BaseModel):
     kind: Literal["graded"]
-    interval: Tuple[Scalar, Scalar]
+    interval: tuple[Scalar, Scalar]
     num: int
     grading: Scalar
 
@@ -75,14 +74,14 @@ CaptureSchema = Annotated[
 
 
 class CommandSchema(BaseModel):
-    command: Optional[Union[str, List[str]]]
+    command: Optional[Union[str, list[str]]]
     name: Optional[str]
-    capture: List[CaptureSchema]
+    capture: list[CaptureSchema]
     allow_failure: bool
     retry_on_fail: bool
-    env: Dict[str, str]
+    env: dict[str, str]
     container: Optional[str]
-    container_args: Union[str, List[str]]
+    container_args: Union[str, list[str]]
     workdir: Optional[str]
 
 
@@ -121,23 +120,23 @@ PlotModeSchema = Annotated[
 
 
 class PlotStyleSchema(BaseModel):
-    color: Optional[List[str]]
-    line: Optional[List[str]]
-    marker: Optional[List[str]]
+    color: Optional[list[str]]
+    line: Optional[list[str]]
+    marker: Optional[list[str]]
 
 
 class PlotSchema(BaseModel):
     filename: str
-    fmt: List[str]
-    parameters: Dict[str, PlotModeSchema]
+    fmt: list[str]
+    parameters: dict[str, PlotModeSchema]
     xaxis: Optional[str]
-    yaxis: List[str]
+    yaxis: list[str]
     kind: Optional[Literal["scatter", "line"]]
     grid: bool
     xmode: Literal["linear", "log"]
     ymode: Literal["linear", "log"]
-    xlim: Optional[Tuple[Scalar, Scalar]]
-    ylim: Optional[Tuple[Scalar, Scalar]]
+    xlim: Optional[tuple[Scalar, Scalar]]
+    ylim: Optional[tuple[Scalar, Scalar]]
     title: Optional[str]
     xlabel: Optional[str]
     ylabel: Optional[str]
@@ -157,14 +156,14 @@ class PluginSchema(BaseModel):
 
 
 class CaseSchema(BaseModel):
-    parameters: Dict[str, ParameterSchema]
-    script: Callable[[api.Context], List[CommandSchema]]
-    constants: Dict[str, Constant]
-    evaluate: Callable[[api.Context], Dict[str, Any]]
+    parameters: dict[str, ParameterSchema]
+    script: Callable[[api.Context], list[CommandSchema]]
+    constants: dict[str, Constant]
+    evaluate: Callable[[api.Context], dict[str, Any]]
     where: Callable[[api.Context], bool]
     prefiles: Callable[[api.Context], list[FileMapSchema]]
     postfiles: Callable[[api.Context], list[FileMapSchema]]
-    types: Dict[str, str]
+    types: dict[str, str]
     settings: SettingsSchema
-    plots: List[PlotSchema]
+    plots: list[PlotSchema]
     plugins: list[PluginSchema]

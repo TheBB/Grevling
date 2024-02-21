@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -9,6 +8,9 @@ from sqlalchemy.types import JSON
 
 from . import api
 from .capture import CaptureCollection
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def engine(path: Path) -> Engine:

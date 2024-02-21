@@ -19,74 +19,73 @@ jobs:
         python-version: ['3.9', '3.10', '3.11', '3.12']
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install poetry
+          python -m pip install pdm
           make install
-      - name: Install package
-        run: poetry run pip install .
       - name: Test
         run: make test
 
-  build_wheels:
-    name: Build wheels
+  build:
+    name: Build
     needs: [test]
     runs-on: ubuntu-latest
     if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.8
+          python-version: 3.9
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install poetry
-      - name: Build wheels
-        run: make wheel
-      - uses: actions/upload-artifact@v3
+          python -m pip install pdm
+      - name: Buil
+        run: make build
+      - uses: actions/upload-artifact@v4
         with:
-          path: ./dist/*.whl
-
-  build_sdist:
-    name: Build sdist
-    needs: [test]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.8
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install poetry
-      - name: Build sdist
-        run: make sdist
-      - uses: actions/upload-artifact@v2
-        with:
+          name: sdist
           path: ./dist/*.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel
+          path: ./dist/*.whl
 
   deploy:
     name: Deploy
-    needs: [build_wheels, build_sdist]
+    needs: [build]
     runs-on: ubuntu-latest
     if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/v')
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: artifact
           path: dist
+          merge-multiple: true
       - uses: pypa/gh-action-pypi-publish@v1.4.1
         with:
           user: __token__
           password: ${{ secrets.pypi_pwd }}
+
+  test-deploy:
+    name: Test Deploy
+    needs: [build]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@v1.4.1
+        with:
+          user: __token__
+          password: ${{ secrets.pypi_test_pwd }}
+          repository_url: https://test.pypi.org/legacy/
+          skip_existing: true

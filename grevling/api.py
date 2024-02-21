@@ -5,29 +5,28 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from fnmatch import fnmatch
 from pathlib import Path
-from types import TracebackType
 from typing import (
     IO,
     TYPE_CHECKING,
     Any,
     BinaryIO,
-    ContextManager,
-    Iterable,
-    Iterator,
     Optional,
     Protocol,
     TextIO,
-    Type,
     TypedDict,
     TypeVar,
     Union,
     cast,
 )
 
-import click
-from typing_extensions import Unpack
-
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+    from contextlib import AbstractContextManager
+    from types import TracebackType
+
+    import click
+    from typing_extensions import Unpack
+
     from . import Case
     from .workflow import Pipe
 
@@ -58,11 +57,11 @@ class Workspace(ABC):
         ...
 
     @abstractmethod
-    def open_str(self, path: PathStr, mode: str = "w") -> ContextManager[TextIO]:
+    def open_str(self, path: PathStr, mode: str = "w") -> AbstractContextManager[TextIO]:
         ...
 
     @abstractmethod
-    def open_bytes(self, path: PathStr) -> ContextManager[BinaryIO]:
+    def open_bytes(self, path: PathStr) -> AbstractContextManager[BinaryIO]:
         ...
 
     @abstractmethod
@@ -107,7 +106,7 @@ class WorkspaceCollection(ABC):
     @abstractmethod
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
+        exc_type: Optional[type[BaseException]],
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
@@ -139,7 +138,7 @@ class Workflow(ABC):
     @abstractmethod
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
+        exc_type: Optional[type[BaseException]],
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:

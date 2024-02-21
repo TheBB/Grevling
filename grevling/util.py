@@ -7,7 +7,7 @@ import logging
 from contextlib import contextmanager
 from functools import wraps
 from itertools import chain, product
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -15,7 +15,10 @@ import rich.logging
 from asteval import Interpreter  # type: ignore
 from numpy.polynomial import Legendre
 
-from . import api
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from . import api
 
 
 class LoggerAdapter(logging.LoggerAdapter):
@@ -71,13 +74,11 @@ def with_context(fmt: str):
 
             return wraps(func)(async_inner)
 
-        else:
+        def sync_inner(*args, **kwargs):
+            with log.with_context(calculate_context(*args, **kwargs)):
+                return func(*args, **kwargs)
 
-            def sync_inner(*args, **kwargs):
-                with log.with_context(calculate_context(*args, **kwargs)):
-                    return func(*args, **kwargs)
-
-            return wraps(func)(sync_inner)
+        return wraps(func)(sync_inner)
 
     return decorator
 
@@ -215,7 +216,7 @@ def legendre(n: int, a: float, b: float, x: float):
     return Legendre(unitvec(n), [a, b])(x)
 
 
-def evaluate(context: api.Context, evaluables: Dict[str, str]) -> Dict[str, Any]:
+def evaluate(context: api.Context, evaluables: dict[str, str]) -> dict[str, Any]:
     evaluator = Interpreter()
     evaluator.symtable.update(
         {
@@ -238,12 +239,8 @@ def evaluate(context: api.Context, evaluables: Dict[str, str]) -> Dict[str, Any]
     return retval
 
 
-def all_truthy(context: api.Context, conditions: List[str]) -> bool:
+def all_truthy(context: api.Context, conditions: list[str]) -> bool:
     evaluator = Interpreter()
     evaluator.symtable.update(context)
 
-    for condition in conditions:
-        if not evaluator.eval(condition):
-            return False
-
-    return True
+    return all(evaluator.eval(condition) for condition in conditions)

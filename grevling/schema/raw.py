@@ -11,14 +11,18 @@ their outputs must necessarily be delayed.
 from __future__ import annotations
 
 from functools import partial
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, TypeVar, Union
 
 from pydantic import BaseModel, Field
-from typing_extensions import Self
 
-from .. import api, util
-from ..render import render
+from grevling import api, util
+from grevling.render import render
+
 from . import refined
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
+
 
 # Numbers can usually be either ints or floats. Note that Pydantic will coerce
 # floats to ints or vice-versa depending on which type is listed first in this
@@ -70,7 +74,7 @@ CaptureSchema = Union[
     str,
     SimpleCaptureSchema,
     RegexCaptureSchema,
-    List[
+    list[
         Union[
             str,
             SimpleCaptureSchema,
@@ -94,7 +98,7 @@ class FileMapBaseSchema(BaseModel):
     template: bool
 
     @classmethod
-    def from_any(cls: Type[Self], source: Union[str, dict[str, Any], Self]) -> Self:
+    def from_any(cls: type[Self], source: Union[str, dict[str, Any], Self]) -> Self:
         """Convert an object with 'any' type to a filemap schema. Most
         importantly, convert strings by interpreting them as source
         filenames.
@@ -132,27 +136,27 @@ class CommandSchema(BaseModel):
     that can be run as part of a Grevling case.
     """
 
-    command: Optional[Union[str, List[str]]] = None
+    command: Optional[Union[str, list[str]]] = None
     name: Optional[str] = None
     capture: CaptureSchema = []
     capture_output: bool = True
     capture_walltime: bool = True
     retry_on_fail: bool = False
-    env: Dict[str, str] = {}
+    env: dict[str, str] = {}
     container: Optional[str] = None
-    container_args: Union[str, List[str]] = []
+    container_args: Union[str, list[str]] = []
     allow_failure: bool = False
     workdir: Optional[str] = None
 
     @staticmethod
-    def from_any(source: Union[str, List[str], CommandSchema, Dict]) -> CommandSchema:
+    def from_any(source: Union[str, list[str], CommandSchema, dict]) -> CommandSchema:
         """Convert an object with 'any' type to a CommandSchema. Most
         importantly, this interprets raw strings and lists of strings as
         commands with only the *command* attribute set.
         """
         if isinstance(source, CommandSchema):
             return source
-        if isinstance(source, Dict):
+        if isinstance(source, dict):
             return CommandSchema.model_validate(source)
         return CommandSchema.model_validate({"command": source})
 
@@ -173,7 +177,7 @@ class CommandSchema(BaseModel):
             }
         )
 
-    def refine_capture(self) -> List[Dict]:
+    def refine_capture(self) -> list[dict]:
         """Convert the *capture* attribute so that it can be loaded by the
         refined models.
         """
@@ -202,7 +206,7 @@ class UniformParameterSchema(BaseModel):
     """Model for uniformly sampled parameters"""
 
     kind: Literal["uniform"] = Field(alias="type")
-    interval: Tuple[Scalar, Scalar]
+    interval: tuple[Scalar, Scalar]
     num: int
 
     def refine(self) -> refined.UniformParameterSchema:
@@ -215,7 +219,7 @@ class GradedParameterSchema(BaseModel):
     """
 
     kind: Literal["graded"] = Field(alias="type")
-    interval: Tuple[Scalar, Scalar]
+    interval: tuple[Scalar, Scalar]
     num: int
     grading: Scalar
 
@@ -225,8 +229,8 @@ class GradedParameterSchema(BaseModel):
 
 # Parameter specifications in the config file should conform to this type
 ParameterSchema = Union[
-    List[Scalar],
-    List[str],
+    list[Scalar],
+    list[str],
     UniformParameterSchema,
     GradedParameterSchema,
 ]
@@ -261,9 +265,9 @@ class PlotStyleSchema(BaseModel):
     options.)
     """
 
-    color: Optional[Union[str, List[str]]] = None
-    line: Optional[Union[str, List[str]]] = None
-    marker: Optional[Union[str, List[str]]] = None
+    color: Optional[Union[str, list[str]]] = None
+    line: Optional[Union[str, list[str]]] = None
+    marker: Optional[Union[str, list[str]]] = None
 
     def refine(self) -> refined.PlotStyleSchema:
         def fix(x: Optional[Union[str, list[str]]]) -> Optional[list[str]]:
@@ -282,11 +286,11 @@ class PlotSchema(BaseModel):
     """Model for specifying a plot."""
 
     filename: str
-    fmt: Union[str, List[str]] = Field(alias="format")
+    fmt: Union[str, list[str]] = Field(alias="format")
     xaxis: Optional[str] = None
-    yaxis: Union[str, List[str]] = Field(alias="yaxis")
-    ylim: Optional[Tuple[Scalar, Scalar]] = None
-    xlim: Optional[Tuple[Scalar, Scalar]] = None
+    yaxis: Union[str, list[str]] = Field(alias="yaxis")
+    ylim: Optional[tuple[Scalar, Scalar]] = None
+    xlim: Optional[tuple[Scalar, Scalar]] = None
     kind: Optional[Literal["scatter", "line"]] = Field(alias="type", default=None)
     legend: Optional[str] = None
     xlabel: Optional[str] = None
@@ -295,16 +299,16 @@ class PlotSchema(BaseModel):
     ymode: Literal["linear", "log"] = "linear"
     title: Optional[str] = None
     grid: bool = True
-    parameters: Dict[str, PlotModeSchema] = {}
+    parameters: dict[str, PlotModeSchema] = {}
     style: PlotStyleSchema = PlotStyleSchema()
 
-    def refine_fmt(self) -> List[str]:
+    def refine_fmt(self) -> list[str]:
         return self.fmt if isinstance(self.fmt, list) else [self.fmt]
 
-    def refine_yaxis(self) -> List[str]:
+    def refine_yaxis(self) -> list[str]:
         return self.yaxis if isinstance(self.yaxis, list) else [self.yaxis]
 
-    def refine_parameters(self) -> Dict[str, Dict]:
+    def refine_parameters(self) -> dict[str, dict]:
         """Convert the *parameters* attribute so that it can be loaded by the
         refined models.
         """
@@ -352,10 +356,10 @@ class SettingsSchema(BaseModel):
 
 ScriptSchema = Union[
     Callable,
-    List[
+    list[
         Union[
             str,
-            List[str],
+            list[str],
             CommandSchema,
         ]
     ],
@@ -376,27 +380,27 @@ FSchema = TypeVar("FSchema", TemplateSchema, FileMapSchema)
 class CaseSchema(BaseModel):
     """Root model for specifying a Grevling case."""
 
-    parameters: Dict[str, ParameterSchema] = {}
+    parameters: dict[str, ParameterSchema] = {}
 
     p_script: ScriptSchema = Field(alias="script", default=[])
 
-    p_containers: Dict[str, Union[str, List[str]]] = Field(alias="containers", default={})
-    p_evaluate: Union[Callable, Dict[str, str]] = Field(alias="evaluate", default={})
-    constants: Dict[str, Constant] = {}
-    p_where: Union[Callable, str, List[str]] = Field(alias="where", default=[])
-    types: Dict[str, str] = {}
+    p_containers: dict[str, Union[str, list[str]]] = Field(alias="containers", default={})
+    p_evaluate: Union[Callable, dict[str, str]] = Field(alias="evaluate", default={})
+    constants: dict[str, Constant] = {}
+    p_where: Union[Callable, str, list[str]] = Field(alias="where", default=[])
+    types: dict[str, str] = {}
 
     p_templates: Union[Callable, list[Union[str, TemplateSchema]]] = Field(alias="templates", default=[])
     p_prefiles: Union[Callable, list[Union[str, FileMapSchema]]] = Field(alias="prefiles", default=[])
     p_postfiles: Union[Callable, list[Union[str, FileMapSchema]]] = Field(alias="postfiles", default=[])
 
-    plots: List[PlotSchema] = []
+    plots: list[PlotSchema] = []
 
     settings: SettingsSchema = SettingsSchema()
 
     plugins: list[Union[str, PluginSchema]] = []
 
-    def refine_parameters(self) -> Dict[str, Union[Dict, refined.ParameterSchema]]:
+    def refine_parameters(self) -> dict[str, Union[dict, refined.ParameterSchema]]:
         """Convert the *parameters* attribute so that raw lists are converted to
         objects when refining.
         """
@@ -411,7 +415,7 @@ class CaseSchema(BaseModel):
                 parameters[name] = schema.refine()
         return parameters
 
-    def refine_script(self) -> Callable[[api.Context], List[refined.CommandSchema]]:
+    def refine_script(self) -> Callable[[api.Context], list[refined.CommandSchema]]:
         """Convert the *script* attribute to a callable so that it is accepted
         by the refined model.
         """
@@ -420,7 +424,7 @@ class CaseSchema(BaseModel):
             return lambda ctx: [CommandSchema.from_any(schema).render(ctx).refine() for schema in p_script]
         return lambda ctx: [CommandSchema.from_any(schema).refine() for schema in p_script(**ctx)]
 
-    def refine_evaluate(self) -> Callable[[api.Context], Dict[str, Any]]:
+    def refine_evaluate(self) -> Callable[[api.Context], dict[str, Any]]:
         """Convert the *evaluate* attribute to a callable so that it is accepted
         by the refined model.
         """
@@ -441,7 +445,7 @@ class CaseSchema(BaseModel):
 
     @staticmethod
     def refine_filemap(
-        schemas: Union[Callable, List[Union[str, FSchema]]],
+        schemas: Union[Callable, list[Union[str, FSchema]]],
         schema_converter: Callable[[Union[str, FSchema]], FSchema],
     ) -> Callable[[api.Context], list[refined.FileMapSchema]]:
         """Helper method for converting filemaps to refined models."""
@@ -449,15 +453,15 @@ class CaseSchema(BaseModel):
             return lambda ctx: [schema_converter(schema).render(ctx).refine() for schema in schemas]
         return lambda ctx: [schema_converter(schema).refine() for schema in schemas(**ctx)]
 
-    def templates_callable(self) -> Callable[[api.Context], List[refined.FileMapSchema]]:
+    def templates_callable(self) -> Callable[[api.Context], list[refined.FileMapSchema]]:
         """Convert the *templates* attribute to a callable."""
         return CaseSchema.refine_filemap(self.p_templates, lambda schema: TemplateSchema.from_any(schema))
 
-    def prefiles_callable(self) -> Callable[[api.Context], List[refined.FileMapSchema]]:
+    def prefiles_callable(self) -> Callable[[api.Context], list[refined.FileMapSchema]]:
         """Convert the *prefiles* attribute to a callable."""
         return CaseSchema.refine_filemap(self.p_prefiles, lambda schema: FileMapSchema.from_any(schema))
 
-    def refine_prefiles(self) -> Callable[[api.Context], List[refined.FileMapSchema]]:
+    def refine_prefiles(self) -> Callable[[api.Context], list[refined.FileMapSchema]]:
         """Combine the *templates* and *prefiles* attributes into a callable
         so that it's accepted by the refined model.
         """
@@ -465,13 +469,13 @@ class CaseSchema(BaseModel):
         templates = self.templates_callable()
         return lambda ctx: [*prefiles(ctx), *templates(ctx)]
 
-    def refine_postfiles(self) -> Callable[[api.Context], List[refined.FileMapSchema]]:
+    def refine_postfiles(self) -> Callable[[api.Context], list[refined.FileMapSchema]]:
         """Convert the *postfiles* attribute to a callable so that it's accepted
         by the refined model.
         """
         return CaseSchema.refine_filemap(self.p_postfiles, lambda schema: FileMapSchema.from_any(schema))
 
-    def refine_plots(self) -> List[refined.PlotSchema]:
+    def refine_plots(self) -> list[refined.PlotSchema]:
         """Refine all the plots in the *plots* attribute."""
         return [plot.refine() for plot in self.plots]
 

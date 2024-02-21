@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, Iterable, List, Optional, Tuple, TypedDict
-
-from typing_extensions import Unpack
+from typing import TYPE_CHECKING, Callable, Optional, TypedDict
 
 from . import api, util
 from .render import render
-from .schema import FileMapSchema
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from typing_extensions import Unpack
+
+    from .schema import FileMapSchema
 
 
 class CopyKwargs(TypedDict, total=False):
@@ -49,7 +53,7 @@ class SingleFileMap:
         self.template = template
         self.mode = mode
 
-    def iter_paths(self, context: api.Context, source: api.Workspace) -> Iterable[Tuple[Path, Path]]:
+    def iter_paths(self, context: api.Context, source: api.Workspace) -> Iterable[tuple[Path, Path]]:
         if self.mode == "simple":
             yield (Path(self.source), Path(self.target))
 
@@ -71,8 +75,8 @@ class SingleFileMap:
                 if ignore_missing:
                     continue
                 return False
-            else:
-                util.log.debug(f"{source.name}/{sourcepath} -> {target.name}/{targetpath}")
+
+            util.log.debug(f"{source.name}/{sourcepath} -> {target.name}/{targetpath}")
 
             if not self.template:
                 with source.open_bytes(sourcepath) as f:
@@ -91,17 +95,17 @@ class SingleFileMap:
 
 
 class FileMap:
-    elements: List[SingleFileMap]
+    elements: list[SingleFileMap]
 
     @staticmethod
-    def from_schema(schema: List[FileMapSchema]) -> FileMap:
+    def from_schema(schema: list[FileMapSchema]) -> FileMap:
         return FileMap([SingleFileMap.from_schema(entry) for entry in schema])
 
     @staticmethod
     def everything() -> FileMap:
         return FileMap([SingleFileMap(source="*", mode="glob")])
 
-    def __init__(self, elements: List[SingleFileMap]):
+    def __init__(self, elements: list[SingleFileMap]):
         self.elements = elements
 
     def copy(
@@ -111,14 +115,11 @@ class FileMap:
         target: api.Workspace,
         **kwargs: Unpack[CopyKwargs],
     ) -> bool:
-        for mapper in self.elements:
-            if not mapper.copy(context, source, target, **kwargs):
-                return False
-        return True
+        return all(mapper.copy(context, source, target, **kwargs) for mapper in self.elements)
 
 
 class FileMapTemplate:
-    def __init__(self, func: Callable[[api.Context], List[FileMapSchema]]):
+    def __init__(self, func: Callable[[api.Context], list[FileMapSchema]]):
         self.func = func
 
     def render(self, ctx: api.Context) -> FileMap:

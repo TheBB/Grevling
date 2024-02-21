@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Sequence, Tuple, Union, overload
+from collections.abc import Iterable, Sequence
+from typing import Any, Union, overload
 
 import numpy as np
 
@@ -25,6 +26,7 @@ class Parameter(Sequence):
             return UniformParameter(name, schema.interval, schema.num)
         if isinstance(schema, GradedParameterSchema):
             return GradedParameter(name, schema.interval, schema.num, schema.grading)
+        return None
 
     def __init__(self, name: str, values: list):
         self.name = name
@@ -46,12 +48,12 @@ class Parameter(Sequence):
 
 
 class UniformParameter(Parameter):
-    def __init__(self, name: str, interval: Tuple[float, float], num: int):
+    def __init__(self, name: str, interval: tuple[float, float], num: int):
         super().__init__(name, list(np.linspace(*interval, num=num)))
 
 
 class GradedParameter(Parameter):
-    def __init__(self, name: str, interval: Tuple[float, float], num: int, grading: float):
+    def __init__(self, name: str, interval: tuple[float, float], num: int, grading: float):
         lo, hi = interval
         step = (hi - lo) * (1 - grading) / (1 - grading ** (num - 1))
         values = [lo]
@@ -63,15 +65,14 @@ class GradedParameter(Parameter):
 
 class ParameterSpace(dict):
     @classmethod
-    def from_schema(cls, schema: Dict[str, ParameterSchema]) -> ParameterSpace:
+    def from_schema(cls, schema: dict[str, ParameterSchema]) -> ParameterSpace:
         return cls({name: Parameter.from_schema(name, spec) for name, spec in schema.items()})
 
-    def subspace(self, *names: str) -> Iterable[Dict]:
+    def subspace(self, *names: str) -> Iterable[dict]:
         params = [self[name] for name in names]
-        for values in util.dict_product(names, params):
-            yield values
+        yield from util.dict_product(names, params)
 
-    def fullspace(self) -> Iterable[Dict]:
+    def fullspace(self) -> Iterable[dict]:
         yield from self.subspace(*self.keys())
 
     def size(self, *names: str) -> int:

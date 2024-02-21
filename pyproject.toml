@@ -1,54 +1,66 @@
-[tool.black]
-line-length = 88
-target-version = ['py37']
-skip-string-normalization = true
-
-[tool.poetry]
+[project]
+authors = [
+    {name = "Eivind Fonn", email = "eivind.fonn@sintef.no"},
+]
+requires-python = ">=3.9,<4.0"
+dependencies = [
+    "asteval<1.0.0,>=0.9.31",
+    "bidict<1.0.0,>=0.22.1",
+    "click<9.0.0,>=8.1.7",
+    "fasteners<1.0,>=0.19",
+    "goldpy<3.0,>=2.1",
+    "Mako<2.0.0,>=1.2.2",
+    "numpy<2.0,>=1.24",
+    "pandas<3.0,>=2.0",
+    "pyarrow<15.0.0,>=14.0.1",
+    "pydantic<3,>=2",
+    "PyYAML<7.0.0,>=6.0.1",
+    "rich<14.0.0,>=13.6.0",
+    "sqlalchemy<3.0.0,>=2.0.23",
+    "alembic<2.0.0,>=1.12.1",
+]
 name = "grevling"
 version = "2.0.4"
 description = "A batch runner tool"
-authors = ["Eivind Fonn <eivind.fonn@sintef.no>"]
-license = "AGPL3"
 readme = "README.md"
-include = ["grevling/py.typed"]
+license = {text = "AGPL3"}
 
-[tool.poetry.dependencies]
-python = "^3.9"
-asteval = "^0.9.31"
-bidict = "^0.22.1"
-click = "^8.1.7"
-fasteners = "^0.19"
-goldpy = "^2.1"
-Mako = "^1.2.2"
-numpy = "^1.24"
-pandas = "^2.0"
-pyarrow = "^14.0.1"
-pydantic = "^2"
-PyYAML = "^6.0.1"
-rich = "^13.6.0"
-sqlalchemy = "^2.0.23"
-alembic = "^1.12.1"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.4.3"
-ruff = "^0.1.5"
-mypy = "^1.7.0"
-types-pyyaml = "^6.0.12.12"
-pandas-stubs = "^2.1.1.230928"
-mkdocs = "^1.5.3"
-mkdocs-material = "^9.4.12"
-
-[tool.poetry.group.matplotlib.dependencies]
-matplotlib = "^3.7"
-
-[tool.poetry.group.plotly.dependencies]
-plotly = "^5.18.0"
-
-[tool.poetry.scripts]
+[project.scripts]
 badger = "grevling.__main__:main"
 grevling = "grevling.__main__:main"
 
+[project.optional-dependencies]
+matplotlib = [
+    "matplotlib<4.0,>=3.7",
+]
+plotly = [
+    "plotly<6.0.0,>=5.18.0",
+]
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "pytest<8.0.0,>=7.4.3",
+    "ruff<1.0.0,>=0.1.5",
+    "mypy<2.0.0,>=1.7.0",
+    "types-pyyaml<7.0.0.0,>=6.0.12.12",
+    "pandas-stubs<3.0.0.0,>=2.1.1.230928",
+    "plotly<6.0.0,>=5.18.0",
+    "matplotlib<4.0,>=3.7",
+    "mkdocs<2.0.0,>=1.5.3",
+    "mkdocs-material<10.0.0,>=9.4.12",
+]
+
+[tool.pdm.build]
+includes = [
+    "grevling/py.typed",
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
 [tool.mypy]
+files = ["grevling/**/*.py"]
 disallow_untyped_defs = true
 disallow_any_unimported = true
 no_implicit_optional = true
@@ -61,18 +73,42 @@ mypy_path = "$MYPY_CONFIG_FILE_DIR/stubs"
 module = "grevling.__main__,grevling.plotting,grevling.util,grevling.render,grevling.typing"
 disallow_untyped_defs = false
 
-[[tool.mypy.overrides]]
-module = "fasteners"
-ignore_missing_imports = true
-
 [tool.ruff]
 line-length = 110
+include = ["grevling/**/*.py", "tests/**/*.py", "stubs/**/*.pyi"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "W"]
+select = [
+    "F",        # Pyflakes rules
+    "W",        # PyCodeStyle warnings
+    "E",        # PyCodeStyle errors
+    "I",        # Sort imports properly
+    "UP",       # Warn if certain things can changed due to newer Python versions
+    "C4",       # Catch incorrect use of comprehensions, dict, list, etc
+    "FA",       # Enforce from __future__ import annotations
+    "ISC",      # Good use of string concatenation
+    "ICN",      # Use common import conventions
+    "RET",      # Good return practices
+    "SIM",      # Common simplification rules
+    "TID",      # Some good import practices
+    "TCH",      # Enforce importing certain types in a TYPE_CHECKING block
+    "PTH",      # Use pathlib instead of os.path
+    "TD",       # Be diligent with TODO comments
+    "NPY",      # Some numpy-specific things
+]
+ignore = [
+    "E741",     # Ambiguous variable name
+    "UP007",    # Only if your project targets Python 3.9 or earlier
+    "SIM115",   # Complains if we use __enter__ inside an __enter__ method
+    "ISC001",   # Conflicts with rust formatting
+    "TD003",    # Issue links for each todo comment
+]
 
 [tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
+
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 
 [tool.bumpversion]
 allow_dirty = false
@@ -112,7 +148,3 @@ filename = "pyproject.toml"
 
 [[tool.bumpversion.files]]
 filename = "grevling/__init__.py"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
