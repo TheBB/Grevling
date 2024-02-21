@@ -6,3 +6,4 @@ build/
 .hypothesis
 /test.db
 /site
+/.pdm-python
