@@ -20,7 +20,7 @@ dependencies = [
     "alembic<2.0.0,>=1.12.1",
 ]
 name = "grevling"
-version = "3.0.0a2"
+version = "3.0.0a3"
 description = "A batch runner tool"
 readme = "README.md"
 license = {text = "AGPL3"}
@@ -112,7 +112,7 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 
 [tool.bumpversion]
 allow_dirty = false
-current_version = "3.0.0a2"
+current_version = "3.0.0a3"
 commit = false
 tag = false
 parse = """(?x)
