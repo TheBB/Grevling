@@ -1,35 +1,42 @@
-.PHONY: lint format pytest myypy test install wheel sdist build
+# Convenience targets
 
-package := grevling
-testpackage := tests
-
-lint:
-	poetry run ruff check $(package)
-	poetry run ruff check $(testpackage)
-	poetry run ruff format --check $(package)
-	poetry run ruff format --check $(testpackage)
-
-format:
-	poetry run ruff check --fix $(package)
-	poetry run ruff check --fix $(testpackage)
-	poetry run ruff format $(package)
-	poetry run ruff format $(testpackage)
-
-pytest:
-	poetry run pytest
-
-mypy:
-	poetry run mypy $(package)
-
-test: mypy lint pytest
-
+.PHONY: install
 install:
-	poetry install --with matplotlib,plotly,dev
+	pdm install --dev
 
-wheel:
-	poetry build -f wheel
 
-sdist:
-	poetry build -f sdist
+# Linting targets
 
-build: wheel sdist
+.PHONY: format
+format:
+	pdm run ruff format
+
+.PHONY: lint
+lint:
+	pdm run ruff check --fix
+
+
+# Test targets
+
+.PHONY: pytest
+pytest:
+	pdm run pytest
+
+.PHONY: mypy
+mypy:
+	pdm run mypy
+
+.PHONY: lint-check
+lint-check:
+	pdm run ruff check
+	pdm run ruff format --check
+
+.PHONY: test
+test: pytest mypy lint-check
+
+
+# Build targets (used from CI)
+
+.PHONY: build
+build:
+	pdm build

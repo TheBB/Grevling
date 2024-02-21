@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import csv
 import importlib.util
 import math
@@ -7,15 +8,13 @@ import operator
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Literal, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Literal, Optional, cast
 
 import numpy as np
 import pandas as pd  # type: ignore
 from bidict._bidict import bidict
 
 from . import api, util
-from .parameters import ParameterSpace
 from .render import render
 from .schema import (
     PlotModeIgnoreSchema,
@@ -24,11 +23,15 @@ from .schema import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from pathlib import Path
+
     from . import Case
+    from .parameters import ParameterSpace
 
 
 class Backends:
-    backends: List[PlotBackend]
+    backends: list[PlotBackend]
 
     def __init__(self, *names: str):
         self.backends = [PlotBackend.get_backend(name)() for name in names]
@@ -80,16 +83,16 @@ class PlotBackend(ABC):
     def set_grid(self, value: bool):
         ...
 
-    def set_xlim(self, value: List[float]):
+    def set_xlim(self, value: list[float]):
         ...
 
-    def set_ylim(self, value: List[float]):
+    def set_ylim(self, value: list[float]):
         ...
 
 
 class MockBackend(PlotBackend):
     name = "mock"
-    plots: List[MockBackend] = []
+    plots: list[MockBackend] = []
 
     @classmethod
     def available(cls) -> bool:
@@ -103,9 +106,9 @@ class MockBackend(PlotBackend):
     def add_line(
         self,
         legend: str,
-        xpoints: List[float],
-        ypoints: List[float],
-        style: Dict[str, str],
+        xpoints: list[float],
+        ypoints: list[float],
+        style: dict[str, str],
         mode="line",
     ):
         self.objects.append(
@@ -139,10 +142,10 @@ class MockBackend(PlotBackend):
     def set_grid(self, value: bool):
         self.meta["grid"] = value
 
-    def set_xlim(self, value: List[float]):
+    def set_xlim(self, value: list[float]):
         self.meta["xlim"] = value
 
-    def set_ylim(self, value: List[float]):
+    def set_ylim(self, value: list[float]):
         self.meta["ylim"] = value
 
     def generate(self, filename: Path):
@@ -166,9 +169,9 @@ class MatplotilbBackend(PlotBackend):
     def add_line(
         self,
         legend: str,
-        xpoints: List[float],
-        ypoints: List[float],
-        style: Dict[str, str],
+        xpoints: list[float],
+        ypoints: list[float],
+        style: dict[str, str],
     ):
         self.axes.plot(
             xpoints,
@@ -182,9 +185,9 @@ class MatplotilbBackend(PlotBackend):
     def add_scatter(
         self,
         legend: str,
-        xpoints: List[float],
-        ypoints: List[float],
-        style: Dict[str, str],
+        xpoints: list[float],
+        ypoints: list[float],
+        style: dict[str, str],
     ):
         self.axes.scatter(xpoints, ypoints)
         self.legend.append(legend)
@@ -207,10 +210,10 @@ class MatplotilbBackend(PlotBackend):
     def set_grid(self, value: bool):
         self.axes.grid(value)
 
-    def set_xlim(self, value: List[float]):
+    def set_xlim(self, value: list[float]):
         self.axes.set_xlim(value[0], value[1])
 
-    def set_ylim(self, value: List[float]):
+    def set_ylim(self, value: list[float]):
         self.axes.set_ylim(value[0], value[1])
 
     def generate(self, filename: Path):
@@ -235,9 +238,9 @@ class PlotlyBackend(PlotBackend):
     def add_line(
         self,
         legend: str,
-        xpoints: List[float],
-        ypoints: List[float],
-        style: Dict[str, str],
+        xpoints: list[float],
+        ypoints: list[float],
+        style: dict[str, str],
         mode="lines",
     ):
         self.figure.add_scatter(x=xpoints, y=ypoints, mode=mode, name=legend)
@@ -260,7 +263,7 @@ class PlotlyBackend(PlotBackend):
     def set_ymode(self, value: str):
         self.figure.layout.yaxis.type = value
 
-    def set_xlim(self, value: List[float]):
+    def set_xlim(self, value: list[float]):
         if self.figure.layout.xaxis.type == "log":
             self.figure.layout.xaxis.range = [
                 math.log10(value[0]),
@@ -269,7 +272,7 @@ class PlotlyBackend(PlotBackend):
         else:
             self.figure.layout.xaxis.range = value
 
-    def set_ylim(self, value: List[float]):
+    def set_ylim(self, value: list[float]):
         if self.figure.layout.yaxis.type == "log":
             self.figure.layout.yaxis.range = [
                 math.log10(value[0]),
@@ -287,8 +290,8 @@ class PlotlyBackend(PlotBackend):
 class CSVBackend(PlotBackend):
     name = "csv"
 
-    columns: List[List[float]]
-    legend: List[str]
+    columns: list[list[float]]
+    legend: list[str]
 
     @classmethod
     def available(cls) -> bool:
@@ -301,9 +304,9 @@ class CSVBackend(PlotBackend):
     def add_line(
         self,
         legend: str,
-        xpoints: List[float],
-        ypoints: List[float],
-        style: Dict[str, str],
+        xpoints: list[float],
+        ypoints: list[float],
+        style: dict[str, str],
     ):
         self.columns.extend((xpoints, ypoints))
         self.legend.extend([f"{legend} (x-axis)", legend])
@@ -315,7 +318,7 @@ class CSVBackend(PlotBackend):
         util.log.info(f"Written: {filename}")
         maxlen = max(len(c) for c in self.columns)
         cols = [list(c) + [None] * (maxlen - len(c)) for c in self.columns]  # type: ignore
-        with open(filename, "w", newline="") as f:
+        with filename.open("w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(self.legend)
             for row in zip(*cols):
@@ -324,7 +327,7 @@ class CSVBackend(PlotBackend):
 
 class PlotStyleManager:
     _category_to_style: bidict
-    _custom_styles: Dict[str, List[str]]
+    _custom_styles: dict[str, list[str]]
     _mode: Literal["line", "scatter"]
     _defaults = {
         "color": {
@@ -358,7 +361,7 @@ class PlotStyleManager:
 
     def __init__(self):
         self._category_to_style = bidict()
-        self._custom_styles = dict()
+        self._custom_styles = {}
         self._mode = "line"
 
     def assigned(self, category: str):
@@ -366,21 +369,19 @@ class PlotStyleManager:
 
     def assign(self, category: str, style: Optional[str] = None):
         if style is None:
-            candidates = list(s for s in self._defaults if s not in self._category_to_style.inverse)
+            candidates = [s for s in self._defaults if s not in self._category_to_style.inverse]
             if self._mode == "scatter":
-                try:
+                with contextlib.suppress(ValueError):
                     candidates.remove("line")
-                except ValueError:
-                    pass
             assert candidates
             style = candidates[0]
         assert style != "line" or self._mode != "scatter"
         self._category_to_style[category] = style
 
-    def set_values(self, style: str, values: List[str]):
+    def set_values(self, style: str, values: list[str]):
         self._custom_styles[style] = values
 
-    def get_values(self, style: str) -> List[str]:
+    def get_values(self, style: str) -> list[str]:
         # Prioritize user customizations
         if style in self._custom_styles:
             return self._custom_styles[style]
@@ -390,10 +391,9 @@ class PlotStyleManager:
 
         s = getter(self._defaults, style)
         s = getter(s, "category" if style in self._category_to_style.inverse else "single")
-        s = getter(s, self._mode)
-        return s  # type: ignore[no-any-return]
+        return cast(list[str], getter(s, self._mode))
 
-    def styles(self, space: ParameterSpace, *categories: str) -> Iterable[Dict[str, str]]:
+    def styles(self, space: ParameterSpace, *categories: str) -> Iterable[dict[str, str]]:
         names, values = [], []
         for c in categories:
             style = self._category_to_style[c]
@@ -403,7 +403,7 @@ class PlotStyleManager:
             values.append(available_values[: len(space[c])])
         yield from util.dict_product(names, values)
 
-    def supplement(self, basestyle: Dict[str, str]):
+    def supplement(self, basestyle: dict[str, str]):
         basestyle = dict(basestyle)
         for style in self._defaults:
             if style not in basestyle and self._category_to_style.get("yaxis") != style:
@@ -428,10 +428,10 @@ class PlotMode:
 
 @dataclass
 class Plot:
-    parameters: Dict[str, PlotMode]
+    parameters: dict[str, PlotMode]
     filename: str
-    fmt: List[str]
-    yaxis: List[str]
+    fmt: list[str]
+    yaxis: list[str]
     xaxis: str
     kind: Optional[Literal["scatter", "line"]]
     legend: Optional[str]
@@ -441,8 +441,8 @@ class Plot:
     xmode: Literal["linear", "log"]
     ymode: str
     grid: bool
-    xlim: Optional[Tuple[float, float]]
-    ylim: Optional[Tuple[float, float]]
+    xlim: Optional[tuple[float, float]]
+    ylim: Optional[tuple[float, float]]
 
     schema: PlotSchema
 
@@ -454,10 +454,7 @@ class Plot:
         # If there is exactly one variate, and the x-axis is not given, assume that is the x-axis
         variates = [param for param, kind in parameters.items() if kind == "variate"]
         nvariate = len(variates)
-        if nvariate == 1 and schema.xaxis is None:
-            xaxis = next(iter(variates))
-        else:
-            xaxis = schema.xaxis
+        xaxis = next(iter(variates)) if nvariate == 1 and schema.xaxis is None else schema.xaxis
 
         return Plot(
             **schema.model_dump(exclude={"style", "parameters", "xaxis"}),
@@ -581,7 +578,7 @@ class Plot:
         backends.generate(filename)
 
     def generate_category(self, case, context: dict, index):
-        # TODO: Pick only finished results
+        # TODO(Eivind): Pick only finished results
         data = case.load_dataframe()
         if isinstance(data, pd.Series):
             data = data.to_frame().T

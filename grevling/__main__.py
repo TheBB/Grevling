@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import io
 import json
 import sys
 import traceback
 from functools import partial
 from pathlib import Path
-from typing import List, cast
+from typing import TYPE_CHECKING, cast
 
 import click
 from asteval import Interpreter  # type: ignore
@@ -16,11 +15,13 @@ import grevling.workflow.local
 
 from . import Case, api, util
 
+if TYPE_CHECKING:
+    import io
+
 
 def workflows(func):
     func = click.option("--local", "workflow", is_flag=True, flag_value="local", default=True)(func)
-    func = click.option("--azure", "workflow", is_flag=True, flag_value="azure")(func)
-    return func
+    return click.option("--azure", "workflow", is_flag=True, flag_value="azure")(func)
 
 
 class CustomClickException(click.ClickException):
@@ -44,8 +45,7 @@ class CaseType(click.Path):
         if not casefile.is_file():
             raise click.FileError(str(casefile), hint="is not a file")
 
-        case = Case(casefile)
-        return case
+        return Case(casefile)
 
 
 def print_version(ctx, param, value):
@@ -137,7 +137,7 @@ def run(ctx: click.Context, workflow: str, nprocs: int):
 @click.argument("context", nargs=-1, type=str)
 @workflows
 @click.pass_context
-def run_with(ctx: click.Context, target: Path, workflow: str, context: List[str]):
+def run_with(ctx: click.Context, target: Path, workflow: str, context: list[str]):
     cs: Case = ctx.obj["case"]
     evaluator = Interpreter()
     parsed_context = {}

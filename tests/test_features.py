@@ -13,7 +13,7 @@ DATADIR = Path(__file__).parent / "data"
 def test_conditions(suffix):
     with Case(DATADIR / "valid" / f"conditions{suffix}") as case:
         case.clear_cache()
-        contexts = list(instance.context for instance in case.create_instances())
+        contexts = [instance.context for instance in case.create_instances()]
     vals = [(ctx["g_index"], ctx["a"], ctx["b"]) for ctx in contexts]
     assert vals == [
         (0, 1, 2),

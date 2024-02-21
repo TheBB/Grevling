@@ -9,11 +9,15 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from time import time as osclock
-from typing import Callable, Dict, Iterator, List, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 from . import api, util
 from .capture import Capture, CaptureCollection
-from .schema import CommandSchema
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from .schema import CommandSchema
 
 
 @contextmanager
@@ -26,7 +30,7 @@ def time() -> Iterator[Callable[[], float]]:
 Result = namedtuple("Result", ["stdout", "stderr", "returncode"])
 
 
-async def run(command: List[str], shell: bool, env: Dict[str, str], cwd: Path) -> Result:
+async def run(command: list[str], shell: bool, env: dict[str, str], cwd: Path) -> Result:
     kwargs = {
         "env": {**os.environ, **env},
         "cwd": cwd,
@@ -59,18 +63,18 @@ async def run(command: List[str], shell: bool, env: Dict[str, str], cwd: Path) -
 @dataclass(frozen=True)
 class Command:
     name: str
-    command: Optional[List[str]]
-    env: Dict[str, str]
+    command: Optional[list[str]]
+    env: dict[str, str]
     workdir: Optional[str]
 
     container: Optional[str]
-    container_args: List[str]
+    container_args: list[str]
 
     shell: bool
     retry_on_fail: bool
     allow_failure: bool
 
-    captures: List[Capture]
+    captures: list[Capture]
 
     @staticmethod
     def from_schema(schema: CommandSchema) -> Command:
@@ -129,7 +133,7 @@ class Command:
 
         util.log.debug(" ".join(shlex.quote(c) for c in command))
 
-        # TODO: How to get good timings when we run async?
+        # TODO(Eivind): How to get good timings when we run async?
         with time() as get_duration:
             while True:
                 result = await run(command, **kwargs)  # type: ignore
@@ -149,9 +153,8 @@ class Command:
             level("stdout stored")
             level("stderr stored")
             return self.allow_failure
-        else:
-            util.log.info(f"{self.name} success ({util.format_seconds(duration)})")
 
+        util.log.info(f"{self.name} success ({util.format_seconds(duration)})")
         return True
 
     def capture(self, collector: CaptureCollection, workspace: api.Workspace) -> None:
@@ -166,10 +169,10 @@ class Command:
 
 @dataclass(frozen=True)
 class Script:
-    commands: List[Command]
+    commands: list[Command]
 
     @staticmethod
-    def from_schema(schema: List[CommandSchema]) -> Script:
+    def from_schema(schema: list[CommandSchema]) -> Script:
         return Script([Command.from_schema(entry) for entry in schema])
 
     async def run(self, cwd: Path, log_ws: api.Workspace) -> bool:
@@ -191,7 +194,7 @@ class Script:
 
 @dataclass(frozen=True)
 class ScriptTemplate:
-    func: Callable[[api.Context], List[CommandSchema]]
+    func: Callable[[api.Context], list[CommandSchema]]
 
     def render(self, ctx: api.Context) -> Script:
         return Script.from_schema(self.func(ctx))

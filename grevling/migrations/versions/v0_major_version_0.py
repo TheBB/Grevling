@@ -7,10 +7,13 @@ Create Date: 2023-11-16 11:30:23.185518
 """
 from __future__ import annotations
 
-from typing import Sequence, Union
+from typing import TYPE_CHECKING, Union
 
 import sqlalchemy as sa
 from alembic import op
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 # revision identifiers, used by Alembic.
 revision: str = "v0"

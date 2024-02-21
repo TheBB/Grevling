@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import json
-import os
 from contextlib import contextmanager
 from importlib import import_module
 from pathlib import Path
-from types import TracebackType
-from typing import Callable, Iterable, Iterator, List, Optional, Type, cast
+from typing import TYPE_CHECKING, Callable, Optional, cast
 
 import pandas as pd
 import sqlalchemy as sql
@@ -22,11 +20,16 @@ from .api import Status
 from .capture import CaptureCollection
 from .context import ContextProvider
 from .filemap import FileMap, FileMapTemplate
-from .parameters import ParameterSpace
 from .plotting import Plot
 from .schema import CaseSchema, PluginSchema, load
 from .script import Script, ScriptTemplate
 from .workflow.local import LocalWorkflow, LocalWorkspace, LocalWorkspaceCollection
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+    from types import TracebackType
+
+    from .parameters import ParameterSpace
 
 __version__ = "3.0.0a2"
 
@@ -37,7 +40,7 @@ def migrator_v1(case: Case) -> None:
     def instances() -> Iterator[db.Instance]:
         statepath = case.storagepath / "state.json"
         if statepath.exists():
-            with open(statepath, "r") as f:
+            with statepath.open() as f:
                 state = json.load(f)
                 has_captured = state["has_captured"]
         else:
@@ -74,7 +77,7 @@ def migrator_v2(case: Case) -> None:
     if not statepath.exists():
         db_case = db.Case(index=0)
     else:
-        with open(statepath, "r") as f:
+        with statepath.open() as f:
             state = json.load(f)
         db_case = db.Case(
             index=0,
@@ -117,7 +120,7 @@ class Case:
     premap: FileMapTemplate
     postmap: FileMapTemplate
     script: ScriptTemplate
-    plots: List[Plot]
+    plots: list[Plot]
 
     _ignore_missing: bool
 
@@ -242,7 +245,7 @@ class Case:
 
     def release_lock(
         self,
-        exc_type: Optional[Type[BaseException]],
+        exc_type: Optional[type[BaseException]],
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
@@ -264,11 +267,11 @@ class Case:
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
+        exc_type: Optional[type[BaseException]],
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
-        with open(self.storagepath / "state.json", "w") as f:
+        with (self.storagepath / "state.json").open("w") as f:
             json.dump(
                 {
                     "running": self.is_running,
@@ -359,11 +362,11 @@ class Case:
         return manager
 
     def create_instances(self) -> Iterable[Instance]:
-        base_ctx = {"g_sourcedir": os.getcwd()}
+        base_ctx = {"g_sourcedir": str(Path.cwd())}
         for i, ctx in enumerate(self.context_mgr.fullspace(context=base_ctx)):
             ctx["g_logdir"] = self._logdir(ctx)
 
-            # TODO: Think more about this
+            # TODO(Eivind): Think more about this
             db_instance = self.session.scalar(
                 sql.select(db.Instance).where(db.Instance.index == ctx["g_index"])
             )
@@ -388,12 +391,12 @@ class Case:
     ) -> Instance:
         if index is None:
             index = 0
-        sourcedir = os.getcwd()
+        sourcedir = Path.cwd()
         ctx = self.context_mgr.evaluate_context(
             {
                 **ctx,
                 "g_index": index,
-                "g_sourcedir": sourcedir,
+                "g_sourcedir": str(sourcedir),
             }
         )
         if logdir is None:

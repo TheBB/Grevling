@@ -5,12 +5,14 @@ import traceback
 from abc import ABC, abstractmethod
 from io import StringIO
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Iterable, List, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 if TYPE_CHECKING:
-    from .. import Case, Instance
+    from collections.abc import Iterable
 
-from .. import api, util
+    from grevling import Case, Instance
+
+from grevling import api, util
 
 
 class Pipe(ABC):
@@ -32,7 +34,7 @@ class PipeSegment(Pipe):
     name: str
     npiped: int
     ncopies: int
-    tasks: List[asyncio.Task]
+    tasks: list[asyncio.Task]
 
     def __init__(self, ncopies: int = 1):
         self.ncopies = ncopies
@@ -82,7 +84,7 @@ class PipeSegment(Pipe):
 
 
 class Pipeline(Pipe):
-    pipes: List[PipeSegment]
+    pipes: list[PipeSegment]
 
     def __init__(self, *pipes: PipeSegment) -> None:
         self.pipes = list(pipes)
@@ -98,7 +100,7 @@ class Pipeline(Pipe):
 
     async def work(self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None) -> None:
         ntasks = len(self.pipes)
-        queues: List[asyncio.Queue] = [asyncio.Queue(maxsize=1) for _ in range(ntasks - 1)]
+        queues: list[asyncio.Queue] = [asyncio.Queue(maxsize=1) for _ in range(ntasks - 1)]
         in_queues = chain([in_queue], queues)
         out_queues = chain(queues, [out_queue])
 

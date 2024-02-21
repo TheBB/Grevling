@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import shlex
-from typing import Dict, List, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Optional, TypeVar, Union
 
 from mako.template import Template
 
-from . import api
+if TYPE_CHECKING:
+    from . import api
 
 
 def quote_shell(text):
@@ -28,11 +29,11 @@ QUOTERS = {
 T = TypeVar(
     "T",
     str,
-    List[str],
-    Dict[str, str],
+    list[str],
+    dict[str, str],
     None,
-    Union[str, List[str]],
-    Union[str, List[str], None],
+    Union[str, list[str]],
+    Union[str, list[str], None],
 )
 
 

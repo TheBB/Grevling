@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 import pandas as pd  # type: ignore
 
@@ -138,7 +138,7 @@ class List(GType):
         return self.eltype.coerce(value)
 
 
-TYPES: Dict[str, GType] = {
+TYPES: dict[str, GType] = {
     "int": Integer(),
     "integer": Integer(),
     "float": Floating(),
@@ -149,7 +149,7 @@ TYPES: Dict[str, GType] = {
 }
 
 
-class TypeManager(Dict[str, GType]):
+class TypeManager(dict[str, GType]):
     def __init__(self, *args, **kwargs):
         dict.__init__(self, *args, **kwargs)
         self["g_index"] = Integer()
@@ -164,17 +164,17 @@ class TypeManager(Dict[str, GType]):
             return Floating()
         return super().__getitem__(key)
 
-    def merge(self, data: Dict):
+    def merge(self, data: dict):
         for k, t in data.items():
             self[k] = self.get(k, AnyType()).merge_object(t)
 
-    def pandas(self) -> Dict:
+    def pandas(self) -> dict:
         return {k: t.pandas_type for k, t in self.items()}
 
-    def fill_string(self, data: Dict[str, str]):
+    def fill_string(self, data: dict[str, str]):
         for name, typename in data.items():
             self[name] = GType.from_string(typename)
 
-    def fill_obj(self, data: Dict[str, str]):
+    def fill_obj(self, data: dict[str, str]):
         for name, typename in data.items():
             self[name] = GType.from_obj(typename)

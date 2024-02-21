@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Iterator, List, Optional, TypedDict
-
-from typing_extensions import Unpack
+from typing import TYPE_CHECKING, Any, Callable, Optional, TypedDict
 
 from . import api
 from .parameters import ParameterSpace
-from .schema import CaseSchema, Constant
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from typing_extensions import Unpack
+
+    from .schema import CaseSchema, Constant
 
 
 class EvaluateKwargs(TypedDict, total=False):
@@ -17,13 +21,13 @@ class EvaluateKwargs(TypedDict, total=False):
 class ContextProvider:
     parameters: ParameterSpace
 
-    evaluables: Callable[[api.Context], Dict[str, Any]]
+    evaluables: Callable[[api.Context], dict[str, Any]]
 
-    constants: Dict[str, Constant]
-    templates: Dict[str, Any]
+    constants: dict[str, Constant]
+    templates: dict[str, Any]
 
     cond_func: Optional[Callable]
-    cond_dep: List[str]
+    cond_dep: list[str]
 
     @classmethod
     def from_schema(cls, schema: CaseSchema) -> ContextProvider:

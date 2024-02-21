@@ -34,11 +34,11 @@ def test_migrate(db):
             if not logdir.is_dir():
                 continue
             ninstances += 1
-            with open(logdir / ".grevling" / "context.json", "r") as f:
+            with (logdir / ".grevling" / "context.json").open() as f:
                 context = json.load(f)
-            with open(logdir / ".grevling" / "captured.json", "r") as f:
+            with (logdir / ".grevling" / "captured.json").open() as f:
                 captured = json.load(f)
-            with open(logdir / ".grevling" / "status.txt", "r") as f:
+            with (logdir / ".grevling" / "status.txt").open() as f:
                 status = f.read().strip()
             index = context["g_index"]
             res = next(

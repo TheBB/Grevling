@@ -1,20 +1,22 @@
 from __future__ import annotations
 
-import os
 import shutil
 import stat
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from types import TracebackType
-from typing import IO, TYPE_CHECKING, BinaryIO, Generator, Iterable, Iterator, Optional, TextIO, Type, Union
+from typing import IO, TYPE_CHECKING, BinaryIO, Optional, TextIO, Union
 
-from .. import api, util
-from ..api import Status
+from grevling import api, util
+from grevling.api import Status
+
 from . import DownloadResults, Pipeline, PipeSegment, PrepareInstance
 
 if TYPE_CHECKING:
-    from .. import Case, Instance
+    from collections.abc import Generator, Iterable, Iterator
+    from types import TracebackType
+
+    from grevling import Case, Instance
 
 
 class RunInstance(PipeSegment):
@@ -50,7 +52,7 @@ class LocalWorkflow(api.Workflow):
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
+        exc_type: Optional[type[BaseException]],
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
@@ -76,7 +78,7 @@ class LocalWorkspaceCollection(api.WorkspaceCollection):
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
+        exc_type: Optional[type[BaseException]],
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
@@ -120,12 +122,12 @@ class LocalWorkspace(api.Workspace):
 
     @contextmanager
     def open_str(self, path: Union[Path, str], mode: str = "w") -> Generator[TextIO, None, None]:
-        with open(self.to_root(path), mode) as f:
+        with self.to_root(path).open(mode) as f:
             yield f  # type: ignore
 
     @contextmanager
     def open_bytes(self, path: Union[Path, str], mode: str = "rb") -> Generator[BinaryIO, None, None]:
-        with open(self.to_root(path), mode) as f:
+        with self.to_root(path).open(mode) as f:
             yield f  # type: ignore
 
     def write_file(
@@ -158,10 +160,10 @@ class LocalWorkspace(api.Workspace):
         return self.to_root(path).exists()
 
     def mode(self, path: Union[Path, str]) -> int:
-        return os.stat(self.to_root(path)).st_mode
+        return self.to_root(path).stat().st_mode
 
     def set_mode(self, path: Union[Path, str], mode: int) -> None:
-        os.chmod(self.to_root(path), stat.S_IMODE(mode))
+        self.to_root(path).chmod(stat.S_IMODE(mode))
 
     def subspace(self, path: str, name: str = "") -> api.Workspace:
         name = name or str(path)
@@ -186,7 +188,7 @@ class TempWorkspaceCollection(LocalWorkspaceCollection):
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
+        exc_type: Optional[type[BaseException]],
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:

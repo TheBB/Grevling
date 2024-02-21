@@ -19,7 +19,7 @@ DATADIR = Path(__file__).parent / "data"
 
 
 def read_file(path: Path) -> str:
-    with open(path, "r") as f:
+    with path.open() as f:
         return f.read()
 
 

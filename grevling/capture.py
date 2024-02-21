@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import json
 import re
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Union, cast
-
-import pandas as pd
+from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 from . import api, typing, util
 from .schema import RegexCaptureSchema, SimpleCaptureSchema
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    import pandas as pd
+
     from .typing import GType, TypeManager
 
 
