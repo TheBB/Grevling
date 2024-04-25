@@ -103,6 +103,19 @@ def test_files(runner, suffix):
 
 
 @pytest.mark.parametrize("runner", [api_run(post=[]), cli_run(commands=["run"])])
+def test_folder(runner):
+    path = DATADIR / "run" / "folder" / "grevling.gold"
+    runner(path)
+
+    with Case(path) as case:
+        storagepath = case.storagepath / "0"
+
+    assert storagepath / "very" / "deeply" / "nested" / "newname" / "a.dat"
+    assert storagepath / "very" / "deeply" / "nested" / "newname" / "b.dat"
+    assert storagepath / "very" / "deeply" / "nested" / "newname" / "yourdir" / "c.dat"
+
+
+@pytest.mark.parametrize("runner", [api_run(post=[]), cli_run(commands=["run"])])
 @pytest.mark.parametrize("suffix", [".yaml", ".gold"])
 def test_template_files(runner, suffix):
     path = DATADIR / "run" / "template-files" / f"grevling{suffix}"
