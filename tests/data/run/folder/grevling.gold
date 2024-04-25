@@ -1,0 +1,10 @@
+import "grevling" as {copy}
+
+{
+    prefiles: [
+        copy("mydir", "blob/newname"),
+    ],
+    postfiles: [
+        copy("blob", "very/deeply/nested"),
+    ],
+}

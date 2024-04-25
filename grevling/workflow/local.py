@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import IO, TYPE_CHECKING, BinaryIO, Optional, TextIO, Union
 
 from grevling import api, util
-from grevling.api import Status
+from grevling.api import PathType, Status
 
 from . import DownloadResults, Pipeline, PipeSegment, PrepareInstance
 
@@ -113,7 +113,9 @@ class LocalWorkspace(api.Workspace):
     def destroy(self) -> None:
         shutil.rmtree(self.root)
 
-    def to_root(self, path: Union[Path, str]) -> Path:
+    def to_root(self, path: Optional[Union[Path, str]]) -> Path:
+        if path is None:
+            return self.root
         if isinstance(path, str):
             path = Path(path)
         if path.is_absolute():
@@ -159,6 +161,14 @@ class LocalWorkspace(api.Workspace):
     def exists(self, path: Union[Path, str]) -> bool:
         return self.to_root(path).exists()
 
+    def type_of(self, path: Union[Path, str]) -> PathType:
+        p = self.to_root(path)
+        if p.is_file():
+            return PathType.File
+        if p.is_dir():
+            return PathType.Folder
+        assert False
+
     def mode(self, path: Union[Path, str]) -> int:
         return self.to_root(path).stat().st_mode
 
@@ -173,6 +183,15 @@ class LocalWorkspace(api.Workspace):
 
     def top_name(self) -> str:
         return self.root.name
+
+    def walk(self, path: Optional[Union[Path, str]]) -> Iterator[Path]:
+        p = self.to_root(path)
+        for sub in p.iterdir():
+            pathtype = self.type_of(sub)
+            if pathtype == PathType.File:
+                yield sub.relative_to(self.root)
+            elif pathtype == PathType.Folder:
+                yield from self.walk(sub)
 
 
 class TempWorkspaceCollection(LocalWorkspaceCollection):

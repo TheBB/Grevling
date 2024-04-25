@@ -45,6 +45,11 @@ class Status(Enum):
     Downloaded = "downloaded"
 
 
+class PathType(Enum):
+    Folder = "folder"
+    File = "file"
+
+
 class Workspace(ABC):
     name: str
 
@@ -77,6 +82,10 @@ class Workspace(ABC):
         ...
 
     @abstractmethod
+    def type_of(self, path: PathStr) -> PathType:
+        ...
+
+    @abstractmethod
     def mode(self, path: PathStr) -> Optional[int]:
         ...
 
@@ -90,6 +99,10 @@ class Workspace(ABC):
 
     @abstractmethod
     def top_name(self) -> str:
+        ...
+
+    @abstractmethod
+    def walk(self, path: Optional[PathStr]) -> Iterator[Path]:
         ...
 
     def glob(self, pattern: str) -> Iterator[Path]:
