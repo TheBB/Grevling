@@ -46,7 +46,12 @@ class SingleFileMap:
 
     def iter_paths(self, context: api.Context, source: api.Workspace) -> Iterable[Tuple[Path, Path]]:
         if self.mode == "simple":
-            yield (Path(self.source), Path(self.target))
+            if source.type_of(self.source) == api.PathType.Folder:
+                for source_path in source.walk(self.source):
+                    target = Path(self.target) / source_path.relative_to(self.source)
+                    yield (source_path, target)
+            else:
+                yield (Path(self.source), Path(self.target))
 
         elif self.mode == "glob":
             for path in source.glob(self.source):

@@ -10,7 +10,7 @@ import tempfile
 from typing import IO, BinaryIO, Generator, TextIO, Union, Iterable, Optional, TYPE_CHECKING
 
 from . import Pipeline, PipeSegment, PrepareInstance, DownloadResults
-from ..api import Status
+from ..api import Status, PathType
 from .. import util, api
 
 if TYPE_CHECKING:
@@ -99,7 +99,9 @@ class LocalWorkspace(api.Workspace):
     def destroy(self):
         shutil.rmtree(self.root)
 
-    def to_root(self, path: Union[Path, str]) -> Path:
+    def to_root(self, path: Optional[Union[Path, str]]) -> Path:
+        if path is None:
+            return self.root
         if isinstance(path, str):
             path = Path(path)
         if path.is_absolute():
@@ -146,6 +148,14 @@ class LocalWorkspace(api.Workspace):
     def mode(self, path) -> int:
         return os.stat(self.to_root(path)).st_mode
 
+    def type_of(self, path):
+        p = self.to_root(path)
+        if p.is_file():
+            return PathType.File
+        if p.is_dir():
+            return PathType.Folder
+        assert False
+
     def set_mode(self, path, mode: int):
         os.chmod(self.to_root(path), stat.S_IMODE(mode))
 
@@ -157,6 +167,15 @@ class LocalWorkspace(api.Workspace):
 
     def top_name(self) -> str:
         return self.root.name
+
+    def walk(self, path=None):
+        p = self.to_root(path)
+        for sub in p.iterdir():
+            pathtype = self.type_of(sub)
+            if pathtype == PathType.File:
+                yield sub.relative_to(self.root)
+            elif pathtype == PathType.Folder:
+                yield from self.walk(sub)
 
 
 class TempWorkspaceCollection(LocalWorkspaceCollection):

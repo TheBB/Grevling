@@ -2,9 +2,9 @@ name: Python package
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, v2 ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, v2 ]
   create:
     tags:
   workflow_dispatch:
@@ -17,7 +17,7 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.9', '3.10', '3.11', '3.12']
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest, macos-13]
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python ${{ matrix.python-version }}
