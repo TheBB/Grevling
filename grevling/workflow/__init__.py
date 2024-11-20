@@ -146,4 +146,5 @@ class DownloadResults(PipeSegment):
     async def apply(self, instance: Instance) -> Instance:
         with instance.bind_remote(self.workspaces):
             instance.download()
+        self.workspaces.destroy_workspace(instance.logdir)
         return instance

@@ -134,6 +134,10 @@ class WorkspaceCollection(ABC):
         ...
 
     @abstractmethod
+    def destroy_workspace(self, path: str) -> None:
+        ...
+
+    @abstractmethod
     def workspace_names(self) -> Iterable[str]:
         ...
 
