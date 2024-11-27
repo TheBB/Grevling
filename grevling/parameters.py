@@ -36,12 +36,10 @@ class Parameter(Sequence):
         return len(self.values)
 
     @overload
-    def __getitem__(self, index: int) -> Any:
-        ...
+    def __getitem__(self, index: int) -> Any: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[Any]:
-        ...
+    def __getitem__(self, index: slice) -> Sequence[Any]: ...
 
     def __getitem__(self, index: Union[int, slice]) -> Any:
         return self.values[index]

@@ -22,12 +22,10 @@ class Pipe(ABC):
         return asyncio.run(self._run(inputs))
 
     @abstractmethod
-    async def _run(self, inputs: Iterable[Any]) -> bool:
-        ...
+    async def _run(self, inputs: Iterable[Any]) -> bool: ...
 
     @abstractmethod
-    async def work(self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None) -> None:
-        ...
+    async def work(self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None) -> None: ...
 
 
 class PipeSegment(Pipe):
@@ -79,8 +77,7 @@ class PipeSegment(Pipe):
         pass
 
     @abstractmethod
-    async def apply(self, arg: Any) -> Any:
-        ...
+    async def apply(self, arg: Any) -> Any: ...
 
 
 class Pipeline(Pipe):
