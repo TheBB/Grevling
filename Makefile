@@ -1,42 +1,44 @@
 # Convenience targets
 
-.PHONY: install
-install:
-	pdm install --dev
+TOOL := uv run
+
+.PHONY: sync
+sync:
+	uv sync --all-extras
 
 
 # Linting targets
 
-.PHONY: format
+.PHONY: fix-format
 format:
-	pdm run ruff format
+	$(TOOL) ruff format
 
-.PHONY: lint
+.PHONY: fix-lint
 lint:
-	pdm run ruff check --fix
+	$(TOOL) ruff check --fix
 
 
 # Test targets
 
 .PHONY: pytest
 pytest:
-	pdm run pytest
+	$(TOOL) pytest
 
 .PHONY: mypy
 mypy:
-	pdm run mypy
+	$(TOOL) mypy
 
-.PHONY: lint-check
+.PHONY: lint
 lint-check:
-	pdm run ruff check
-	pdm run ruff format --check
+	$(TOOL) ruff check
+	$(TOOL) ruff format --check
 
 .PHONY: test
-test: pytest mypy lint-check
+test: pytest mypy lint
 
 
 # Build targets (used from CI)
 
 .PHONY: build
 build:
-	pdm build
+	uv build

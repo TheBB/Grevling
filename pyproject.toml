@@ -37,8 +37,8 @@ plotly = [
     "plotly<6.0.0,>=5.18.0",
 ]
 
-[tool.pdm.dev-dependencies]
-dev = [
+[tool.uv]
+dev-dependencies = [
     "pytest<8.0.0,>=7.4.3",
     "ruff<1.0.0,>=0.1.5",
     "mypy<2.0.0,>=1.7.0",
@@ -50,14 +50,9 @@ dev = [
     "mkdocs-material<10.0.0,>=9.4.12",
 ]
 
-[tool.pdm.build]
-includes = [
-    "grevling/py.typed",
-]
-
 [build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.mypy]
 files = ["grevling/**/*.py"]

@@ -31,9 +31,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install pdm
-          make install
+          python -m pip install --upgrade pip uv
+          make sync
       - name: Test
         run: make test
 
@@ -50,8 +49,7 @@ jobs:
           python-version: 3.9
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install pdm
+          python -m pip install --upgrade pip uv
       - name: Buil
         run: make build
       - uses: actions/upload-artifact@v4
