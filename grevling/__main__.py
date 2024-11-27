@@ -5,7 +5,7 @@ import sys
 import traceback
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import IO, TYPE_CHECKING, Any, cast
 
 import click
 from asteval import Interpreter  # type: ignore
@@ -25,7 +25,7 @@ def workflows(func):
 
 
 class CustomClickException(click.ClickException):
-    def show(self):
+    def show(self, file: IO[Any] | None = None) -> None:
         util.log.critical(str(self))
 
 

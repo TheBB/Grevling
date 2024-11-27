@@ -432,7 +432,7 @@ class Plot:
     filename: str
     fmt: list[str]
     yaxis: list[str]
-    xaxis: str
+    xaxis: str | None
     kind: Optional[Literal["scatter", "line"]]
     legend: Optional[str]
     xlabel: Optional[str]
