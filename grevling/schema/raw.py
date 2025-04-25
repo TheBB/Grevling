@@ -42,6 +42,7 @@ class RegexCaptureSchema(BaseModel):
     capture_type: Literal["regex"] = "regex"
     pattern: str
     mode: Literal["first", "last", "all"] = "last"
+    multiline: bool = False
 
     @staticmethod
     def from_str(pattern: str) -> RegexCaptureSchema:

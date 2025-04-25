@@ -23,6 +23,7 @@ class Capture:
             return Capture(
                 pattern=schema.pattern,
                 mode=schema.mode,
+                multiline=schema.multiline,
             )
 
         pattern = {
@@ -64,8 +65,12 @@ class Capture:
         pattern: str,
         mode: str = "last",
         tp: Optional[GType] = None,
+        multiline: bool = False,
     ):
-        self._regex = re.compile(pattern)
+        flags = 0
+        if multiline:
+            flags |= re.MULTILINE
+        self._regex = re.compile(pattern, flags=flags)
         self._mode = mode
         self._type = tp
 

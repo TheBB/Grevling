@@ -62,6 +62,7 @@ class RegexCaptureSchema(BaseModel):
     capture_type: Literal["regex"]
     pattern: str
     mode: Literal["first", "last", "all"]
+    multiline: bool = False
 
 
 CaptureSchema = Annotated[
