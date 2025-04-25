@@ -51,7 +51,7 @@ jobs:
           python -m pip install poetry
       - name: Build wheels
         run: make wheel
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           path: ./dist/*.whl
 
@@ -72,7 +72,7 @@ jobs:
           python -m pip install poetry
       - name: Build sdist
         run: make sdist
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           path: ./dist/*.tar.gz
 
@@ -82,7 +82,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/v')
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: artifact
           path: dist
