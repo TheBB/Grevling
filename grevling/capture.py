@@ -96,7 +96,7 @@ class Capture:
             tp = self._type
 
         else:
-            tp = typing.List(self._type) if self._type else None
+            tp = typing.List(self._type) if self._type else typing.List(typing.AnyType())
             filtered = list(matches)
 
         for match in filtered:
