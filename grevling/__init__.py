@@ -25,7 +25,7 @@ from .workflow.local import LocalWorkspaceCollection, LocalWorkspace, LocalWorkf
 from . import util, api
 
 
-__version__ = "2.1.1"
+__version__ = "2.1.2"
 
 
 class CaseState(PersistentObject):
