@@ -53,6 +53,7 @@ jobs:
         run: make wheel
       - uses: actions/upload-artifact@v4
         with:
+          name: wheels
           path: ./dist/*.whl
 
   build_sdist:
@@ -74,6 +75,7 @@ jobs:
         run: make sdist
       - uses: actions/upload-artifact@v4
         with:
+          name: sdist
           path: ./dist/*.tar.gz
 
   deploy:
@@ -84,7 +86,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: artifact
+          merge-multiple: true
           path: dist
       - uses: pypa/gh-action-pypi-publish@v1.4.1
         with:
