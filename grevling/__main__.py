@@ -33,7 +33,7 @@ class CaseType(click.Path):
     def convert(self, value, param, ctx):
         if isinstance(value, Case):
             return value
-        path = Path(cast(str, super().convert(value, param, ctx)))
+        path = Path(cast("str", super().convert(value, param, ctx)))
         casefile = path
         if path.is_dir():
             for candidate in ["grevling.gold", "grevling.yaml", "badger.yaml"]:
@@ -76,7 +76,7 @@ def main(ctx: click.Context, case: Case, verbosity: str) -> None:
 class PluginCli(click.MultiCommand):
     def list_commands(self, ctx: click.Context) -> list[str]:
         cs: Case = ctx.obj["case"]
-        return [cast(str, command.name) for plugin in cs.plugins for command in plugin.commands(ctx)]
+        return [cast("str", command.name) for plugin in cs.plugins for command in plugin.commands(ctx)]
 
     def get_command(self, ctx: click.Context, name: str) -> click.Command:
         cs: Case = ctx.obj["case"]

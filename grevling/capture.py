@@ -60,7 +60,7 @@ class Capture:
             mode = spec.get("mode", "last")
             tp = typing.GType.from_string(spec["type"])
             return cls(pattern, mode, tp)
-        return cast(Capture, util.call_yaml(cls, spec))
+        return cast("Capture", util.call_yaml(cls, spec))
 
     def __init__(
         self,

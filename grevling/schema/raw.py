@@ -7,7 +7,6 @@ Since Grevling allows many parts of the input to be callables, validation of
 their outputs must necessarily be delayed.
 """
 
-
 from __future__ import annotations
 
 from functools import partial

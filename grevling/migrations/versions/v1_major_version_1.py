@@ -5,6 +5,7 @@ Revises: v0
 Create Date: 2023-11-16 22:48:14.270179
 
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Union

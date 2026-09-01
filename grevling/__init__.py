@@ -95,7 +95,7 @@ MIGRATORS: dict[int, Migrator] = {1: migrator_v1, 2: migrator_v2}
 
 def load_plugin(case: Case, spec: PluginSchema) -> api.Plugin:
     module = import_module(spec.name)
-    return cast(api.Plugin, module.Plugin(case, spec.settings))
+    return cast("api.Plugin", module.Plugin(case, spec.settings))
 
 
 class Case:
@@ -198,7 +198,7 @@ class Case:
     @property
     def is_running(self) -> bool:
         return cast(
-            bool,
+            "bool",
             self.session.query(
                 sql.select(db.Instance)
                 .where(db.Instance.status.in_((api.Status.Started, api.Status.Prepared)))
@@ -209,7 +209,7 @@ class Case:
     @property
     def has_data(self) -> bool:
         return cast(
-            bool,
+            "bool",
             self.session.query(
                 sql.select(db.Instance).where(db.Instance.status == api.Status.Downloaded).exists()
             ).scalar(),
@@ -218,7 +218,7 @@ class Case:
     @property
     def has_captured(self) -> bool:
         return cast(
-            bool,
+            "bool",
             not self.session.query(
                 sql.select(db.Instance).where(db.Instance.captured.is_(None)).exists()
             ).scalar(),

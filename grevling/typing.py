@@ -38,8 +38,7 @@ class GType(ABC):
         return self.merge(GType.from_obj(other))
 
     @abstractmethod
-    def merge(self, other: GType) -> GType:
-        ...
+    def merge(self, other: GType) -> GType: ...
 
     def coerce(self, obj: Any):
         return obj
