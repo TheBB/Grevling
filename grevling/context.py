@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Optional, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from . import api
 from .parameters import ParameterSpace
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
-
-    from typing_extensions import Unpack
+    from collections.abc import Callable, Iterator
+    from typing import Unpack
 
     from .schema import CaseSchema, Constant
 
@@ -26,7 +25,7 @@ class ContextProvider:
     constants: dict[str, Constant]
     templates: dict[str, Any]
 
-    cond_func: Optional[Callable]
+    cond_func: Callable | None
     cond_dep: list[str]
 
     @classmethod
@@ -64,7 +63,7 @@ class ContextProvider:
     def _subspace(
         self,
         *names: str,
-        context: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs: Unpack[EvaluateKwargs],
     ) -> Iterator[api.Context]:
         if context is None:
@@ -82,7 +81,7 @@ class ContextProvider:
     def subspace(
         self,
         *names: str,
-        context: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs: Unpack[EvaluateKwargs],
     ) -> Iterator[api.Context]:
         for i, ctx in enumerate(self._subspace(*names, context=context, **kwargs)):
@@ -91,7 +90,7 @@ class ContextProvider:
 
     def fullspace(
         self,
-        context: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs: Unpack[EvaluateKwargs],
     ) -> Iterator[api.Context]:
         yield from self.subspace(*self.parameters, context=context, **kwargs)

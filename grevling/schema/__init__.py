@@ -22,7 +22,7 @@ which return validated models when called with a context as argument.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import goldpy as gold  # type: ignore
 import yaml
@@ -33,7 +33,7 @@ from . import raw, refined
 from .refined import *  # noqa: F403
 
 
-def libfinder(path: str) -> Optional[dict[str, Any]]:
+def libfinder(path: str) -> dict[str, Any] | None:
     """This function is called when a Gold script imports a module which
     Gold doesn't know about. We provide this to allow user scripts to import
     the 'grevling.gold' helper file.

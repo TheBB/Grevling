@@ -7,7 +7,7 @@ import logging
 from contextlib import contextmanager
 from functools import wraps
 from itertools import chain, product
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -16,7 +16,7 @@ from asteval import Interpreter  # type: ignore
 from numpy.polynomial import Legendre
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
 
     from . import api
 
@@ -204,7 +204,7 @@ def deprecated(info, name=None):
     return decorator
 
 
-def unitvec(n: int, length: Optional[int] = None) -> np.ndarray:
+def unitvec(n: int, length: int | None = None) -> np.ndarray:
     if length is None:
         length = n + 1
     retval = np.zeros((length,))

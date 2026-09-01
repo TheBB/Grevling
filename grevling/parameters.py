@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
-from typing import Any, Union, overload
+from typing import Any, overload
 
 import numpy as np
 
@@ -26,7 +26,7 @@ class Parameter(Sequence):
             return UniformParameter(name, schema.interval, schema.num)
         if isinstance(schema, GradedParameterSchema):
             return GradedParameter(name, schema.interval, schema.num, schema.grading)
-        return None
+        assert False
 
     def __init__(self, name: str, values: list):
         self.name = name
@@ -41,7 +41,7 @@ class Parameter(Sequence):
     @overload
     def __getitem__(self, index: slice) -> Sequence[Any]: ...
 
-    def __getitem__(self, index: Union[int, slice]) -> Any:
+    def __getitem__(self, index: int | slice) -> Any:
         return self.values[index]
 
 
@@ -61,7 +61,7 @@ class GradedParameter(Parameter):
         super().__init__(name, values)
 
 
-class ParameterSpace(dict):
+class ParameterSpace(dict[str, Parameter]):
     @classmethod
     def from_schema(cls, schema: dict[str, ParameterSchema]) -> ParameterSpace:
         return cls({name: Parameter.from_schema(name, spec) for name, spec in schema.items()})

@@ -2,7 +2,7 @@
 authors = [
     {name = "Eivind Fonn", email = "eivind.fonn@sintef.no"},
 ]
-requires-python = ">=3.9,<4.0"
+requires-python = ">=3.12,<4.0"
 dependencies = [
     "asteval<1.0.0,>=0.9.31",
     "bidict<1.0.0,>=0.22.1",
@@ -10,9 +10,11 @@ dependencies = [
     "fasteners<1.0,>=0.19",
     "goldpy<3.0,>=2.1",
     "Mako<2.0.0,>=1.2.2",
-    "numpy<2.0,>=1.24",
-    "pandas<3.0,>=2.0",
-    "pyarrow<15.0.0,>=14.0.1",
+    # numpy and pandas lower bounds track SPEC 0 (https://scientific-python.org/specs/spec-0000/)
+    "numpy<3.0,>=2.2",
+    "pandas<3.0,>=2.3",
+    # pyarrow >=16 is the first release compatible with numpy 2
+    "pyarrow<21.0.0,>=16.0.0",
     "pydantic<3,>=2",
     "PyYAML<7.0.0,>=6.0.1",
     "rich<14.0.0,>=13.6.0",
@@ -31,7 +33,7 @@ grevling = "grevling.__main__:main"
 
 [project.optional-dependencies]
 matplotlib = [
-    "matplotlib<4.0,>=3.7",
+    "matplotlib<4.0,>=3.10",
 ]
 plotly = [
     "plotly<6.0.0,>=5.18.0",
@@ -52,7 +54,7 @@ dev = [
     "types-pyyaml<7.0.0.0,>=6.0.12.12",
     "pandas-stubs<3.0.0.0,>=2.1.1.230928",
     "plotly<6.0.0,>=5.18.0",
-    "matplotlib<4.0,>=3.7",
+    "matplotlib<4.0,>=3.10",
     "mkdocs<2.0.0,>=1.5.3",
     "mkdocs-material<10.0.0,>=9.4.12",
 ]
@@ -92,8 +94,6 @@ select = [
 ]
 ignore = [
     "E741",     # Ambiguous variable name
-    "UP007",    # Only if your project targets Python 3.9 or earlier
-    "UP045",    # Only if your project targets Python 3.9 or earlier
     "SIM115",   # Complains if we use __enter__ inside an __enter__ method
     "ISC001",   # Conflicts with rust formatting
     "TD003",    # Issue links for each todo comment

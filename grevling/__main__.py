@@ -5,7 +5,7 @@ import sys
 import traceback
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import IO, TYPE_CHECKING, Any, cast
 
 import click
 from asteval import Interpreter  # type: ignore
@@ -25,7 +25,7 @@ def workflows(func):
 
 
 class CustomClickException(click.ClickException):
-    def show(self):
+    def show(self, file: IO[Any] | None = None) -> None:
         util.log.critical(str(self))
 
 
@@ -73,7 +73,7 @@ def main(ctx: click.Context, case: Case, verbosity: str) -> None:
     ctx.obj["case"] = case
 
 
-class PluginCli(click.MultiCommand):
+class PluginCli(click.Group):
     def list_commands(self, ctx: click.Context) -> list[str]:
         cs: Case = ctx.obj["case"]
         return [cast("str", command.name) for plugin in cs.plugins for command in plugin.commands(ctx)]

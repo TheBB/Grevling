@@ -9,13 +9,13 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from time import time as osclock
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING
 
 from . import api, util
 from .capture import Capture, CaptureCollection
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from .schema import CommandSchema
 
@@ -63,11 +63,11 @@ async def run(command: list[str], shell: bool, env: dict[str, str], cwd: Path) -
 @dataclass(frozen=True)
 class Command:
     name: str
-    command: Optional[list[str]]
+    command: list[str] | None
     env: dict[str, str]
-    workdir: Optional[str]
+    workdir: str | None
 
-    container: Optional[str]
+    container: str | None
     container_args: list[str]
 
     shell: bool

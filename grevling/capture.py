@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import TYPE_CHECKING, Any, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from . import api, typing, util
 from .schema import RegexCaptureSchema, SimpleCaptureSchema
@@ -18,10 +18,10 @@ if TYPE_CHECKING:
 class Capture:
     _regex: re.Pattern
     _mode: str
-    _type: Optional[GType]
+    _type: GType | None
 
     @staticmethod
-    def from_schema(schema: Union[RegexCaptureSchema, SimpleCaptureSchema]) -> Capture:
+    def from_schema(schema: RegexCaptureSchema | SimpleCaptureSchema) -> Capture:
         if isinstance(schema, RegexCaptureSchema):
             return Capture(
                 pattern=schema.pattern,
@@ -66,7 +66,7 @@ class Capture:
         self,
         pattern: str,
         mode: str = "last",
-        tp: Optional[GType] = None,
+        tp: GType | None = None,
     ) -> None:
         self._regex = re.compile(pattern)
         self._mode = mode
@@ -108,7 +108,7 @@ class CaptureCollection(api.Context):
     def __init__(self, types: TypeManager):
         self.types = types
 
-    def collect(self, name: str, value: Any, tp: Optional[GType] = None) -> None:
+    def collect(self, name: str, value: Any, tp: GType | None = None) -> None:
         gtp: GType = tp if tp is not None else self.types.get(name, typing.AnyType())
         value = gtp.coerce(value)
         if gtp.is_list:

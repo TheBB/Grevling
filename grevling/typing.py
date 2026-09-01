@@ -174,6 +174,6 @@ class TypeManager(dict[str, GType]):
         for name, typename in data.items():
             self[name] = GType.from_string(typename)
 
-    def fill_obj(self, data: dict[str, str]):
+    def fill_obj(self, data: dict[str, Any]):
         for name, typename in data.items():
             self[name] = GType.from_obj(typename)

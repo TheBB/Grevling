@@ -8,7 +8,7 @@ import operator
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Literal, Optional, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -357,7 +357,7 @@ class PlotStyleManager:
     def assigned(self, category: str):
         return category in self._category_to_style
 
-    def assign(self, category: str, style: Optional[str] = None):
+    def assign(self, category: str, style: str | None = None):
         if style is None:
             candidates = [s for s in self._defaults if s not in self._category_to_style.inverse]
             if self._mode == "scatter":
@@ -422,17 +422,17 @@ class Plot:
     filename: str
     fmt: list[str]
     yaxis: list[str]
-    xaxis: str
-    kind: Optional[Literal["scatter", "line"]]
-    legend: Optional[str]
-    xlabel: Optional[str]
-    ylabel: Optional[str]
-    title: Optional[str]
+    xaxis: str | None
+    kind: Literal["scatter", "line"] | None
+    legend: str | None
+    xlabel: str | None
+    ylabel: str | None
+    title: str | None
     xmode: Literal["linear", "log"]
     ymode: str
     grid: bool
-    xlim: Optional[tuple[float, float]]
-    ylim: Optional[tuple[float, float]]
+    xlim: tuple[float, float] | None
+    ylim: tuple[float, float] | None
 
     schema: PlotSchema
 
@@ -468,7 +468,7 @@ class Plot:
             styles.assign("yaxis")
         return styles
 
-    def _parameters_of_kind(self, *kinds: str, req_arg: Optional[bool] = None):
+    def _parameters_of_kind(self, *kinds: str, req_arg: bool | None = None):
         return [
             param
             for param, mode in self.parameters.items()
