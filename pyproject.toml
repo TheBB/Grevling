@@ -4,7 +4,7 @@ authors = [
 ]
 requires-python = ">=3.12,<4.0"
 dependencies = [
-    "asteval<1.0.0,>=0.9.31",
+    "asteval>=0.9.31,<2.0.0",
     "bidict<1.0.0,>=0.22.1",
     "click<9.0.0,>=8.1.7",
     "fasteners<1.0,>=0.19",
