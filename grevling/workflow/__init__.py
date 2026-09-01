@@ -5,7 +5,7 @@ import traceback
 from abc import ABC, abstractmethod
 from io import StringIO
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -22,12 +22,10 @@ class Pipe(ABC):
         return asyncio.run(self._run(inputs))
 
     @abstractmethod
-    async def _run(self, inputs: Iterable[Any]) -> bool:
-        ...
+    async def _run(self, inputs: Iterable[Any]) -> bool: ...
 
     @abstractmethod
-    async def work(self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None) -> None:
-        ...
+    async def work(self, in_queue: asyncio.Queue, out_queue: asyncio.Queue | None = None) -> None: ...
 
 
 class PipeSegment(Pipe):
@@ -41,7 +39,7 @@ class PipeSegment(Pipe):
         self.npiped = 0
         self.tasks = []
 
-    def create_tasks(self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None) -> None:
+    def create_tasks(self, in_queue: asyncio.Queue, out_queue: asyncio.Queue | None = None) -> None:
         self.tasks = [asyncio.create_task(self.work(in_queue, out_queue)) for _ in range(self.ncopies)]
 
     async def close_tasks(self) -> None:
@@ -50,12 +48,12 @@ class PipeSegment(Pipe):
 
     async def _run(self, inputs: Iterable[Any]) -> bool:
         queue = util.to_queue(inputs)
-        ninputs = cast(int, queue.qsize())
+        ninputs = cast("int", queue.qsize())
         asyncio.create_task(self.work(queue))
         await queue.join()
         return self.npiped == ninputs
 
-    async def work(self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None) -> None:
+    async def work(self, in_queue: asyncio.Queue, out_queue: asyncio.Queue | None = None) -> None:
         try:
             while True:
                 arg = await in_queue.get()
@@ -79,8 +77,7 @@ class PipeSegment(Pipe):
         pass
 
     @abstractmethod
-    async def apply(self, arg: Any) -> Any:
-        ...
+    async def apply(self, arg: Any) -> Any: ...
 
 
 class Pipeline(Pipe):
@@ -91,14 +88,14 @@ class Pipeline(Pipe):
 
     async def _run(self, inputs: Iterable[Any]) -> bool:
         queue = util.to_queue(inputs)
-        ninputs = cast(int, queue.qsize())
+        ninputs = cast("int", queue.qsize())
         await self.work(queue)
         success = self.pipes[-1].npiped == ninputs
         for pipe in self.pipes:
             pipe.finalize(success)
         return success
 
-    async def work(self, in_queue: asyncio.Queue, out_queue: Optional[asyncio.Queue] = None) -> None:
+    async def work(self, in_queue: asyncio.Queue, out_queue: asyncio.Queue | None = None) -> None:
         ntasks = len(self.pipes)
         queues: list[asyncio.Queue] = [asyncio.Queue(maxsize=1) for _ in range(ntasks - 1)]
         in_queues = chain([in_queue], queues)

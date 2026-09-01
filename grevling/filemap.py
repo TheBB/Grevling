@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Optional, TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 from . import api, util
 from .render import render
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
-
-    from typing_extensions import Unpack
+    from collections.abc import Callable, Iterable
+    from typing import Unpack
 
     from .schema import FileMapSchema
 
@@ -36,7 +35,7 @@ class SingleFileMap:
     def __init__(
         self,
         source: str,
-        target: Optional[str] = None,
+        target: str | None = None,
         template: bool = False,
         mode: str = "simple",
     ):

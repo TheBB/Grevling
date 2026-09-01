@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -45,5 +45,5 @@ class Instance(Base):
     index: Mapped[int] = mapped_column("id", primary_key=True)
     logdir: Mapped[str]
     context: Mapped[api.Context]
-    captured: Mapped[Optional[CaptureCollection]] = mapped_column(default=None)
+    captured: Mapped[CaptureCollection | None] = mapped_column(default=None)
     status: Mapped[api.Status]

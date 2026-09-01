@@ -7,11 +7,11 @@ Since Grevling allows many parts of the input to be callables, validation of
 their outputs must necessarily be delayed.
 """
 
-
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -21,21 +21,16 @@ from grevling.render import render
 from . import refined
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
 
 # Numbers can usually be either ints or floats. Note that Pydantic will coerce
 # floats to ints or vice-versa depending on which type is listed first in this
 # union. To prevent this, models which make use of scalars should use the
 # `smart_unions` config option.
-Scalar = Union[int, float]
+Scalar = int | float
 
-Constant = Union[
-    str,
-    None,
-    Scalar,
-    bool,
-]
+Constant = str | None | Scalar | bool
 
 
 class RegexCaptureSchema(BaseModel):
@@ -70,18 +65,9 @@ class SimpleCaptureSchema(BaseModel):
 
 
 # Captures should conform to this type when written in the config file
-CaptureSchema = Union[
-    str,
-    SimpleCaptureSchema,
-    RegexCaptureSchema,
-    list[
-        Union[
-            str,
-            SimpleCaptureSchema,
-            RegexCaptureSchema,
-        ]
-    ],
-]
+CaptureSchema = (
+    str | SimpleCaptureSchema | RegexCaptureSchema | list[str | SimpleCaptureSchema | RegexCaptureSchema]
+)
 
 
 class FileMapBaseSchema(BaseModel):
@@ -93,12 +79,12 @@ class FileMapBaseSchema(BaseModel):
     """
 
     source: str
-    target: Optional[str] = None
+    target: str | None = None
     mode: Literal["simple", "glob"] = "simple"
     template: bool
 
     @classmethod
-    def from_any(cls: type[Self], source: Union[str, dict[str, Any], Self]) -> Self:
+    def from_any(cls: type[Self], source: str | dict[str, Any] | Self) -> Self:
         """Convert an object with 'any' type to a filemap schema. Most
         importantly, convert strings by interpreting them as source
         filenames.
@@ -136,20 +122,20 @@ class CommandSchema(BaseModel):
     that can be run as part of a Grevling case.
     """
 
-    command: Optional[Union[str, list[str]]] = None
-    name: Optional[str] = None
+    command: str | list[str] | None = None
+    name: str | None = None
     capture: CaptureSchema = []
     capture_output: bool = True
     capture_walltime: bool = True
     retry_on_fail: bool = False
     env: dict[str, str] = {}
-    container: Optional[str] = None
-    container_args: Union[str, list[str]] = []
+    container: str | None = None
+    container_args: str | list[str] = []
     allow_failure: bool = False
-    workdir: Optional[str] = None
+    workdir: str | None = None
 
     @staticmethod
-    def from_any(source: Union[str, list[str], CommandSchema, dict]) -> CommandSchema:
+    def from_any(source: str | list[str] | CommandSchema | dict) -> CommandSchema:
         """Convert an object with 'any' type to a CommandSchema. Most
         importantly, this interprets raw strings and lists of strings as
         commands with only the *command* attribute set.
@@ -228,12 +214,7 @@ class GradedParameterSchema(BaseModel):
 
 
 # Parameter specifications in the config file should conform to this type
-ParameterSchema = Union[
-    list[Scalar],
-    list[str],
-    UniformParameterSchema,
-    GradedParameterSchema,
-]
+ParameterSchema = list[Scalar] | list[str] | UniformParameterSchema | GradedParameterSchema
 
 
 class PlotCategorySchema(BaseModel):
@@ -242,22 +223,20 @@ class PlotCategorySchema(BaseModel):
     """
 
     mode: Literal["category"]
-    argument: Optional[Literal["color", "line", "marker"]] = Field(alias="style", default=None)
+    argument: Literal["color", "line", "marker"] | None = Field(alias="style", default=None)
 
 
 class PlotIgnoreSchema(BaseModel):
     """Model for specifying that a parameter should be ignored in plots."""
 
     mode: Literal["ignore"]
-    argument: Optional[Union[Scalar, str]] = Field(alias="value", default=None)
+    argument: Scalar | str | None = Field(alias="value", default=None)
 
 
 # Parameter plot modes in the config file should conform to this type
-PlotModeSchema = Union[
-    Literal["fixed", "variate", "category", "ignore", "mean"],
-    PlotCategorySchema,
-    PlotIgnoreSchema,
-]
+PlotModeSchema = (
+    Literal["fixed", "variate", "category", "ignore", "mean"] | PlotCategorySchema | PlotIgnoreSchema
+)
 
 
 class PlotStyleSchema(BaseModel):
@@ -265,12 +244,12 @@ class PlotStyleSchema(BaseModel):
     options.)
     """
 
-    color: Optional[Union[str, list[str]]] = None
-    line: Optional[Union[str, list[str]]] = None
-    marker: Optional[Union[str, list[str]]] = None
+    color: str | list[str] | None = None
+    line: str | list[str] | None = None
+    marker: str | list[str] | None = None
 
     def refine(self) -> refined.PlotStyleSchema:
-        def fix(x: Optional[Union[str, list[str]]]) -> Optional[list[str]]:
+        def fix(x: str | list[str] | None) -> list[str] | None:
             return [x] if isinstance(x, str) else x
 
         return refined.PlotStyleSchema.model_validate(
@@ -286,18 +265,18 @@ class PlotSchema(BaseModel):
     """Model for specifying a plot."""
 
     filename: str
-    fmt: Union[str, list[str]] = Field(alias="format")
-    xaxis: Optional[str] = None
-    yaxis: Union[str, list[str]] = Field(alias="yaxis")
-    ylim: Optional[tuple[Scalar, Scalar]] = None
-    xlim: Optional[tuple[Scalar, Scalar]] = None
-    kind: Optional[Literal["scatter", "line"]] = Field(alias="type", default=None)
-    legend: Optional[str] = None
-    xlabel: Optional[str] = None
-    ylabel: Optional[str] = None
+    fmt: str | list[str] = Field(alias="format")
+    xaxis: str | None = None
+    yaxis: str | list[str] = Field(alias="yaxis")
+    ylim: tuple[Scalar, Scalar] | None = None
+    xlim: tuple[Scalar, Scalar] | None = None
+    kind: Literal["scatter", "line"] | None = Field(alias="type", default=None)
+    legend: str | None = None
+    xlabel: str | None = None
+    ylabel: str | None = None
     xmode: Literal["linear", "log"] = "linear"
     ymode: Literal["linear", "log"] = "linear"
-    title: Optional[str] = None
+    title: str | None = None
     grid: bool = True
     parameters: dict[str, PlotModeSchema] = {}
     style: PlotStyleSchema = PlotStyleSchema()
@@ -333,7 +312,7 @@ class SettingsSchema(BaseModel):
     """Model for specifying case settings."""
 
     storagedir: str = ".grevlingdata"
-    logdir: Union[Callable, str] = "${g_index}"
+    logdir: Callable | str = "${g_index}"
     ignore_missing_files: bool = Field(alias="ignore-missing-files", default=False)
 
     def refine_logdir(self) -> Callable[[api.Context], str]:
@@ -354,16 +333,7 @@ class SettingsSchema(BaseModel):
         )
 
 
-ScriptSchema = Union[
-    Callable,
-    list[
-        Union[
-            str,
-            list[str],
-            CommandSchema,
-        ]
-    ],
-]
+ScriptSchema = Callable | list[str | list[str] | CommandSchema]
 
 
 class PluginSchema(BaseModel):
@@ -384,27 +354,27 @@ class CaseSchema(BaseModel):
 
     p_script: ScriptSchema = Field(alias="script", default=[])
 
-    p_containers: dict[str, Union[str, list[str]]] = Field(alias="containers", default={})
-    p_evaluate: Union[Callable, dict[str, str]] = Field(alias="evaluate", default={})
+    p_containers: dict[str, str | list[str]] = Field(alias="containers", default={})
+    p_evaluate: Callable | dict[str, str] = Field(alias="evaluate", default={})
     constants: dict[str, Constant] = {}
-    p_where: Union[Callable, str, list[str]] = Field(alias="where", default=[])
+    p_where: Callable | str | list[str] = Field(alias="where", default=[])
     types: dict[str, str] = {}
 
-    p_templates: Union[Callable, list[Union[str, TemplateSchema]]] = Field(alias="templates", default=[])
-    p_prefiles: Union[Callable, list[Union[str, FileMapSchema]]] = Field(alias="prefiles", default=[])
-    p_postfiles: Union[Callable, list[Union[str, FileMapSchema]]] = Field(alias="postfiles", default=[])
+    p_templates: Callable | list[str | TemplateSchema] = Field(alias="templates", default=[])
+    p_prefiles: Callable | list[str | FileMapSchema] = Field(alias="prefiles", default=[])
+    p_postfiles: Callable | list[str | FileMapSchema] = Field(alias="postfiles", default=[])
 
     plots: list[PlotSchema] = []
 
     settings: SettingsSchema = SettingsSchema()
 
-    plugins: list[Union[str, PluginSchema]] = []
+    plugins: list[str | PluginSchema] = []
 
-    def refine_parameters(self) -> dict[str, Union[dict, refined.ParameterSchema]]:
+    def refine_parameters(self) -> dict[str, dict | refined.ParameterSchema]:
         """Convert the *parameters* attribute so that raw lists are converted to
         objects when refining.
         """
-        parameters: dict[str, Union[dict, refined.ParameterSchema]] = {}
+        parameters: dict[str, dict | refined.ParameterSchema] = {}
         for name, schema in self.parameters.items():
             if isinstance(schema, list):
                 parameters[name] = {
@@ -445,8 +415,8 @@ class CaseSchema(BaseModel):
 
     @staticmethod
     def refine_filemap(
-        schemas: Union[Callable, list[Union[str, FSchema]]],
-        schema_converter: Callable[[Union[str, FSchema]], FSchema],
+        schemas: Callable | list[str | FSchema],
+        schema_converter: Callable[[str | FSchema], FSchema],
     ) -> Callable[[api.Context], list[refined.FileMapSchema]]:
         """Helper method for converting filemaps to refined models."""
         if isinstance(schemas, list):

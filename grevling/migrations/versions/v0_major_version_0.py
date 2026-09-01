@@ -5,9 +5,10 @@ Revises:
 Create Date: 2023-11-16 11:30:23.185518
 
 """
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from alembic import op
@@ -17,9 +18,9 @@ if TYPE_CHECKING:
 
 # revision identifiers, used by Alembic.
 revision: str = "v0"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

@@ -1,21 +1,19 @@
 from __future__ import annotations
 
-from typing import Annotated, Any, Callable, Literal, Optional, Union
+from collections.abc import Callable
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
 from grevling import api
 
-Scalar = Union[int, float]
-Constant = Union[str, None, Scalar, bool]
+Scalar = int | float
+Constant = str | None | Scalar | bool
 
 
 class ListedParameterSchema(BaseModel):
     kind: Literal["listed"]
-    values: Union[
-        list[Scalar],
-        list[str],
-    ]
+    values: list[Scalar] | list[str]
 
 
 class UniformParameterSchema(BaseModel):
@@ -32,18 +30,14 @@ class GradedParameterSchema(BaseModel):
 
 
 ParameterSchema = Annotated[
-    Union[
-        ListedParameterSchema,
-        UniformParameterSchema,
-        GradedParameterSchema,
-    ],
+    ListedParameterSchema | UniformParameterSchema | GradedParameterSchema,
     Field(discriminator="kind"),
 ]
 
 
 class FileMapSchema(BaseModel):
     source: str
-    target: Optional[str]
+    target: str | None
     mode: Literal["simple", "glob"]
     template: bool
 
@@ -65,24 +59,21 @@ class RegexCaptureSchema(BaseModel):
 
 
 CaptureSchema = Annotated[
-    Union[
-        SimpleCaptureSchema,
-        RegexCaptureSchema,
-    ],
+    SimpleCaptureSchema | RegexCaptureSchema,
     Field(discriminator="capture_type"),
 ]
 
 
 class CommandSchema(BaseModel):
-    command: Optional[Union[str, list[str]]]
-    name: Optional[str]
+    command: str | list[str] | None
+    name: str | None
     capture: list[CaptureSchema]
     allow_failure: bool
     retry_on_fail: bool
     env: dict[str, str]
-    container: Optional[str]
-    container_args: Union[str, list[str]]
-    workdir: Optional[str]
+    container: str | None
+    container_args: str | list[str]
+    workdir: str | None
 
 
 class PlotModeFixedSchema(BaseModel):
@@ -95,12 +86,12 @@ class PlotModeVariateSchema(BaseModel):
 
 class PlotModeCategorySchema(BaseModel):
     mode: Literal["category"] = "category"
-    argument: Optional[Literal["color", "line", "marker"]] = None
+    argument: Literal["color", "line", "marker"] | None = None
 
 
 class PlotModeIgnoreSchema(BaseModel):
     mode: Literal["ignore"] = "ignore"
-    argument: Optional[Union[Scalar, str]] = None
+    argument: Scalar | str | None = None
 
 
 class PlotModeMeanSchema(BaseModel):
@@ -108,39 +99,37 @@ class PlotModeMeanSchema(BaseModel):
 
 
 PlotModeSchema = Annotated[
-    Union[
-        PlotModeFixedSchema,
-        PlotModeVariateSchema,
-        PlotModeCategorySchema,
-        PlotModeIgnoreSchema,
-        PlotModeMeanSchema,
-    ],
+    PlotModeFixedSchema
+    | PlotModeVariateSchema
+    | PlotModeCategorySchema
+    | PlotModeIgnoreSchema
+    | PlotModeMeanSchema,
     Field(discriminator="mode"),
 ]
 
 
 class PlotStyleSchema(BaseModel):
-    color: Optional[list[str]]
-    line: Optional[list[str]]
-    marker: Optional[list[str]]
+    color: list[str] | None
+    line: list[str] | None
+    marker: list[str] | None
 
 
 class PlotSchema(BaseModel):
     filename: str
     fmt: list[str]
     parameters: dict[str, PlotModeSchema]
-    xaxis: Optional[str]
+    xaxis: str | None
     yaxis: list[str]
-    kind: Optional[Literal["scatter", "line"]]
+    kind: Literal["scatter", "line"] | None
     grid: bool
     xmode: Literal["linear", "log"]
     ymode: Literal["linear", "log"]
-    xlim: Optional[tuple[Scalar, Scalar]]
-    ylim: Optional[tuple[Scalar, Scalar]]
-    title: Optional[str]
-    xlabel: Optional[str]
-    ylabel: Optional[str]
-    legend: Optional[str]
+    xlim: tuple[Scalar, Scalar] | None
+    ylim: tuple[Scalar, Scalar] | None
+    title: str | None
+    xlabel: str | None
+    ylabel: str | None
+    legend: str | None
     style: PlotStyleSchema
 
 

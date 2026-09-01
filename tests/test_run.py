@@ -94,8 +94,8 @@ def test_files(runner, suffix):
     for a in range(1, 4):
         for b in "abc":
             path = storagepath / f"{a}-{b}"
-            assert read_file(path / "template.txt") == f"a={a} b={b} c={2*a-1}\n"
-            assert read_file(path / "other-template.txt") == f"a={a} b={b} c={2*a-1}\n"
+            assert read_file(path / "template.txt") == f"a={a} b={b} c={2 * a - 1}\n"
+            assert read_file(path / "other-template.txt") == f"a={a} b={b} c={2 * a - 1}\n"
             assert read_file(path / "non-template.txt") == "a=${alpha} b=${bravo} c=${charlie}\n"
             assert read_file(path / "some" / "deep" / "directory" / "empty1.dat") == ""
             assert read_file(path / "some" / "deep" / "directory" / "empty2.dat") == ""

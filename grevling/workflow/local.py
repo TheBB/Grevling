@@ -5,7 +5,7 @@ import stat
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, BinaryIO, Optional, TextIO, Union
+from typing import IO, TYPE_CHECKING, BinaryIO, TextIO
 
 from grevling import api, util
 from grevling.api import PathType, Status
@@ -52,9 +52,9 @@ class LocalWorkflow(api.Workflow):
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         self.workspaces.__exit__(exc_type, exc_val, exc_tb)
 
@@ -69,7 +69,7 @@ class LocalWorkflow(api.Workflow):
 class LocalWorkspaceCollection(api.WorkspaceCollection):
     root: Path
 
-    def __init__(self, root: Union[str, Path], name: str = ""):
+    def __init__(self, root: str | Path, name: str = ""):
         self.root = Path(root)
         self.name = name
 
@@ -78,13 +78,13 @@ class LocalWorkspaceCollection(api.WorkspaceCollection):
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         pass
 
-    def new_workspace(self, prefix: Optional[str] = None, name: str = "") -> LocalWorkspace:
+    def new_workspace(self, prefix: str | None = None, name: str = "") -> LocalWorkspace:
         path = Path(tempfile.mkdtemp(prefix=prefix, dir=self.root))
         return LocalWorkspace(path, name)
 
@@ -107,7 +107,7 @@ class LocalWorkspace(api.Workspace):
     root: Path
     name: str
 
-    def __init__(self, root: Union[str, Path], name: str = ""):
+    def __init__(self, root: str | Path, name: str = ""):
         self.root = Path(root)
         self.name = name
 
@@ -117,7 +117,7 @@ class LocalWorkspace(api.Workspace):
     def destroy(self) -> None:
         shutil.rmtree(self.root)
 
-    def to_root(self, path: Optional[Union[Path, str]]) -> Path:
+    def to_root(self, path: Path | str | None) -> Path:
         if path is None:
             return self.root
         if isinstance(path, str):
@@ -127,18 +127,16 @@ class LocalWorkspace(api.Workspace):
         return self.root / path
 
     @contextmanager
-    def open_str(self, path: Union[Path, str], mode: str = "w") -> Generator[TextIO, None, None]:
+    def open_str(self, path: Path | str, mode: str = "w") -> Generator[TextIO, None, None]:
         with self.to_root(path).open(mode) as f:
             yield f  # type: ignore
 
     @contextmanager
-    def open_bytes(self, path: Union[Path, str], mode: str = "rb") -> Generator[BinaryIO, None, None]:
+    def open_bytes(self, path: Path | str, mode: str = "rb") -> Generator[BinaryIO, None, None]:
         with self.to_root(path).open(mode) as f:
             yield f  # type: ignore
 
-    def write_file(
-        self, path: Union[Path, str], source: Union[str, bytes, IO, Path], append: bool = False
-    ) -> None:
+    def write_file(self, path: Path | str, source: str | bytes | IO | Path, append: bool = False) -> None:
         target = self.to_root(path)
         target.parent.mkdir(parents=True, exist_ok=True)
 
@@ -162,10 +160,10 @@ class LocalWorkspace(api.Workspace):
             if path.is_file():
                 yield path.relative_to(self.root)
 
-    def exists(self, path: Union[Path, str]) -> bool:
+    def exists(self, path: Path | str) -> bool:
         return self.to_root(path).exists()
 
-    def type_of(self, path: Union[Path, str]) -> PathType:
+    def type_of(self, path: Path | str) -> PathType:
         p = self.to_root(path)
         if p.is_file():
             return PathType.File
@@ -173,10 +171,10 @@ class LocalWorkspace(api.Workspace):
             return PathType.Folder
         assert False
 
-    def mode(self, path: Union[Path, str]) -> int:
+    def mode(self, path: Path | str) -> int:
         return self.to_root(path).stat().st_mode
 
-    def set_mode(self, path: Union[Path, str], mode: int) -> None:
+    def set_mode(self, path: Path | str, mode: int) -> None:
         self.to_root(path).chmod(stat.S_IMODE(mode))
 
     def subspace(self, path: str, name: str = "") -> api.Workspace:
@@ -188,7 +186,7 @@ class LocalWorkspace(api.Workspace):
     def top_name(self) -> str:
         return self.root.name
 
-    def walk(self, path: Optional[Union[Path, str]]) -> Iterator[Path]:
+    def walk(self, path: Path | str | None) -> Iterator[Path]:
         p = self.to_root(path)
         for sub in p.iterdir():
             pathtype = self.type_of(sub)
@@ -211,9 +209,9 @@ class TempWorkspaceCollection(LocalWorkspaceCollection):
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         super().__exit__(exc_type, exc_val, exc_tb)
         self.tempdir.__exit__(exc_type, exc_val, exc_tb)

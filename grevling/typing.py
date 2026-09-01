@@ -38,8 +38,7 @@ class GType(ABC):
         return self.merge(GType.from_obj(other))
 
     @abstractmethod
-    def merge(self, other: GType) -> GType:
-        ...
+    def merge(self, other: GType) -> GType: ...
 
     def coerce(self, obj: Any):
         return obj
@@ -175,6 +174,6 @@ class TypeManager(dict[str, GType]):
         for name, typename in data.items():
             self[name] = GType.from_string(typename)
 
-    def fill_obj(self, data: dict[str, str]):
+    def fill_obj(self, data: dict[str, Any]):
         for name, typename in data.items():
             self[name] = GType.from_obj(typename)

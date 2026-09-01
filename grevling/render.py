@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import shlex
-from typing import TYPE_CHECKING, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, overload
 
 from mako.template import Template
 
@@ -26,18 +26,27 @@ QUOTERS = {
 }
 
 
-T = TypeVar(
-    "T",
-    str,
-    list[str],
-    dict[str, str],
-    None,
-    Union[str, list[str]],
-    Union[str, list[str], None],
-)
+@overload
+def render(template: str, context: api.Context, mode: str | None = ...) -> str: ...
 
 
-def render(template: T, context: api.Context, mode: Optional[str] = None) -> T:
+@overload
+def render(template: list[str], context: api.Context, mode: str | None = ...) -> list[str]: ...
+
+
+@overload
+def render(template: dict[str, str], context: api.Context, mode: str | None = ...) -> list[str]: ...
+
+
+@overload
+def render(template: None, context: api.Context, mode: str | None = ...) -> None: ...
+
+
+def render(
+    template: str | list[str] | dict[str, str] | None,
+    context: api.Context,
+    mode: str | None = None,
+) -> str | list[str] | dict[str, str] | None:
     if isinstance(template, str):
         return render_str(template, context, mode)
     if isinstance(template, list):
@@ -47,7 +56,7 @@ def render(template: T, context: api.Context, mode: Optional[str] = None) -> T:
     return None
 
 
-def render_str(template: str, context: api.Context, mode: Optional[str] = None) -> str:
+def render_str(template: str, context: api.Context, mode: str | None = None) -> str:
     filters = ["str"]
     imports = [
         "from numpy import sin, cos",

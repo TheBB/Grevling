@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from contextlib import contextmanager
 from importlib import import_module
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Optional, cast
+from typing import TYPE_CHECKING, cast
 
 import pandas as pd
 import sqlalchemy as sql
@@ -95,7 +96,7 @@ MIGRATORS: dict[int, Migrator] = {1: migrator_v1, 2: migrator_v2}
 
 def load_plugin(case: Case, spec: PluginSchema) -> api.Plugin:
     module = import_module(spec.name)
-    return cast(api.Plugin, module.Plugin(case, spec.settings))
+    return cast("api.Plugin", module.Plugin(case, spec.settings))
 
 
 class Case:
@@ -105,7 +106,7 @@ class Case:
     dbc: db.Case
 
     # Configs may be provided in pure data, in which case they don't correspond to a file
-    configpath: Optional[Path]
+    configpath: Path | None
 
     # Raw structured data used to initialize this case
     schema: CaseSchema
@@ -131,10 +132,10 @@ class Case:
     def __init__(
         self,
         localpath: api.PathStr = ".",
-        storagepath: Optional[Path] = None,
-        casedata: Optional[CaseSchema] = None,
+        storagepath: Path | None = None,
+        casedata: CaseSchema | None = None,
     ):
-        configpath: Optional[Path] = None
+        configpath: Path | None = None
 
         if isinstance(localpath, str):
             localpath = Path(localpath)
@@ -198,7 +199,7 @@ class Case:
     @property
     def is_running(self) -> bool:
         return cast(
-            bool,
+            "bool",
             self.session.query(
                 sql.select(db.Instance)
                 .where(db.Instance.status.in_((api.Status.Started, api.Status.Prepared)))
@@ -209,7 +210,7 @@ class Case:
     @property
     def has_data(self) -> bool:
         return cast(
-            bool,
+            "bool",
             self.session.query(
                 sql.select(db.Instance).where(db.Instance.status == api.Status.Downloaded).exists()
             ).scalar(),
@@ -218,7 +219,7 @@ class Case:
     @property
     def has_captured(self) -> bool:
         return cast(
-            bool,
+            "bool",
             not self.session.query(
                 sql.select(db.Instance).where(db.Instance.captured.is_(None)).exists()
             ).scalar(),
@@ -245,9 +246,9 @@ class Case:
 
     def release_lock(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         assert self.lock
         self.lock.__exit__(exc_type, exc_val, exc_tb)
@@ -267,9 +268,9 @@ class Case:
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         with (self.storagepath / "state.json").open("w") as f:
             json.dump(
@@ -386,8 +387,8 @@ class Case:
     def create_instance(
         self,
         ctx: api.Context,
-        logdir: Optional[Path] = None,
-        index: Optional[int] = None,
+        logdir: Path | None = None,
+        index: int | None = None,
     ) -> Instance:
         if index is None:
             index = 0
@@ -454,8 +455,8 @@ class Instance:
 
     dbo: db.Instance
 
-    remote: Optional[api.Workspace]
-    remote_book: Optional[api.Workspace]
+    remote: api.Workspace | None
+    remote_book: api.Workspace | None
 
     _case: Case
 
@@ -464,7 +465,7 @@ class Instance:
         case: Case,
         dbo: db.Instance,
         /,
-        local: Optional[api.Workspace] = None,
+        local: api.Workspace | None = None,
     ):
         self._case = case
         self.dbo = dbo

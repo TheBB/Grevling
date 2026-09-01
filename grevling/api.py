@@ -10,12 +10,10 @@ from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
-    Optional,
     Protocol,
     TextIO,
     TypedDict,
     TypeVar,
-    Union,
     cast,
 )
 
@@ -23,15 +21,15 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
     from contextlib import AbstractContextManager
     from types import TracebackType
+    from typing import Unpack
 
     import click
-    from typing_extensions import Unpack
 
     from . import Case
     from .workflow import Pipe
 
 
-PathStr = Union[Path, str]
+PathStr = Path | str
 
 
 T = TypeVar("T")
@@ -54,56 +52,43 @@ class Workspace(ABC):
     name: str
 
     @abstractmethod
-    def __str__(self) -> str:
-        ...
+    def __str__(self) -> str: ...
 
     @abstractmethod
-    def destroy(self) -> None:
-        ...
+    def destroy(self) -> None: ...
 
     @abstractmethod
-    def open_str(self, path: PathStr, mode: str = "w") -> AbstractContextManager[TextIO]:
-        ...
+    def open_str(self, path: PathStr, mode: str = "w") -> AbstractContextManager[TextIO]: ...
 
     @abstractmethod
-    def open_bytes(self, path: PathStr) -> AbstractContextManager[BinaryIO]:
-        ...
+    def open_bytes(self, path: PathStr) -> AbstractContextManager[BinaryIO]: ...
 
     @abstractmethod
-    def write_file(self, path: PathStr, source: Union[str, bytes, IO, Path], append: bool = False) -> None:
-        ...
+    def write_file(self, path: PathStr, source: str | bytes | IO | Path, append: bool = False) -> None: ...
 
     @abstractmethod
-    def files(self) -> Iterator[Path]:
-        ...
+    def files(self) -> Iterator[Path]: ...
 
     @abstractmethod
-    def exists(self, path: PathStr) -> bool:
-        ...
+    def exists(self, path: PathStr) -> bool: ...
 
     @abstractmethod
-    def type_of(self, path: PathStr) -> PathType:
-        ...
+    def type_of(self, path: PathStr) -> PathType: ...
 
     @abstractmethod
-    def mode(self, path: PathStr) -> Optional[int]:
-        ...
+    def mode(self, path: PathStr) -> int | None: ...
 
     @abstractmethod
-    def set_mode(self, path: PathStr, mode: int) -> None:
-        ...
+    def set_mode(self, path: PathStr, mode: int) -> None: ...
 
     @abstractmethod
-    def subspace(self, path: str, name: str = "") -> Workspace:
-        ...
+    def subspace(self, path: str, name: str = "") -> Workspace: ...
 
     @abstractmethod
-    def top_name(self) -> str:
-        ...
+    def top_name(self) -> str: ...
 
     @abstractmethod
-    def walk(self, path: Optional[PathStr]) -> Iterator[Path]:
-        ...
+    def walk(self, path: PathStr | None) -> Iterator[Path]: ...
 
     def glob(self, pattern: str) -> Iterator[Path]:
         for path in self.files():
@@ -113,53 +98,44 @@ class Workspace(ABC):
 
 class WorkspaceCollection(ABC):
     @abstractmethod
-    def __enter__(self) -> WorkspaceCollection:
-        ...
+    def __enter__(self) -> WorkspaceCollection: ...
 
     @abstractmethod
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
-    ) -> None:
-        ...
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None: ...
 
     @abstractmethod
-    def new_workspace(self, prefix: Optional[str] = None) -> Workspace:
-        ...
+    def new_workspace(self, prefix: str | None = None) -> Workspace: ...
 
     @abstractmethod
-    def open_workspace(self, path: str, name: str = "") -> Workspace:
-        ...
+    def open_workspace(self, path: str, name: str = "") -> Workspace: ...
 
     @abstractmethod
-    def destroy_workspace(self, path: str) -> None:
-        ...
+    def destroy_workspace(self, path: str) -> None: ...
 
     @abstractmethod
-    def workspace_names(self) -> Iterable[str]:
-        ...
+    def workspace_names(self) -> Iterable[str]: ...
 
 
 class WorkflowConstructor(Protocol):
-    def __call__(self, nprocs: int = 1) -> Workflow:
-        ...
+    def __call__(self, nprocs: int = 1) -> Workflow: ...
 
 
 class Workflow(ABC):
     @abstractmethod
-    def __enter__(self) -> Workflow:
-        ...
+    def __enter__(self) -> Workflow: ...
 
     @abstractmethod
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
-    ) -> None:
-        ...
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None: ...
 
     @staticmethod
     def get_workflow(name: str) -> WorkflowConstructor:
@@ -168,11 +144,10 @@ class Workflow(ABC):
         cls = util.find_subclass(Workflow, name, attr="name")
         if not cls:
             raise ImportError(f"Unknown workflow, or additional dependencies required: {name}")
-        return cast(WorkflowConstructor, cls)
+        return cast("WorkflowConstructor", cls)
 
     @abstractmethod
-    def pipeline(self, case: Case) -> Pipe:
-        ...
+    def pipeline(self, case: Case) -> Pipe: ...
 
 
 class JsonKwargs(TypedDict, total=False):
