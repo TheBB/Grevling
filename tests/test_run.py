@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sqlite3
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import time
@@ -286,6 +287,65 @@ def test_double_capture(runner, suffix):
             },
         ),
     )
+
+
+@pytest.mark.parametrize("runner", [api_run(), cli_run()])
+@pytest.mark.parametrize("suffix", [".yaml", ".gold"])
+def test_generated_columns(runner, suffix):
+    path = DATADIR / "run" / "capture" / f"grevling{suffix}"
+    runner(path)
+
+    with Case(path) as case:
+        dbpath = case.dbpath
+
+    con = sqlite3.connect(dbpath)
+    try:
+        # PRAGMA table_xinfo rows are (cid, name, type, notnull, dflt, pk, hidden);
+        # hidden == 0 is a real column, hidden == 2 is a VIRTUAL generated column.
+        cols = con.execute("PRAGMA table_xinfo(instance)").fetchall()
+        real = {name for _, name, _, _, _, _, hidden in cols if hidden == 0}
+        generated = {name for _, name, _, _, _, _, hidden in cols if hidden == 2}
+
+        n_instances = con.execute("SELECT count(*) FROM instance").fetchone()[0]
+        list_names = [n for (n,) in con.execute("SELECT DISTINCT name FROM instance_list_value")]
+        per_name = dict(
+            con.execute("SELECT name, count(*) FROM instance_list_value GROUP BY name").fetchall()
+        )
+        total = con.execute("SELECT count(*) FROM instance_list_value").fetchone()[0]
+        idx_range = con.execute("SELECT min(idx), max(idx) FROM instance_list_value").fetchone()
+    finally:
+        con.close()
+
+    assert real == {"id", "logdir", "context", "captured", "status"}
+    assert generated == {
+        # parameters
+        "alpha",
+        "bravo",
+        # scalar captures
+        "firstalpha",
+        "lastalpha",
+        "firstbravo",
+        "lastbravo",
+        # list captures (also projected here, as their raw JSON array)
+        "allalpha",
+        "allbravo",
+        # grevling builtins
+        "g_index",
+        "g_logdir",
+        "g_sourcedir",
+        "g_started",
+        "g_finished",
+        "g_success",
+        "g_walltime_cat",
+    }
+
+    # Only the list-valued captures show up in the unnested view, and each list
+    # has four elements (see template.txt) for every one of the 9 instances.
+    assert n_instances == 9
+    assert sorted(list_names) == ["allalpha", "allbravo"]
+    assert per_name == {"allalpha": 36, "allbravo": 36}
+    assert total == 72
+    assert idx_range == (0, 3)
 
 
 @pytest.mark.parametrize("runner", [api_run(), cli_run()])

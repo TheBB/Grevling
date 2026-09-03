@@ -259,6 +259,7 @@ class Case:
         self.engine = sql.create_engine(f"sqlite:///{self.dbpath}")
         self.session = Session(self.engine).__enter__()
         self.auto_migrate()
+        self.sync_generated_columns()
 
         dbc = self.session.scalar(sql.select(db.Case))
         assert dbc
@@ -272,6 +273,11 @@ class Case:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
+        if exc_type is None:
+            # Catches data written outside Case.run/capture/collect, e.g. the
+            # CLI `run` command drives the pipeline directly.
+            self.sync_generated_columns()
+
         with (self.storagepath / "state.json").open("w") as f:
             json.dump(
                 {
@@ -325,6 +331,14 @@ class Case:
 
     def migrate_to_head(self, config: AlembicCfg) -> None:
         alembic_command.upgrade(config, "head")
+
+    def sync_generated_columns(self) -> None:
+        """Project the JSON ``context`` / ``captured`` blobs of the instance
+        table out into plain (untyped) columns, so aggregated views can be built
+        with ordinary SQL. Safe to call repeatedly; picks up new keys as
+        instances are run and captured.
+        """
+        db.sync_generated_columns(self.session, extra_names=self.types.keys())
 
     def instance_by_index(self, index: int) -> Instance:
         db_instance = self.session.scalar(sql.select(db.Instance).where(db.Instance.index == index))
@@ -424,8 +438,10 @@ class Case:
     def capture(self) -> None:
         for instance in self.instances(Status.Downloaded):
             instance.capture()
+        self.sync_generated_columns()
 
     def collect(self) -> None:
+        self.sync_generated_columns()
         data = self.load_dataframe()
         for instance in self.instances(Status.Downloaded):
             collector = instance.cached_capture()
@@ -441,7 +457,9 @@ class Case:
 
     def run(self, nprocs: int = 1) -> bool:
         with LocalWorkflow(nprocs=nprocs) as workflow:
-            return workflow.pipeline(self).run(self.create_instances())
+            result = workflow.pipeline(self).run(self.create_instances())
+        self.sync_generated_columns()
+        return result
 
     def run_single(self, namespace: api.Context, logdir: Path, index: int = 0) -> None:
         instance = self.create_instance(namespace, logdir=logdir, index=index)
