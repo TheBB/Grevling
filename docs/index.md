@@ -1,4 +1,6 @@
-# Grevling
+<p align="center">
+  <img src="assets/logo-large.png" width="200px" alt="Large Logo">
+</p>
 
 *Grevling* (meaning "badger" in Norwegian) is a highly configurable tool for
 

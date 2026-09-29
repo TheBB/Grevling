@@ -7,3 +7,5 @@ build/
 /test.db
 /site
 /.pdm-python
+/.docs-venv
+/.cache
