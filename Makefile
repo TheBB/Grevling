@@ -58,4 +58,4 @@ docs-clean:
 
 .docs-venv:
 	uv venv .docs-venv
-	uv pip install --python .docs-venv/bin/python zensical
+	uv pip install --python .docs-venv/bin/python zensical -e ./docs/lexer

@@ -15,7 +15,7 @@ Grevling runs *parametrized* jobs, so it must know what the parameters are for
 each job that it runs. The `parameters` key, if present, maps *names of
 parameters* to *lists of possible values*, like so:
 
-```
+```gold
 {
     parameters: {
         degree: [1, 2, 3, 4, 5, 6],
@@ -32,7 +32,7 @@ Grevling has functions that help facilitate some common use cases. They can be
 imported from the `"grevling"` library - a library that is available for import
 when running with Grevling. This is equivalent to the above:
 
-```
+```gold
 import "grevling" as g
 
 {
@@ -58,7 +58,7 @@ source directory (the directory where the configuration file is located). This
 can be configured using the `prefiles` key, which should be a list of files to
 copy. We recommend using the `copy` function to construct this list.
 
-```
+```gold
 import "grevling" as { copy }
 
 {
@@ -74,7 +74,7 @@ The name of the file in the working directory will be identical to its name in
 the source directory, but the name (and location) can be changed with an
 optional second argument:
 
-```
+```gold
 import "grevling" as { copy }
 
 {
@@ -87,7 +87,7 @@ import "grevling" as { copy }
 Grevling also supports *globbing*: copying multiple files at once. For this, use
 the `glob` function.
 
-```
+```gold
 import "grevling" as { glob }
 
 {
@@ -102,7 +102,7 @@ subdirectory in the working directory. Beware that all files will retain their
 original relative path to the target. In the following example, the files will
 end up in `images/subpath/...`.
 
-```
+```gold
 import "grevling" as { glob }
 
 {
@@ -117,7 +117,7 @@ parameters. For this, Grevling uses template substitution with the
 [Mako](https://www.makotemplates.org/) library. To enable template substitution,
 set the optional `template` keyword argument to `true`.
 
-```
+```gold
 import "grevling" as { copy }
 
 {
@@ -141,7 +141,7 @@ TODO: Glob
 The `script` key indicates how to run a job after it has been prepared. It is a
 list of commands. We recommend using the `cmd` function to construct this list.
 
-```
+```gold
 import "grevling" as { cmd }
 
 {
@@ -160,7 +160,7 @@ element being the command to run, the subsequent elements being the arguments).
 This option is more foolproof against accidental shell quoting trouble, and is
 generally recommended - although somewhat more verbose.
 
-```
+```gold
 import "grevling" as { cmd }
 
 {
@@ -173,7 +173,7 @@ import "grevling" as { cmd }
 
 The `cmd` function takes many optional parameters:
 
-```
+```gold
 cmd(
     command;
     name = null,
@@ -224,7 +224,7 @@ after the job instance is finished. If you want to keep those files, e.g. to
 check whether template substitution was successful, those files must be copied
 explicitly in `postfiles` as well.
 
-```
+```gold
 import "grevling" as { copy }
 
 {
@@ -246,7 +246,7 @@ input and return the necessary values.
 
 For example, assume we have an `adaptive` parameter as such:
 
-```
+```gold
 {
     parameters: {
         adaptive: [true, false],
@@ -262,7 +262,7 @@ and thus template substitution will not work.
 
 Instead we could make `prefiles` a function that determines what file to use:
 
-```
+```gold
 import "grevling" as { copy }
 
 {
@@ -292,7 +292,7 @@ All of the `prefiles`, `postfiles` and `script` keys support this mechanism. It
 can be used, for example, to allow command-line arguments to some commands to be
 parameter-dependent:
 
-```
+```gold
 import "grevling" as { cmd }
 
 {
@@ -308,7 +308,7 @@ import "grevling" as { cmd }
 or perhaps this, making use of Gold's
 [advanced collection features](https://thebb.github.io/Gold/whirlwind/#advanced-collections).
 
-```
+```gold
 import "grevling" as { cmd }
 
 {
@@ -334,7 +334,7 @@ evaluation context TODO.
 
 Consider for example:
 
-```
+```gold
 {
     parameters: {
         degree: [1, 2, 3, 4, 5, 6],
@@ -347,7 +347,7 @@ Consider for example:
 In certain numerical simulations, a relevant quantity of interest might be the
 number of nodes in a mesh, which is
 
-```
+```gold
     ((1 / meshsize) + degree) ^ dimension
 ```
 
@@ -360,7 +360,7 @@ This formula can of course be replicated everywhere it might be needed:
 but it is tedious and error-prone to do so. Nor is it really a solution to
 parametrize the problem in terms of this quantity. To solve this, we can write:
 
-```
+```gold
 {
     parameters: {
         degree: [1, 2, 3, 4, 5, 6],
@@ -376,7 +376,7 @@ parametrize the problem in terms of this quantity. To solve this, we can write:
 Now, `numnodes` will be available in all those contexts mentioned earlier on the
 same level as the parameters. For instance, you could write:
 
-```
+```gold
 import "grevling" as { copy }
 
 {

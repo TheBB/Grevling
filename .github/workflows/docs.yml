@@ -20,9 +20,9 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install Zensical and Mike
+      - name: Install Zensical, Mike, and Gold lexer
         run: |
-          pip install zensical git+https://github.com/squidfunk/mike
+          pip install zensical git+https://github.com/squidfunk/mike ./docs/lexer
 
       - name: Configure Git
         run: |

@@ -1,6 +1,6 @@
 __pycache__
 build/
-/*.egg-info
+*.egg-info
 .grevlingdata
 .vscode/settings.json
 .hypothesis
