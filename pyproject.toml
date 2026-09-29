@@ -4,7 +4,7 @@ authors = [
 ]
 requires-python = ">=3.12,<4.0"
 dependencies = [
-    "asteval<1.0.0,>=0.9.31",
+    "asteval<2.0.0,>=0.9.31",
     "bidict<1.0.0,>=0.22.1",
     "click<9.0.0,>=8.1.7",
     "fasteners<1.0,>=0.19",
@@ -12,13 +12,14 @@ dependencies = [
     "Mako<2.0.0,>=1.2.2",
     # numpy and pandas lower bounds track SPEC 0 (https://scientific-python.org/specs/spec-0000/)
     "numpy<3.0,>=2.2",
-    "pandas<3.0,>=2.3",
+    "pandas<4.0,>=2.3",
     # pyarrow >=22 is the first release shipping cp314 wheels
     "pyarrow<26.0.0,>=22.0.0",
-    "pydantic<3,>=2",
+    # pydantic >=2.12 is the first release whose pydantic-core ships cp314 wheels
+    "pydantic<3,>=2.12",
     # PyYAML >=6.0.3 is the first release shipping cp314 wheels
     "PyYAML<7.0.0,>=6.0.3",
-    "rich<14.0.0,>=13.6.0",
+    "rich<16.0.0,>=13.6.0",
     "sqlalchemy<3.0.0,>=2.0.23",
     "alembic<2.0.0,>=1.12.1",
 ]
@@ -37,7 +38,7 @@ matplotlib = [
     "matplotlib<4.0,>=3.10",
 ]
 plotly = [
-    "plotly<6.0.0,>=5.18.0",
+    "plotly<8.0.0,>=5.18.0",
 ]
 
 [build-system]
@@ -49,12 +50,12 @@ packages = ["grevling"]
 
 [dependency-groups]
 dev = [
-    "pytest<9.0.0,>=8.3.4",
+    "pytest<10.0.0,>=8.3.4",
     "ruff<1.0.0,>=0.1.5",
     "pyrefly<2.0.0,>=1.2.0",
     "types-pyyaml<7.0.0.0,>=6.0.12.12",
-    "pandas-stubs<3.0.0.0,>=2.1.1.230928",
-    "plotly<6.0.0,>=5.18.0",
+    "pandas-stubs<4.0.0.0,>=2.1.1.230928",
+    "plotly<8.0.0,>=5.18.0",
     "matplotlib<4.0,>=3.10",
 ]
 
