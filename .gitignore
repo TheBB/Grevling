@@ -9,5 +9,4 @@ build/
 /.venv
 /dist
 /.pdm-python
-/.docs-venv
 /.cache

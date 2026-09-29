@@ -48,14 +48,10 @@ build:
 # Documentation targets
 
 .PHONY: docs-serve
-docs-serve: .docs-venv
+docs-serve:
 	rm -rf .cache
-	.docs-venv/bin/zensical serve
+	uv run zensical serve
 
 .PHONY: docs-clean
 docs-clean:
-	rm -rf .docs-venv .cache site
-
-.docs-venv:
-	uv venv .docs-venv
-	uv pip install --python .docs-venv/bin/python zensical -e ./docs/lexer
+	rm -rf .cache site

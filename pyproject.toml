@@ -57,7 +57,15 @@ dev = [
     "pandas-stubs<4.0.0.0,>=2.1.1.230928",
     "plotly<8.0.0,>=5.18.0",
     "matplotlib<4.0,>=3.10",
+    "zensical>=0.0.66",
+    "mike",
+    "gold-lexer",
 ]
+
+[tool.uv.sources]
+# Zensical needs squidfunk's fork of mike, which is not on PyPI
+mike = { git = "https://github.com/squidfunk/mike" }
+gold-lexer = { path = "docs/lexer", editable = true }
 
 [tool.pyrefly]
 project-includes = ["grevling/**/*.py"]
