@@ -43,3 +43,19 @@ test: pytest pyrefly lint-check
 .PHONY: build
 build:
 	uv build
+
+
+# Documentation targets
+
+.PHONY: docs-serve
+docs-serve: .docs-venv
+	rm -rf .cache
+	.docs-venv/bin/zensical serve
+
+.PHONY: docs-clean
+docs-clean:
+	rm -rf .docs-venv .cache site
+
+.docs-venv:
+	uv venv .docs-venv
+	uv pip install --python .docs-venv/bin/python zensical
