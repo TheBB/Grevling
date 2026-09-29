@@ -14,7 +14,14 @@ jobs:
     name: Debug
     runs-on: ubuntu-latest
     steps:
-      - uses: hmarr/debug-action@v3
+      - name: Dump contexts
+        env:
+          GITHUB_CONTEXT: ${{ toJSON(github) }}
+          RUNNER_CONTEXT: ${{ toJSON(runner) }}
+        run: |
+          echo "$GITHUB_CONTEXT"
+          echo "$RUNNER_CONTEXT"
+          env | sort
 
   test:
     name: Test
@@ -24,9 +31,9 @@ jobs:
         python-version: ['3.12', '3.13', '3.14']
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
@@ -43,9 +50,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Install dependencies
@@ -54,11 +61,11 @@ jobs:
           python -m pip install uv
       - name: Build
         run: make build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sdist
           path: ./dist/*.tar.gz
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheel
           path: ./dist/*.whl
@@ -69,11 +76,11 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
-      - uses: pypa/gh-action-pypi-publish@v1.4.1
+      - uses: pypa/gh-action-pypi-publish@v1.14.2
         with:
           user: __token__
           password: ${{ secrets.pypi_pwd }}
@@ -84,13 +91,13 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
-      - uses: pypa/gh-action-pypi-publish@v1.4.1
+      - uses: pypa/gh-action-pypi-publish@v1.14.2
         with:
           user: __token__
           password: ${{ secrets.pypi_test_pwd }}
-          repository_url: https://test.pypi.org/legacy/
-          skip_existing: true
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
